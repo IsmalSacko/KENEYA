@@ -1,5 +1,11 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+
+# Some third-party CMake files (e.g. Firebase C++ SDK) still declare an old
+# cmake_minimum_required. Raise the global policy compatibility floor to 3.10
+# to avoid deprecation warnings with recent CMake versions.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+
 project(keneya_plus LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
@@ -65,9 +71,9 @@ include(flutter/generated_plugins.cmake)
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
-endif()
+# Always install next to the built executable inside the project build folder.
+# This prevents CMake from using a stale/global prefix like Program Files.
+set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 
 import '../core/storage/token_storage.dart';
 import '../models/user_model.dart';
@@ -29,10 +30,7 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login({
-    required String telephone,
-    required String pin,
-  }) async {
+  Future<bool> login({required String telephone, required String pin}) async {
     loading = true;
     error = null;
     notifyListeners();
@@ -56,8 +54,62 @@ class AuthController extends ChangeNotifier {
 
       error = 'Token invalide.';
       return false;
+    } on DioException catch (e) {
+      error =
+          _extractApiMessage(e) ??
+          'Echec de connexion. Verifie telephone et PIN.';
+      return false;
     } catch (_) {
       error = 'Echec de connexion. Verifie telephone et PIN.';
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> register({
+    required String nomEtablissement,
+    required String type,
+    required String name,
+    required String telephone,
+    required String pin,
+  }) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final data = await _authService.register(
+        nomEtablissement: nomEtablissement,
+        type: type,
+        name: name,
+        telephone: telephone,
+        pin: pin,
+      );
+
+      accessToken = (data['access_token'] ?? '').toString();
+      final userJson = data['user'];
+      if (userJson is Map<String, dynamic>) {
+        currentUser = UserModel.fromJson(userJson);
+      } else if (userJson is Map) {
+        currentUser = UserModel.fromJson(Map<String, dynamic>.from(userJson));
+      } else {
+        currentUser = null;
+      }
+
+      if (accessToken != null && accessToken!.isNotEmpty) {
+        await TokenStorage.saveToken(accessToken!);
+        return true;
+      }
+
+      error = 'Token invalide apres inscription.';
+      return false;
+    } on DioException catch (e) {
+      error = _extractApiMessage(e) ?? 'Echec de l\'inscription.';
+      return false;
+    } catch (_) {
+      error = 'Echec de l\'inscription.';
       return false;
     } finally {
       loading = false;
@@ -80,5 +132,13 @@ class AuthController extends ChangeNotifier {
       loading = false;
       notifyListeners();
     }
+  }
+
+  String? _extractApiMessage(DioException e) {
+    final data = e.response?.data;
+    if (data is Map && data['message'] != null) {
+      return data['message'].toString();
+    }
+    return null;
   }
 }
