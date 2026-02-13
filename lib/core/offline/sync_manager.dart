@@ -5,6 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
+import '../storage/token_storage.dart';
+import 'local_store.dart';
 import 'sync_queue.dart';
 
 class SyncManager {
@@ -14,6 +16,7 @@ class SyncManager {
 
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
   StreamSubscription<List<ConnectivityResult>>? _subscription;
+  Timer? _timer;
   bool _syncing = false;
 
   Future<void> init() async {
@@ -25,6 +28,10 @@ class SyncManager {
         unawaited(syncNow());
       }
     });
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 25), (_) {
+      unawaited(syncNow());
+    });
 
     final initial = await Connectivity().checkConnectivity();
     final online = initial.any((r) => r != ConnectivityResult.none);
@@ -35,6 +42,7 @@ class SyncManager {
 
   Future<void> dispose() async {
     await _subscription?.cancel();
+    _timer?.cancel();
   }
 
   Future<void> syncNow() async {
@@ -47,6 +55,15 @@ class SyncManager {
         _updatePendingCount();
         return;
       }
+      queue.sort((a, b) {
+        final aPath = (a['path'] ?? '').toString();
+        final bPath = (b['path'] ?? '').toString();
+        if (aPath == '/register' && bPath != '/register') return -1;
+        if (bPath == '/register' && aPath != '/register') return 1;
+        final aAt = (a['createdAt'] ?? '').toString();
+        final bAt = (b['createdAt'] ?? '').toString();
+        return aAt.compareTo(bAt);
+      });
 
       final kept = <Map<String, dynamic>>[];
 
@@ -59,11 +76,12 @@ class SyncManager {
         if (path.isEmpty) continue;
 
         try {
-          await ApiClient.dio.request<dynamic>(
+          final response = await ApiClient.dio.request<dynamic>(
             path,
             data: payload,
             options: Options(method: method),
           );
+          await _onSyncedSuccess(path: path, response: response);
         } on DioException catch (e) {
           // Keep queued when still offline, otherwise retry later up to limit.
           final networkIssue = ApiClient.isNetworkError(e);
@@ -90,5 +108,20 @@ class SyncManager {
 
   void _updatePendingCount() {
     pendingCount.value = SyncQueue.getAll().length;
+  }
+
+  Future<void> _onSyncedSuccess({
+    required String path,
+    required Response<dynamic> response,
+  }) async {
+    if (path != '/register') return;
+
+    final data = response.data;
+    if (data is! Map) return;
+    final token = (data['access_token'] ?? '').toString();
+    if (token.isEmpty) return;
+
+    await TokenStorage.saveToken(token);
+    await LocalStore.remove('offline_provisional_profile');
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 import '../constants/api_constants.dart';
@@ -29,6 +31,7 @@ class ApiClient {
     return e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout ||
-        e.type == DioExceptionType.sendTimeout;
+        e.type == DioExceptionType.sendTimeout ||
+        (e.type == DioExceptionType.unknown && e.error is SocketException);
   }
 }

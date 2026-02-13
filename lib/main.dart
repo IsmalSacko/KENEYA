@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'common/utils/kcolors.dart';
+import 'common/utils/app_theme.dart';
 import 'core/offline/local_store.dart';
 import 'core/offline/sync_manager.dart';
 import 'controllers/auth_controller.dart';
@@ -12,7 +12,6 @@ import 'controllers/medicament_controller.dart';
 import 'controllers/patient_controller.dart';
 import 'controllers/user_controller.dart';
 import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/auth_gateway_screen.dart';
 import 'screens/onboarding_screen.dart';
 
@@ -28,72 +27,33 @@ class KeneyaPlusApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(390, 844),
-      minTextAdapt: true,
-      splitScreenMode: true,
-      builder: (context, child) {
-        return MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AuthController>(
-              create: (_) => AuthController(),
-            ),
-            ChangeNotifierProvider<PatientController>(
-              create: (_) => PatientController(),
-            ),
-            ChangeNotifierProvider<MedicamentController>(
-              create: (_) => MedicamentController(),
-            ),
-            ChangeNotifierProvider<EtablissementController>(
-              create: (_) => EtablissementController(),
-            ),
-            ChangeNotifierProvider<UserController>(
-              create: (_) => UserController(),
-            ),
-          ],
-          child: MaterialApp(
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthController>(create: (_) => AuthController()),
+        ChangeNotifierProvider<PatientController>(
+          create: (_) => PatientController(),
+        ),
+        ChangeNotifierProvider<MedicamentController>(
+          create: (_) => MedicamentController(),
+        ),
+        ChangeNotifierProvider<EtablissementController>(
+          create: (_) => EtablissementController(),
+        ),
+        ChangeNotifierProvider<UserController>(create: (_) => UserController()),
+      ],
+      child: ScreenUtilInit(
+        designSize: const Size(390, 844),
+        minTextAdapt: true,
+        splitScreenMode: true,
+        builder: (context, child) {
+          return MaterialApp(
             title: 'KENEYA+',
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(seedColor: Kolors.kPrimary),
-              useMaterial3: true,
-              scaffoldBackgroundColor: const Color(0xFFF5F8FF),
-              appBarTheme: const AppBarTheme(
-                backgroundColor: Kolors.kPrimary,
-                foregroundColor: Kolors.kWhite,
-                centerTitle: true,
-                elevation: 0,
-              ),
-              cardTheme: CardThemeData(
-                color: Colors.white,
-                elevation: 1.5,
-                shadowColor: Colors.black.withValues(alpha: 0.08),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              navigationBarTheme: NavigationBarThemeData(
-                labelTextStyle: WidgetStateProperty.all(
-                  const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                indicatorColor: Kolors.kPrimary.withValues(alpha: 0.14),
-              ),
-              inputDecorationTheme: InputDecorationTheme(
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
+            theme: AppTheme.lightTheme,
             home: const _AppEntryPoint(),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

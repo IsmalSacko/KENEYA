@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/offline/local_store.dart';
 import '../core/offline/sync_manager.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/etablissement_controller.dart';
@@ -30,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isOffline = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   int _tabIndex = 0;
+  late final VoidCallback _pendingListener;
 
   @override
   void initState() {
@@ -43,10 +45,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       if (!mounted) return;
+      final wasOffline = _isOffline;
+      final nowOffline = results.every((r) => r == ConnectivityResult.none);
       setState(() {
-        _isOffline = results.every((r) => r == ConnectivityResult.none);
+        _isOffline = nowOffline;
       });
+      if (wasOffline && !nowOffline) {
+        _refreshAll();
+      }
     });
+
+    _pendingListener = () {
+      if (!mounted) return;
+      if (SyncManager.instance.pendingCount.value == 0 && !_isOffline) {
+        _refreshAll();
+      }
+    };
+    SyncManager.instance.pendingCount.addListener(_pendingListener);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refreshAll();
@@ -56,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _connectivitySub?.cancel();
+    SyncManager.instance.pendingCount.removeListener(_pendingListener);
     super.dispose();
   }
 
@@ -101,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       _UsersTab(userCtrl: userCtrl),
       const _ModulesTab(),
-      _ProfileTab(auth: auth),
+      const _ProfileTab(),
     ];
 
     final content = Column(
@@ -123,8 +139,19 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               color: Colors.blue.withValues(alpha: 0.10),
-              child: Text(
-                '$pending operation(s) en attente de synchronisation.',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$pending operation(s) en attente de synchronisation.',
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => SyncManager.instance.syncNow(),
+                    icon: const Icon(Icons.sync),
+                    label: const Text('Synchroniser'),
+                  ),
+                ],
               ),
             );
           },
@@ -364,52 +391,172 @@ class _DashboardTab extends StatelessWidget {
   }
 }
 
-class _PatientsTab extends StatelessWidget {
+class _PatientsTab extends StatefulWidget {
   const _PatientsTab({required this.patientCtrl, required this.onRefresh});
 
   final PatientController patientCtrl;
   final Future<void> Function() onRefresh;
 
   @override
-  Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: patientCtrl.patients.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            if (patientCtrl.loading) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (patientCtrl.error != null) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(patientCtrl.error!),
-              );
-            }
-            if (patientCtrl.patients.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Aucun patient disponible.'),
-              );
-            }
-            return const SizedBox.shrink();
-          }
+  State<_PatientsTab> createState() => _PatientsTabState();
+}
 
-          final p = patientCtrl.patients[index - 1];
-          return Card(
-            child: ListTile(
-              title: Text(p.nom),
-              subtitle: Text('${p.telephone ?? '-'}\n${p.adresse ?? '-'}'),
-              isThreeLine: true,
-            ),
-          );
-        },
+class _PatientsTabState extends State<_PatientsTab> {
+  final _formKey = GlobalKey<FormState>();
+  final _nomCtrl = TextEditingController();
+  final _telCtrl = TextEditingController();
+  final _adresseCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nomCtrl.dispose();
+    _telCtrl.dispose();
+    _adresseCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitPatient() async {
+    if (!_formKey.currentState!.validate()) return;
+    final ok = await widget.patientCtrl.createPatient(
+      nom: _nomCtrl.text.trim(),
+      telephone: _telCtrl.text.trim().isEmpty ? null : _telCtrl.text.trim(),
+      adresse: _adresseCtrl.text.trim().isEmpty
+          ? null
+          : _adresseCtrl.text.trim(),
+    );
+    if (!mounted) return;
+    if (ok) {
+      _nomCtrl.clear();
+      _telCtrl.clear();
+      _adresseCtrl.clear();
+      final text = widget.patientCtrl.lastActionQueued
+          ? 'Hors connexion: patient en attente de synchronisation.'
+          : 'Patient ajoute.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(widget.patientCtrl.error ?? 'Echec creation patient.'),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final patientCtrl = widget.patientCtrl;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 1000;
+
+    final formCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _nomCtrl,
+                decoration: const InputDecoration(labelText: 'Nom du patient'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Champ obligatoire'
+                    : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _telCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Telephone (optionnel)',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _adresseCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Adresse (optionnel)',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: patientCtrl.loading ? null : _submitPatient,
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: const Text('Ajouter patient'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final listCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: RefreshIndicator(
+          onRefresh: widget.onRefresh,
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: patientCtrl.patients.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                if (patientCtrl.loading && patientCtrl.patients.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (patientCtrl.error != null) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(patientCtrl.error!),
+                  );
+                }
+                if (patientCtrl.patients.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Aucun patient disponible.'),
+                  );
+                }
+                return const SizedBox.shrink();
+              }
+
+              final p = patientCtrl.patients[index - 1];
+              return ListTile(
+                title: Text(p.nom),
+                subtitle: Text('${p.telephone ?? '-'}\n${p.adresse ?? '-'}'),
+                isThreeLine: true,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    if (!isDesktop) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [formCard, const SizedBox(height: 12), listCard],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+            children: [formCard],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(8, 16, 16, 16),
+            children: [listCard],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -454,9 +601,12 @@ class _UsersTabState extends State<_UsersTab> {
       _nameCtrl.clear();
       _phoneCtrl.clear();
       _pinCtrl.clear();
+      final message = widget.userCtrl.lastActionQueued
+          ? 'Hors connexion: utilisateur en file d\'attente de synchronisation.'
+          : 'Utilisateur ajoute.';
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Utilisateur ajoute.')));
+      ).showSnackBar(SnackBar(content: Text(message)));
       return;
     }
 
@@ -536,6 +686,17 @@ class _UsersTabState extends State<_UsersTab> {
                   child: const Text('Ajouter utilisateur'),
                 ),
               ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: widget.userCtrl.loading
+                      ? null
+                      : () => widget.userCtrl.fetchUsers(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Rafraichir la liste'),
+                ),
+              ),
             ],
           ),
         ),
@@ -590,35 +751,324 @@ class _UsersTabState extends State<_UsersTab> {
   }
 }
 
-class _ProfileTab extends StatelessWidget {
-  const _ProfileTab({required this.auth});
+class _ProfileTab extends StatefulWidget {
+  const _ProfileTab();
 
-  final AuthController auth;
+  @override
+  State<_ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<_ProfileTab> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _pinCtrl = TextEditingController();
+
+  bool _stockAlerts = true;
+  bool _syncAlerts = true;
+  bool _soundNotif = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = context.read<AuthController>();
+    _nameCtrl.text = auth.currentUser?.name ?? '';
+    _phoneCtrl.text = auth.currentUser?.telephone ?? '';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthController>().refreshCurrentUser().then((_) {
+        if (!mounted) return;
+        final updated = context.read<AuthController>();
+        _nameCtrl.text = updated.currentUser?.name ?? _nameCtrl.text;
+        _phoneCtrl.text = updated.currentUser?.telephone ?? _phoneCtrl.text;
+      });
+    });
+    _loadSettings();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final auth = context.read<AuthController>();
+    _nameCtrl.text = auth.currentUser?.name ?? '';
+    _phoneCtrl.text = auth.currentUser?.telephone ?? '';
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _pinCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSettings() async {
+    final stock = LocalStore.read<bool>('settings_stock_alerts');
+    final sync = LocalStore.read<bool>('settings_sync_alerts');
+    final sound = LocalStore.read<bool>('settings_sound_notif');
+    if (!mounted) return;
+    setState(() {
+      _stockAlerts = stock ?? true;
+      _syncAlerts = sync ?? true;
+      _soundNotif = sound ?? false;
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    await LocalStore.write('settings_stock_alerts', _stockAlerts);
+    await LocalStore.write('settings_sync_alerts', _syncAlerts);
+    await LocalStore.write('settings_sound_notif', _soundNotif);
+  }
+
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+    final auth = context.read<AuthController>();
+    final ok = await auth.updateProfile(
+      name: _nameCtrl.text.trim(),
+      telephone: _phoneCtrl.text.trim(),
+      pin: _pinCtrl.text.trim().isEmpty ? null : _pinCtrl.text.trim(),
+    );
+    if (!mounted) return;
+    if (ok) {
+      _pinCtrl.clear();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profil mis a jour.')));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(auth.error ?? 'Echec de mise a jour du profil.')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final auth = context.watch<AuthController>();
+    final user = auth.currentUser;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 1000;
+
+    final profileInfoCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text('Nom: ${auth.currentUser?.name ?? '-'}'),
-                const SizedBox(height: 6),
-                Text('Telephone: ${auth.currentUser?.telephone ?? '-'}'),
-                const SizedBox(height: 6),
-                Text('Role: ${auth.currentUser?.role ?? '-'}'),
-                const SizedBox(height: 14),
-                ElevatedButton.icon(
-                  onPressed: auth.loading ? null : () => auth.logout(),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Se deconnecter'),
+                const CircleAvatar(
+                  radius: 26,
+                  child: Icon(Icons.person, size: 28),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user?.name ?? '-',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(user?.telephone ?? '-'),
+                    ],
+                  ),
+                ),
+                Chip(
+                  label: Text(user?.role ?? '-'),
+                  avatar: const Icon(Icons.verified_user_outlined, size: 18),
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                Chip(
+                  label: Text(
+                    auth.offlineProvisionalSession
+                        ? 'Session locale'
+                        : 'Session active',
+                  ),
+                  avatar: Icon(
+                    auth.offlineProvisionalSession
+                        ? Icons.cloud_off_outlined
+                        : Icons.cloud_done_outlined,
+                    size: 18,
+                  ),
+                ),
+                Chip(
+                  label: Text(
+                    user?.actif == true ? 'Compte actif' : 'Compte inactif',
+                  ),
+                  avatar: Icon(
+                    user?.actif == true
+                        ? Icons.check_circle_outline
+                        : Icons.block_outlined,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final editCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Modifier mon profil',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nameCtrl,
+                decoration: const InputDecoration(labelText: 'Nom complet'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Champ obligatoire'
+                    : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Telephone'),
+                validator: (v) {
+                  final t = v?.trim() ?? '';
+                  if (t.length < 8 || t.length > 20) {
+                    return 'Telephone invalide (8 a 20 caracteres)';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _pinCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Nouveau PIN (optionnel)',
+                ),
+                validator: (v) {
+                  final t = v?.trim() ?? '';
+                  if (t.isEmpty) return null;
+                  if (t.length < 4 || t.length > 6) {
+                    return 'PIN invalide (4 a 6 caracteres)';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: auth.loading ? null : _saveProfile,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Enregistrer'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: auth.loading ? null : () => auth.logout(),
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Se deconnecter'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final settingsCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Alertes et notifications',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _stockAlerts,
+              onChanged: (v) async {
+                setState(() => _stockAlerts = v);
+                await _saveSettings();
+              },
+              title: const Text('Alertes stock faible'),
+              subtitle: const Text('Afficher les alertes de seuil de stock.'),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _syncAlerts,
+              onChanged: (v) async {
+                setState(() => _syncAlerts = v);
+                await _saveSettings();
+              },
+              title: const Text('Alertes synchronisation'),
+              subtitle: const Text(
+                'Notifier les echecs et reprises de synchro.',
+              ),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _soundNotif,
+              onChanged: (v) async {
+                setState(() => _soundNotif = v);
+                await _saveSettings();
+              },
+              title: const Text('Son des notifications'),
+              subtitle: const Text(
+                'Activer un son lors des notifications locales.',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!isDesktop) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          profileInfoCard,
+          const SizedBox(height: 12),
+          editCard,
+          const SizedBox(height: 12),
+          settingsCard,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+            children: [
+              profileInfoCard,
+              const SizedBox(height: 12),
+              settingsCard,
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(8, 16, 16, 16),
+            children: [editCard],
           ),
         ),
       ],

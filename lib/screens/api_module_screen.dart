@@ -1,9 +1,14 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../core/api/api_client.dart';
+import '../core/offline/local_store.dart';
+import '../core/offline/sync_manager.dart';
+import '../core/offline/sync_queue.dart';
 
 enum ModuleFieldType { text, number, decimal, select, date, boolean, relation }
 
@@ -71,6 +76,7 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
   bool _loading = false;
   String? _error;
   List<Map<String, dynamic>> _items = [];
+  String get _cacheKey => 'cache_module_${widget.endpoint}';
 
   @override
   void initState() {
@@ -87,9 +93,24 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
       final response = await ApiClient.dio.get(widget.endpoint);
       final data = response.data;
       final parsed = _parseList(data);
+      await LocalStore.write(_cacheKey, parsed);
       setState(() => _items = parsed);
     } on DioException catch (e) {
-      setState(() => _error = _extractMessage(e));
+      if (ApiClient.isNetworkError(e)) {
+        final cached = LocalStore.read<List<dynamic>>(_cacheKey) ?? <dynamic>[];
+        final parsed = cached
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        setState(() {
+          _items = parsed;
+          _error = parsed.isEmpty
+              ? 'Hors connexion. Aucune donnee locale disponible.'
+              : null;
+        });
+      } else {
+        setState(() => _error = _extractMessage(e));
+      }
     } catch (_) {
       setState(() => _error = 'Erreur de chargement.');
     } finally {
@@ -124,8 +145,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
 
   String _extractMessage(DioException e) {
     final body = e.response?.data;
-    if (body is Map && body['message'] != null)
+    if (body is Map && body['message'] != null) {
       return body['message'].toString();
+    }
     return e.message ?? 'Erreur API';
   }
 
@@ -145,6 +167,28 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
       ).showSnackBar(const SnackBar(content: Text('Creation reussie.')));
       await _load();
     } on DioException catch (e) {
+      if (ApiClient.isNetworkError(e)) {
+        await SyncQueue.enqueue(
+          method: 'POST',
+          path: widget.endpoint,
+          payload: normalizedPayload,
+          cacheInvalidateKey: _cacheKey,
+        );
+        final optimistic = Map<String, dynamic>.from(normalizedPayload);
+        optimistic['id'] = -DateTime.now().millisecondsSinceEpoch;
+        setState(() => _items = [optimistic, ..._items]);
+        await LocalStore.write(_cacheKey, _items);
+        await SyncManager.instance.syncNow();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hors connexion: creation en file d\'attente. Synchronisation automatique.',
+            ),
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -175,6 +219,32 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
       ).showSnackBar(const SnackBar(content: Text('Mise a jour reussie.')));
       await _load();
     } on DioException catch (e) {
+      if (ApiClient.isNetworkError(e)) {
+        await SyncQueue.enqueue(
+          method: 'PATCH',
+          path: '${widget.endpoint}/$id',
+          payload: normalizedPayload,
+          cacheInvalidateKey: _cacheKey,
+        );
+        final next = _items.map((row) {
+          if (row['id'].toString() != id.toString()) return row;
+          final updated = Map<String, dynamic>.from(row);
+          updated.addAll(normalizedPayload);
+          return updated;
+        }).toList();
+        setState(() => _items = next);
+        await LocalStore.write(_cacheKey, next);
+        await SyncManager.instance.syncNow();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hors connexion: modification en file d\'attente. Synchronisation automatique.',
+            ),
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -212,6 +282,28 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
       ).showSnackBar(const SnackBar(content: Text('Suppression reussie.')));
       await _load();
     } on DioException catch (e) {
+      if (ApiClient.isNetworkError(e)) {
+        await SyncQueue.enqueue(
+          method: 'DELETE',
+          path: '${widget.endpoint}/$id',
+          cacheInvalidateKey: _cacheKey,
+        );
+        final next = _items
+            .where((row) => row['id'].toString() != id.toString())
+            .toList();
+        setState(() => _items = next);
+        await LocalStore.write(_cacheKey, next);
+        await SyncManager.instance.syncNow();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hors connexion: suppression en file d\'attente. Synchronisation automatique.',
+            ),
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -271,6 +363,7 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
       }
     }
 
+    if (!context.mounted) return null;
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -315,20 +408,26 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
                     case ModuleFieldType.text:
                     case ModuleFieldType.date:
                       final v = textControllers[f.key]!.text.trim();
-                      if (v.isNotEmpty) payload[f.key] = v;
+                      if (v.isNotEmpty) {
+                        payload[f.key] = v;
+                      }
                     case ModuleFieldType.number:
                       final v = textControllers[f.key]!.text.trim();
-                      if (v.isNotEmpty) payload[f.key] = int.tryParse(v) ?? v;
+                      if (v.isNotEmpty) {
+                        payload[f.key] = int.tryParse(v) ?? v;
+                      }
                     case ModuleFieldType.decimal:
                       final v = textControllers[f.key]!.text.trim();
-                      if (v.isNotEmpty)
+                      if (v.isNotEmpty) {
                         payload[f.key] = double.tryParse(v) ?? v;
+                      }
                     case ModuleFieldType.select:
                     case ModuleFieldType.boolean:
                     case ModuleFieldType.relation:
                       final v = values[f.key];
-                      if (v != null && v.toString().isNotEmpty)
+                      if (v != null && v.toString().isNotEmpty) {
                         payload[f.key] = v;
+                      }
                   }
                 }
                 Navigator.of(context).pop(payload);
@@ -400,9 +499,12 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(labelText: field.label),
           validator: (v) {
-            if (!field.required && (v == null || v.trim().isEmpty)) return null;
-            if (v == null || int.tryParse(v.trim()) == null)
+            if (!field.required && (v == null || v.trim().isEmpty)) {
+              return null;
+            }
+            if (v == null || int.tryParse(v.trim()) == null) {
               return 'Nombre entier attendu';
+            }
             return null;
           },
         );
@@ -412,9 +514,12 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(labelText: field.label),
           validator: (v) {
-            if (!field.required && (v == null || v.trim().isEmpty)) return null;
-            if (v == null || double.tryParse(v.trim()) == null)
+            if (!field.required && (v == null || v.trim().isEmpty)) {
+              return null;
+            }
+            if (v == null || double.tryParse(v.trim()) == null) {
               return 'Nombre decimal attendu';
+            }
             return null;
           },
         );
@@ -459,6 +564,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
               .toList(),
           onChanged: (v) => setModalState(() => values[field.key] = v),
           validator: (v) {
+            if (field.required && opts.isEmpty) {
+              return 'Aucune option disponible pour ce champ.';
+            }
             if (!field.required) return null;
             return v == null ? 'Champ obligatoire' : null;
           },
@@ -496,6 +604,7 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
       ),
       floatingActionButton: widget.allowCreate
           ? FloatingActionButton.extended(
+              heroTag: null,
               onPressed: _create,
               icon: const Icon(Icons.add),
               label: const Text('Ajouter'),
@@ -506,40 +615,84 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
 
   Widget _buildDesktopTable() {
     final columns = _collectColumns();
-    return SingleChildScrollView(
-      key: const ValueKey('desktop-table'),
-      padding: const EdgeInsets.all(12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: [
-            for (final c in columns) DataColumn(label: Text(c)),
-            const DataColumn(label: Text('Actions')),
-          ],
-          rows: _items.map((item) {
-            return DataRow(
-              cells: [
-                for (final c in columns) DataCell(Text(_cellValue(item[c]))),
-                DataCell(
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      if (widget.allowUpdate)
-                        OutlinedButton(
-                          onPressed: () => _update(item),
-                          child: const Text('Modifier'),
-                        ),
-                      if (widget.allowDelete)
-                        OutlinedButton(
-                          onPressed: () => _delete(item),
-                          child: const Text('Supprimer'),
-                        ),
-                    ],
-                  ),
-                ),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1600),
+        child: Card(
+          margin: const EdgeInsets.all(12),
+          child: SingleChildScrollView(
+            key: const ValueKey('desktop-table'),
+            padding: const EdgeInsets.all(12),
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 28,
+              dataRowMinHeight: 58,
+              dataRowMaxHeight: 66,
+              columns: [
+                for (final c in columns) DataColumn(label: Text(c)),
+                const DataColumn(label: Text('Actions')),
               ],
-            );
-          }).toList(),
+              rows: _items.map((item) {
+                return DataRow(
+                  cells: [
+                    for (final c in columns)
+                      DataCell(Text(_cellValue(item[c]))),
+                    DataCell(
+                      PopupMenuButton<String>(
+                        tooltip: 'Actions',
+                        onSelected: (value) {
+                          if (value == 'update') _update(item);
+                          if (value == 'delete') _delete(item);
+                        },
+                        itemBuilder: (context) => [
+                          if (widget.allowUpdate)
+                            const PopupMenuItem<String>(
+                              value: 'update',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_outlined, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Modifier'),
+                                ],
+                              ),
+                            ),
+                          if (widget.allowDelete)
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Supprimer'),
+                                ],
+                              ),
+                            ),
+                        ],
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.more_horiz, size: 18),
+                              SizedBox(width: 6),
+                              Text('Actions'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
         ),
       ),
     );

@@ -19,4 +19,8 @@ class LocalStore {
   static Future<void> write(String key, dynamic value) async {
     await _box.write(key, value);
   }
+
+  static Future<void> remove(String key) async {
+    await _box.remove(key);
+  }
 }

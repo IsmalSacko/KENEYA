@@ -8,6 +8,7 @@ class UserController extends ChangeNotifier {
 
   bool loading = false;
   String? error;
+  bool lastActionQueued = false;
   List<UserModel> users = [];
 
   Future<void> fetchUsers() async {
@@ -19,9 +20,8 @@ class UserController extends ChangeNotifier {
       final data = await _service.getUsersInMyEtablissements();
       users = data
           .map(
-            (item) => UserModel.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ),
+            (item) =>
+                UserModel.fromJson(Map<String, dynamic>.from(item as Map)),
           )
           .toList();
     } catch (_) {
@@ -40,16 +40,47 @@ class UserController extends ChangeNotifier {
   }) async {
     loading = true;
     error = null;
+    lastActionQueued = false;
     notifyListeners();
 
     try {
-      await _service.addUser(
+      final result = await _service.addUser(
         name: name,
         telephone: telephone,
         role: role,
         pin: pin,
       );
-      await fetchUsers();
+      final queued = result['queued'] == true;
+      lastActionQueued = queued;
+
+      if (queued) {
+        users = [
+          UserModel(
+            id: -DateTime.now().millisecondsSinceEpoch,
+            etablissementId: null,
+            name: name,
+            telephone: telephone,
+            role: role,
+            actif: true,
+          ),
+          ...users,
+        ];
+        loading = false;
+        notifyListeners();
+      } else {
+        final createdRaw = result['user'];
+        if (createdRaw is Map) {
+          final created = UserModel.fromJson(
+            Map<String, dynamic>.from(createdRaw),
+          );
+          final exists = users.any((u) => u.id == created.id);
+          if (!exists) {
+            users = [created, ...users];
+            notifyListeners();
+          }
+        }
+        await fetchUsers();
+      }
       return true;
     } catch (_) {
       error = 'Echec de creation utilisateur.';

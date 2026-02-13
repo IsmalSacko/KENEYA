@@ -45,10 +45,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!mounted) return;
     if (ok) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Inscription reussie.')));
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      if (auth.lastRegisterQueued) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hors connexion: inscription en attente de synchronisation. '
+              'Mode local active, synchronisation automatique au retour d\'Internet.',
+            ),
+          ),
+        );
+        Navigator.of(context).maybePop();
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Inscription reussie.')));
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
       return;
     }
 
