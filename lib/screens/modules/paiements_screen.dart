@@ -3,46 +3,76 @@ import 'package:flutter/material.dart';
 import '../api_module_screen.dart';
 
 class PaiementsScreen extends StatelessWidget {
-  const PaiementsScreen({super.key});
+  const PaiementsScreen({
+    super.key,
+    this.hasCabinet = true,
+    this.hasPharmacie = true,
+    this.allowCreate = true,
+    this.allowUpdate = true,
+    this.allowDelete = true,
+  });
+
+  final bool hasCabinet;
+  final bool hasPharmacie;
+  final bool allowCreate;
+  final bool allowUpdate;
+  final bool allowDelete;
 
   @override
   Widget build(BuildContext context) {
-    return const ApiModuleScreen(
+    final sourceOptions = [
+      if (hasCabinet) 'consultation',
+      if (hasPharmacie) 'vente_pharmacie',
+    ];
+
+    return ApiModuleScreen(
       title: 'Paiements',
       endpoint: '/paiements',
+      allowCreate: allowCreate,
+      allowUpdate: allowUpdate,
+      allowDelete: allowDelete,
       fields: [
         ModuleField(
           key: 'source_type',
-          label: 'Source type',
+          label: 'Type de paiement',
           type: ModuleFieldType.select,
           required: true,
-          options: ['consultation', 'vente_pharmacie'],
+          options: sourceOptions,
+          optionLabels: const {
+            'consultation': 'Consultation',
+            'vente_pharmacie': 'Vente pharmacie',
+          },
         ),
         ModuleField(
           key: 'consultation_id',
           label: 'Consultation',
           type: ModuleFieldType.relation,
-          required: true,
+          required: hasCabinet,
           relationEndpoint: '/consultations',
           relationLabelKey: 'motif',
+          relationSubtitleKey: 'montant',
           visibleWhenKey: 'source_type',
           visibleWhenValue: 'consultation',
+          emptyOptionsHint: 'Aucune consultation disponible pour paiement.',
         ),
         ModuleField(
           key: 'vente_pharmacie_id',
           label: 'Vente pharmacie',
           type: ModuleFieldType.relation,
-          required: true,
+          required: hasPharmacie,
           relationEndpoint: '/ventes-pharmacie',
           relationLabelKey: 'id',
+          relationSubtitleKey: 'mode_paiement',
           visibleWhenKey: 'source_type',
           visibleWhenValue: 'vente_pharmacie',
+          emptyOptionsHint: 'Aucune vente pharmacie disponible pour paiement.',
         ),
         ModuleField(
           key: 'montant',
           label: 'Montant',
           type: ModuleFieldType.decimal,
           required: true,
+          minValue: 0.01,
         ),
         ModuleField(
           key: 'mode_paiement',
@@ -50,6 +80,12 @@ class PaiementsScreen extends StatelessWidget {
           type: ModuleFieldType.select,
           required: true,
           options: ['espece', 'orange', 'wave', 'moov'],
+          optionLabels: const {
+            'espece': 'Especes',
+            'orange': 'Orange Money',
+            'wave': 'Wave',
+            'moov': 'Moov Money',
+          },
         ),
       ],
     );

@@ -3,14 +3,25 @@ import 'package:flutter/material.dart';
 import '../api_module_screen.dart';
 
 class EtablissementsScreen extends StatelessWidget {
-  const EtablissementsScreen({super.key});
+  const EtablissementsScreen({
+    super.key,
+    this.allowCreate = false,
+    this.allowUpdate = true,
+    this.allowDelete = true,
+  });
+
+  final bool allowCreate;
+  final bool allowUpdate;
+  final bool allowDelete;
 
   @override
   Widget build(BuildContext context) {
-    return const ApiModuleScreen(
+    return ApiModuleScreen(
       title: 'Etablissements',
       endpoint: '/etablissements',
-      allowCreate: false,
+      allowCreate: allowCreate,
+      allowUpdate: allowUpdate,
+      allowDelete: allowDelete,
       fields: [
         ModuleField(key: 'nom', label: 'Nom', type: ModuleFieldType.text),
         ModuleField(
@@ -18,6 +29,11 @@ class EtablissementsScreen extends StatelessWidget {
           label: 'Type',
           type: ModuleFieldType.select,
           options: ['cabinet', 'pharmacie', 'cabinet_pharmacie'],
+          optionLabels: {
+            'cabinet': 'Cabinet',
+            'pharmacie': 'Pharmacie',
+            'cabinet_pharmacie': 'Cabinet + Pharmacie',
+          },
         ),
         ModuleField(
           key: 'telephone',

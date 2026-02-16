@@ -29,7 +29,7 @@ class SyncManager {
       }
     });
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 25), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
       unawaited(syncNow());
     });
 
