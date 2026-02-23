@@ -3,13 +3,25 @@ import 'package:flutter/material.dart';
 import '../api_module_screen.dart';
 
 class JournalAuditsScreen extends StatelessWidget {
-  const JournalAuditsScreen({super.key});
+  const JournalAuditsScreen({
+    super.key,
+    this.allowCreate = false,
+    this.allowUpdate = false,
+    this.allowDelete = false,
+  });
+
+  final bool allowCreate;
+  final bool allowUpdate;
+  final bool allowDelete;
 
   @override
   Widget build(BuildContext context) {
-    return const ApiModuleScreen(
+    return ApiModuleScreen(
       title: 'Journal Audits',
       endpoint: '/journal-audits',
+      allowCreate: allowCreate,
+      allowUpdate: allowUpdate,
+      allowDelete: allowDelete,
       fields: [
         ModuleField(
           key: 'action',

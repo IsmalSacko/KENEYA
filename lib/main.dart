@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,14 +12,16 @@ import 'controllers/etablissement_controller.dart';
 import 'controllers/medicament_controller.dart';
 import 'controllers/patient_controller.dart';
 import 'controllers/user_controller.dart';
-import 'screens/home_screen.dart';
+import 'screens/home/home_screen.dart';
 import 'screens/auth_gateway_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'services/local_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalStore.init();
   await SyncManager.instance.init();
+  await LocalNotificationService.init();
   runApp(const KeneyaPlusApp());
 }
 
@@ -50,6 +53,12 @@ class KeneyaPlusApp extends StatelessWidget {
             title: 'KENEYA+',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [Locale('fr'), Locale('en')],
             home: const _AppEntryPoint(),
           );
         },
