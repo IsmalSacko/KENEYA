@@ -10,11 +10,11 @@ on:
       track:
         description: "Piste Play Store"
         required: true
-        default: "internal"
+        default: "alpha"
         type: choice
         options:
-          - internal
           - alpha
+          - internal
           - beta
           - production
 
@@ -83,11 +83,11 @@ jobs:
           bundler-cache: true
           working-directory: android
 
-      - name: Upload vers le Play Store (piste de test fermé, brouillon)
+      - name: Upload vers le Play Store (brouillon)
         working-directory: android
         env:
           PLAY_SERVICE_ACCOUNT_JSON_PATH: fastlane/play-service-account.json
-        run: bundle exec fastlane closed
+        run: bundle exec fastlane deploy track:"${{ github.event.inputs.track || 'alpha' }}"
 
       - name: Nettoyage des secrets
         if: always()
