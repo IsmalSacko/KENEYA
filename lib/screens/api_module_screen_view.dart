@@ -219,6 +219,16 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                     color: Color(0xFF2563EB),
                   ),
                   onPressed: () => _openItinerary(item),
+                )
+              else if (widget.endpoint == '/etablissements' &&
+                  widget.allowUpdate)
+                IconButton(
+                  tooltip: 'Définir la position (GPS)',
+                  icon: const Icon(
+                    Icons.add_location_alt_outlined,
+                    color: Color(0xFF4B6358),
+                  ),
+                  onPressed: () => _update(item),
                 ),
               if (widget.allowUpdate || widget.allowDelete) _actionsMenu(item),
             ],
