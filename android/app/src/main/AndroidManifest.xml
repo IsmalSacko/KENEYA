@@ -1,8 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Acces reseau (requis aussi en build release ; en debug Flutter l'ajoute seul). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="KENEYA+"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:keneya_plus/common/utils/kcolors.dart';
+import 'package:keneya_plus/common/utils/role_ui.dart';
 import 'package:keneya_plus/controllers/user_controller.dart';
 
 class UsersTab extends StatefulWidget {
@@ -152,16 +154,18 @@ class _UsersTabState extends State<UsersTab> {
             : widget.userCtrl.users.isEmpty
             ? const Text('Aucun utilisateur.')
             : Column(
-                children: widget.userCtrl.users
-                    .map(
-                      (u) => ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(u.name),
-                        subtitle: Text('${u.role} | ${u.telephone}'),
+                children: [
+                  for (final u in widget.userCtrl.users)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _UserCard(
+                        name: u.name,
+                        telephone: u.telephone,
+                        role: u.role,
+                        actif: u.actif,
                       ),
-                    )
-                    .toList(),
+                    ),
+                ],
               ),
       ),
     );
@@ -188,6 +192,113 @@ class _UsersTabState extends State<UsersTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Carte utilisateur : avatar coloré selon le rôle + puces rôle & statut.
+class _UserCard extends StatelessWidget {
+  const _UserCard({
+    required this.name,
+    required this.telephone,
+    required this.role,
+    required this.actif,
+  });
+
+  final String name;
+  final String telephone;
+  final String role;
+  final bool actif;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = RoleUi.of(role);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Kolors.kWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Kolors.kBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 44,
+            width: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: r.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(r.icon, color: r.color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                    color: Kolors.kTextHigh,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  telephone,
+                  style: const TextStyle(
+                    color: Kolors.kTextMuted,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MiniChip(text: r.label, color: r.color),
+              const SizedBox(height: 6),
+              _MiniChip(
+                text: actif ? 'Actif' : 'Inactif',
+                color: actif ? Kolors.kSuccess : Kolors.kRed,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniChip extends StatelessWidget {
+  const _MiniChip({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

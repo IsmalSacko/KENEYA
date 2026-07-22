@@ -56,7 +56,12 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> getCurrentUser() async {
-    final response = await ApiClient.dio.get('/etablissements');
-    return Map<String, dynamic>.from(response.data as Map);
+    final response = await ApiClient.dio.get('/me');
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final user = data['user'];
+    if (user is Map) {
+      return Map<String, dynamic>.from(user);
+    }
+    return data;
   }
 }

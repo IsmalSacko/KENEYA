@@ -87,56 +87,240 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
     final columns = _collectColumns();
     return ListView.builder(
       key: const ValueKey('mobile-list'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       itemCount: _items.length,
       itemBuilder: (context, index) {
         final item = _items[index];
         final isVentePharmacie = widget.endpoint == '/ventes-pharmacie';
+        final card = isVentePharmacie
+            ? _buildVentePharmacieCard(item)
+            : _buildGenericCard(context, item, columns);
         return TweenAnimationBuilder<double>(
           duration: Duration(milliseconds: 180 + (index * 20)),
           tween: Tween<double>(begin: 0, end: 1),
-          builder: (context, value, child) => Opacity(opacity: value, child: child),
-          child: isVentePharmacie
-              ? _buildVentePharmacieCard(item)
-              : Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final c in columns.take(6))
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              '${_displayLabelForKey(c)}: ${_cellValueForColumn(c, item[c], item)}',
-                            ),
-                          ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            if (widget.allowUpdate)
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _update(item),
-                                  child: const Text('Modifier'),
-                                ),
-                              ),
-                            if (widget.allowUpdate && widget.allowDelete) const SizedBox(width: 8),
-                            if (widget.allowDelete)
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _delete(item),
-                                  child: const Text('Supprimer'),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+          builder: (context, value, child) => Opacity(
+            opacity: value,
+            child: Transform.translate(
+              offset: Offset(0, (1 - value) * 8),
+              child: child,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: card,
+          ),
         );
       },
+    );
+  }
+
+  /// Carte générique moderne pour un enregistrement (tous modules sauf ventes).
+  Widget _buildGenericCard(
+    BuildContext context,
+    Map<String, dynamic> item,
+    List<String> columns,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    const titleCandidates = [
+      'nom',
+      'name',
+      'libelle',
+      'titre',
+      'motif',
+      'action',
+      'reference',
+    ];
+    String? titleKey;
+    for (final k in titleCandidates) {
+      if (columns.contains(k) &&
+          (item[k]?.toString().trim().isNotEmpty ?? false)) {
+        titleKey = k;
+        break;
+      }
+    }
+    final title = titleKey != null
+        ? _cellValueForColumn(titleKey, item[titleKey], item)
+        : (item['id'] != null ? '#${item['id']}' : '—');
+    final statusKeys = columns
+        .where((c) => c == 'actif' || c == 'statut' || c == 'statut_sync')
+        .toList();
+    final subtitleKeys = columns
+        .where((c) => c != 'id' && c != titleKey && !statusKeys.contains(c))
+        .take(3)
+        .toList();
+    final icon = _iconForItem(item);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2ECE7)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A0E9F6E),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 44,
+                width: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: scheme.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: Color(0xFF0B3D2E),
+                      ),
+                    ),
+                    for (final c in subtitleKeys)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          '${_displayLabelForKey(c)}: ${_cellValueForColumn(c, item[c], item)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF4B6358),
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (widget.allowUpdate || widget.allowDelete) _actionsMenu(item),
+            ],
+          ),
+          if (statusKeys.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final c in statusKeys) _statusChip(c, item[c], item),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _actionsMenu(Map<String, dynamic> item) {
+    return PopupMenuButton<String>(
+      tooltip: 'Actions',
+      icon: const Icon(Icons.more_vert, color: Color(0xFF4B6358)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (value) {
+        if (value == 'update') _update(item);
+        if (value == 'delete') _delete(item);
+      },
+      itemBuilder: (context) => [
+        if (widget.allowUpdate)
+          const PopupMenuItem<String>(
+            value: 'update',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 18),
+                SizedBox(width: 10),
+                Text('Modifier'),
+              ],
+            ),
+          ),
+        if (widget.allowDelete)
+          const PopupMenuItem<String>(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
+                SizedBox(width: 10),
+                Text('Supprimer', style: TextStyle(color: Color(0xFFDC2626))),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Icône adaptée au module (et au type pour les établissements).
+  IconData _iconForItem(Map<String, dynamic> item) {
+    if (widget.endpoint == '/etablissements') {
+      final type = item['type']?.toString();
+      if (type == 'pharmacie') return Icons.local_pharmacy_rounded;
+      if (type == 'cabinet') return Icons.medical_services_rounded;
+      return Icons.local_hospital_rounded;
+    }
+    switch (widget.endpoint) {
+      case '/patients':
+        return Icons.person_rounded;
+      case '/medicaments':
+        return Icons.medication_rounded;
+      case '/consultations':
+        return Icons.medical_services_rounded;
+      case '/paiements':
+        return Icons.payments_rounded;
+      case '/mouvement-stocks':
+        return Icons.swap_vert_rounded;
+      case '/journal-audits':
+        return Icons.history_rounded;
+      case '/vente-pharmacie-articles':
+        return Icons.inventory_2_rounded;
+      default:
+        return Icons.folder_rounded;
+    }
+  }
+
+  Widget _statusChip(String key, dynamic raw, Map<String, dynamic> item) {
+    final label = _cellValueForColumn(key, raw, item);
+    bool positive;
+    if (key == 'actif') {
+      positive = raw == true || raw == 1 || raw == '1' || raw == 'true';
+    } else if (key == 'statut_sync') {
+      positive = raw != 'en_attente';
+    } else if (key == 'statut') {
+      positive = raw == 'payee';
+    } else {
+      positive = true;
+    }
+    final color =
+        positive ? const Color(0xFF16A34A) : const Color(0xFFF59E0B);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 

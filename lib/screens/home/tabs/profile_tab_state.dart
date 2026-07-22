@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:keneya_plus/common/utils/kcolors.dart';
+import 'package:keneya_plus/common/utils/role_ui.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/core/offline/local_store.dart';
 import 'package:provider/provider.dart';
@@ -101,71 +102,91 @@ class ProfileTabState extends State<ProfileTab> {
     final user = auth.currentUser;
     final isDesktop = MediaQuery.sizeOf(context).width >= 1000;
 
-    final profileInfoCard = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const CircleAvatar(
-                  radius: 26,
-                  child: Icon(Icons.person, size: 28),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.name ?? '-',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(user?.telephone ?? '-'),
-                    ],
-                  ),
-                ),
-                Chip(
-                  label: Text(user?.role ?? '-'),
-                  avatar: const Icon(Icons.verified_user_outlined, size: 18),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                Chip(
-                  label: Text(
-                    auth.offlineProvisionalSession
-                        ? 'Session locale'
-                        : 'Session active',
-                  ),
-                  avatar: Icon(
-                    auth.offlineProvisionalSession
-                        ? Icons.cloud_off_outlined
-                        : Icons.cloud_done_outlined,
-                    size: 18,
-                  ),
-                ),
-                Chip(
-                  label: Text(
-                    user?.actif == true ? 'Compte actif' : 'Compte inactif',
-                  ),
-                  avatar: Icon(
-                    user?.actif == true
-                        ? Icons.check_circle_outline
-                        : Icons.block_outlined,
-                    size: 18,
-                  ),
-                ),
-              ],
-            ),
-          ],
+    final role = RoleUi.of(user?.role);
+    final profileInfoCard = Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Kolors.kPrimary, Kolors.kBlue],
         ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Kolors.kPrimary.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 60,
+                width: 60,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Kolors.kWhite.withValues(alpha: 0.20),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(role.icon, color: Kolors.kWhite, size: 30),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.name ?? '-',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Kolors.kWhite,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user?.telephone ?? '-',
+                      style: TextStyle(
+                        color: Kolors.kWhite.withValues(alpha: 0.9),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _WhiteChip(icon: role.icon, label: role.label),
+              _WhiteChip(
+                icon: auth.offlineProvisionalSession
+                    ? Icons.cloud_off_rounded
+                    : Icons.cloud_done_rounded,
+                label: auth.offlineProvisionalSession
+                    ? 'Session locale'
+                    : 'Session active',
+              ),
+              _WhiteChip(
+                icon: user?.actif == true
+                    ? Icons.check_circle_rounded
+                    : Icons.block_rounded,
+                label:
+                    user?.actif == true ? 'Compte actif' : 'Compte inactif',
+              ),
+            ],
+          ),
+        ],
       ),
     );
 
@@ -336,6 +357,40 @@ class ProfileTabState extends State<ProfileTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Puce blanche translucide pour les en-têtes en dégradé.
+class _WhiteChip extends StatelessWidget {
+  const _WhiteChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Kolors.kWhite.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: Kolors.kWhite),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Kolors.kWhite,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

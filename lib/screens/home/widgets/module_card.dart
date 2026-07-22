@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../common/utils/kcolors.dart';
+
 class ModuleCard extends StatelessWidget {
   const ModuleCard({
     super.key,
@@ -16,63 +18,73 @@ class ModuleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
+    return Material(
+      color: Kolors.kWhite,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
-        child: Container(
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, const Color(0xFFF4F7FF)],
-            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Kolors.kBorder),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A0E9F6E),
+                blurRadius: 14,
+                offset: Offset(0, 6),
+              ),
+            ],
           ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(14),
+          child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4F46E5).withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Kolors.kPrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: const Color(0xFF4F46E5)),
+                child: Icon(icon, color: Kolors.kPrimary, size: 24),
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
+              const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  subtitle,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF475569),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Kolors.kTextHigh,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Kolors.kTextMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.tonalIcon(
-                  onPressed: onTap,
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                  label: const Text('Ouvrir'),
-                ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Kolors.kGray,
+                size: 22,
               ),
             ],
           ),

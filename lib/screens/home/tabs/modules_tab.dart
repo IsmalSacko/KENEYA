@@ -170,7 +170,11 @@ class ModulesTab extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            childAspectRatio: width >= 900 ? 1.55 : 1.30,
+            childAspectRatio: columns == 1
+                ? 3.6
+                : columns == 2
+                    ? 2.4
+                    : 2.0,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
