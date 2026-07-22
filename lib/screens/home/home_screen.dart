@@ -88,7 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDesktop = screenWidth >= 1000;
     final isTablet = screenWidth >= 700 && screenWidth < 1000;
     final shouldUseCompactNavLabels = screenWidth < 480;
-    final isFrench = Localizations.localeOf(context).languageCode == 'fr';
     final auth = context.watch<AuthController>();
     final patientCtrl = context.watch<PatientController>();
     final medicamentCtrl = context.watch<MedicamentController>();
@@ -103,8 +102,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final navTabs = <_NavTab>[
       _NavTab(
-        title: isFrench ? 'Accueil' : 'Home',
-        shortLabel: isFrench ? 'Accueil' : 'Home',
+        title: 'Accueil',
+        shortLabel: 'Accueil',
         icon: Icons.home_outlined,
         selectedIcon: Icons.home,
         page: DashboardTab(
@@ -128,22 +127,22 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       if (canManageUsers)
         _NavTab(
-          title: isFrench ? 'Utilisateurs' : 'Users',
-          shortLabel: isFrench ? 'Utilis.' : 'Users',
+          title: 'Utilisateurs',
+          shortLabel: 'Utilis.',
           icon: Icons.person_add_alt_outlined,
           selectedIcon: Icons.person_add_alt_1,
           page: UsersTab(userCtrl: userCtrl),
         ),
       _NavTab(
-        title: isFrench ? 'Ressources' : 'Resources',
-        shortLabel: isFrench ? 'Ress.' : 'Res.',
+        title: 'Ressources',
+        shortLabel: 'Ress.',
         icon: Icons.widgets_outlined,
         selectedIcon: Icons.widgets,
         page: const ModulesTab(),
       ),
       _NavTab(
-        title: isFrench ? 'Profil' : 'Profile',
-        shortLabel: isFrench ? 'Profil' : 'Profile',
+        title: 'Profil',
+        shortLabel: 'Profil',
         icon: Icons.account_circle_outlined,
         selectedIcon: Icons.account_circle,
         page: const ProfileTab(),
