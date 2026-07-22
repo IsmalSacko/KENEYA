@@ -46,6 +46,20 @@ class EtablissementsScreen extends StatelessWidget {
           type: ModuleFieldType.text,
         ),
         ModuleField(
+          key: 'latitude',
+          label: 'Latitude',
+          type: ModuleFieldType.decimal,
+          minValue: -90,
+          maxValue: 90,
+        ),
+        ModuleField(
+          key: 'longitude',
+          label: 'Longitude',
+          type: ModuleFieldType.decimal,
+          minValue: -180,
+          maxValue: 180,
+        ),
+        ModuleField(
           key: 'actif',
           label: 'Actif',
           type: ModuleFieldType.boolean,

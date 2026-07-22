@@ -47,6 +47,10 @@ dependencies:
   # Hors-ligne
   connectivity_plus: ^6.1.5
 
+  # Geolocalisation / itineraire
+  geolocator: ^13.0.2
+  url_launcher: ^6.3.1
+
   # UI / i18n
   google_fonts: ^8.0.1
   flutter_screenutil: ^5.9.0

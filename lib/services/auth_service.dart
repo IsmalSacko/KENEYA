@@ -5,12 +5,17 @@ import '../core/offline/sync_manager.dart';
 import '../core/offline/sync_queue.dart';
 
 class AuthService {
+  /// Inscription. [uuid] / [userUuid] rendent l'opération idempotente : une
+  /// inscription créée hors-ligne puis rejouée ne crée pas de doublon côté
+  /// serveur (voir docs/OFFLINE_SYNC.md §8).
   Future<Map<String, dynamic>> register({
     required String nomEtablissement,
     required String type,
     required String name,
     required String telephone,
     required String pin,
+    required String uuid,
+    required String userUuid,
   }) async {
     final payload = {
       'nom_etablissement': nomEtablissement,
@@ -18,6 +23,8 @@ class AuthService {
       'name': name,
       'telephone': telephone,
       'pin': pin,
+      'uuid': uuid,
+      'user_uuid': userUuid,
     };
     try {
       final response = await ApiClient.dio.post('/register', data: payload);
@@ -34,10 +41,20 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> login(String telephone, String pin) async {
+  /// Connexion. [etablissementUuid] lève l'ambiguïté quand un même numéro
+  /// existe dans plusieurs établissements (le serveur répond alors 409).
+  Future<Map<String, dynamic>> login(
+    String telephone,
+    String pin, {
+    String? etablissementUuid,
+  }) async {
     final response = await ApiClient.dio.post(
       '/login',
-      data: {'telephone': telephone, 'pin': pin},
+      data: {
+        'telephone': telephone,
+        'pin': pin,
+        'etablissement_uuid': ?etablissementUuid,
+      },
     );
 
     return Map<String, dynamic>.from(response.data as Map);

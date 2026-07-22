@@ -235,10 +235,22 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
       icon: const Icon(Icons.more_vert, color: Color(0xFF4B6358)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (value) {
+        if (value == 'itineraire') _openItinerary(item);
         if (value == 'update') _update(item);
         if (value == 'delete') _delete(item);
       },
       itemBuilder: (context) => [
+        if (_canRouteTo(item))
+          const PopupMenuItem<String>(
+            value: 'itineraire',
+            child: Row(
+              children: [
+                Icon(Icons.directions_rounded, size: 18, color: Color(0xFF2563EB)),
+                SizedBox(width: 10),
+                Text('Itinéraire', style: TextStyle(color: Color(0xFF2563EB))),
+              ],
+            ),
+          ),
         if (widget.allowUpdate)
           const PopupMenuItem<String>(
             value: 'update',
@@ -263,6 +275,28 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
           ),
       ],
     );
+  }
+
+  /// Vrai pour un établissement géolocalisé (affiche l'action « Itinéraire »).
+  bool _canRouteTo(Map<String, dynamic> item) {
+    if (widget.endpoint != '/etablissements') return false;
+    final lat = double.tryParse(item['latitude']?.toString() ?? '');
+    final lng = double.tryParse(item['longitude']?.toString() ?? '');
+    return lat != null && lng != null;
+  }
+
+  /// Ouvre Google Maps en itinéraire vers l'établissement.
+  Future<void> _openItinerary(Map<String, dynamic> item) async {
+    final lat = double.tryParse(item['latitude']?.toString() ?? '');
+    final lng = double.tryParse(item['longitude']?.toString() ?? '');
+    if (lat == null || lng == null) return;
+
+    final ok = await GeolocationService.openItinerary(lat, lng);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d\'ouvrir la carte.')),
+      );
+    }
   }
 
   /// Icône adaptée au module (et au type pour les établissements).

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 
+import '../core/api/api_client.dart';
 import '../core/offline/local_store.dart';
+import '../core/offline/pin_cache.dart';
+import '../core/offline/uuid.dart';
 import '../core/storage/token_storage.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -17,6 +20,31 @@ class AuthController extends ChangeNotifier {
   bool offlineProvisionalSession = false;
   String? accessToken;
   UserModel? currentUser;
+
+  /// Rempli quand le login renvoie 409 (numéro partagé par plusieurs
+  /// établissements). La couche UI propose alors un choix, puis rappelle
+  /// login(..., etablissementUuid: ...).
+  List<Map<String, dynamic>> loginEtablissements = [];
+  bool requiresEtablissementChoice = false;
+
+  String _offlineLoginKey(String telephone) => 'offline_login_$telephone';
+
+  Map<String, dynamic> _profileMap(UserModel u) => {
+    'id': u.id,
+    'etablissement_id': u.etablissementId,
+    'name': u.name,
+    'telephone': u.telephone,
+    'role': u.role,
+    'actif': u.actif,
+  };
+
+  UserModel? _parseUser(dynamic userJson) {
+    if (userJson is Map<String, dynamic>) return UserModel.fromJson(userJson);
+    if (userJson is Map) {
+      return UserModel.fromJson(Map<String, dynamic>.from(userJson));
+    }
+    return null;
+  }
 
   bool get isAuthenticated =>
       (accessToken != null && accessToken!.isNotEmpty) ||
@@ -58,33 +86,69 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<bool> login({required String telephone, required String pin}) async {
+  Future<bool> login({
+    required String telephone,
+    required String pin,
+    String? etablissementUuid,
+  }) async {
     loading = true;
     error = null;
+    requiresEtablissementChoice = false;
+    loginEtablissements = [];
     notifyListeners();
 
     try {
-      final data = await _authService.login(telephone, pin);
+      final data = await _authService.login(
+        telephone,
+        pin,
+        etablissementUuid: etablissementUuid,
+      );
       accessToken = (data['access_token'] ?? '').toString();
-      final userJson = data['user'];
-      if (userJson is Map<String, dynamic>) {
-        currentUser = UserModel.fromJson(userJson);
-      } else if (userJson is Map) {
-        currentUser = UserModel.fromJson(Map<String, dynamic>.from(userJson));
-      } else {
-        currentUser = null;
-      }
+      currentUser = _parseUser(data['user']);
 
       if (accessToken != null && accessToken!.isNotEmpty) {
         offlineProvisionalSession = false;
         await LocalStore.remove(_offlineProfileKey);
         await TokenStorage.saveToken(accessToken!);
+
+        // Mémorise de quoi se reconnecter hors-ligne plus tard.
+        await PinCache.save(telephone, pin);
+        if (currentUser != null) {
+          await LocalStore.write(
+            _offlineLoginKey(telephone),
+            _profileMap(currentUser!),
+          );
+        }
         return true;
       }
 
       error = 'Token invalide.';
       return false;
     } on DioException catch (e) {
+      // 409 : le numéro existe dans plusieurs établissements.
+      if (e.response?.statusCode == 409) {
+        final data = e.response?.data;
+        if (data is Map && data['etablissements'] is List) {
+          loginEtablissements = (data['etablissements'] as List)
+              .whereType<Map>()
+              .map((m) => Map<String, dynamic>.from(m))
+              .toList();
+          requiresEtablissementChoice = true;
+        }
+        error =
+            (data is Map ? data['message']?.toString() : null) ??
+            'Précisez l\'établissement.';
+        return false;
+      }
+
+      // Hors-ligne : tenter la connexion via le cache local.
+      if (ApiClient.isNetworkError(e)) {
+        if (await _offlineLogin(telephone, pin)) return true;
+        error =
+            'Hors-ligne : identifiants non mis en cache. Connectez-vous une fois en ligne d\'abord.';
+        return false;
+      }
+
       error =
           _extractApiMessage(e) ??
           'Echec de connexion. Verifie telephone et PIN.';
@@ -96,6 +160,22 @@ class AuthController extends ChangeNotifier {
       loading = false;
       notifyListeners();
     }
+  }
+
+  /// Connexion hors-ligne : valide le PIN contre le cache sécurisé et restaure
+  /// le profil mémorisé lors d'une précédente connexion en ligne.
+  Future<bool> _offlineLogin(String telephone, String pin) async {
+    if (!await PinCache.verify(telephone, pin)) return false;
+
+    final profile = LocalStore.read<Map<String, dynamic>>(
+      _offlineLoginKey(telephone),
+    );
+    if (profile == null) return false;
+
+    currentUser = UserModel.fromJson(profile);
+    accessToken = null;
+    offlineProvisionalSession = true;
+    return true;
   }
 
   Future<bool> register({
@@ -111,13 +191,22 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // uuid générés par le client → inscription idempotente au rejeu.
+      final etablissementUuid = uuidV4();
+      final userUuid = uuidV4();
+
       final data = await _authService.register(
         nomEtablissement: nomEtablissement,
         type: type,
         name: name,
         telephone: telephone,
         pin: pin,
+        uuid: etablissementUuid,
+        userUuid: userUuid,
       );
+
+      // Permet de se (re)connecter hors-ligne dès l'inscription.
+      await PinCache.save(telephone, pin);
 
       if (data['queued'] == true) {
         accessToken = null;
@@ -130,32 +219,34 @@ class AuthController extends ChangeNotifier {
           actif: true,
         );
         offlineProvisionalSession = true;
-        await LocalStore.write(_offlineProfileKey, {
+        final profile = {
           'id': currentUser!.id,
           'etablissement_id': null,
+          'uuid': userUuid,
           'name': currentUser!.name,
           'telephone': currentUser!.telephone,
           'role': currentUser!.role,
           'actif': true,
-        });
+        };
+        await LocalStore.write(_offlineProfileKey, profile);
+        await LocalStore.write(_offlineLoginKey(telephone), profile);
         lastRegisterQueued = true;
         return true;
       }
 
       accessToken = (data['access_token'] ?? '').toString();
-      final userJson = data['user'];
-      if (userJson is Map<String, dynamic>) {
-        currentUser = UserModel.fromJson(userJson);
-      } else if (userJson is Map) {
-        currentUser = UserModel.fromJson(Map<String, dynamic>.from(userJson));
-      } else {
-        currentUser = null;
-      }
+      currentUser = _parseUser(data['user']);
 
       if (accessToken != null && accessToken!.isNotEmpty) {
         offlineProvisionalSession = false;
         await LocalStore.remove(_offlineProfileKey);
         await TokenStorage.saveToken(accessToken!);
+        if (currentUser != null) {
+          await LocalStore.write(
+            _offlineLoginKey(telephone),
+            _profileMap(currentUser!),
+          );
+        }
         return true;
       }
 

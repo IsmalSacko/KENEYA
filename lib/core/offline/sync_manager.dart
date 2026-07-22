@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import '../api/api_client.dart';
 import '../storage/token_storage.dart';
 import 'local_store.dart';
+import 'offline_mirror.dart';
+import 'sync_api.dart';
 import 'sync_queue.dart';
 
 class SyncManager {
@@ -53,6 +55,7 @@ class SyncManager {
       final queue = SyncQueue.getAll();
       if (queue.isEmpty) {
         _updatePendingCount();
+        await _pullChanges();
         return;
       }
       queue.sort((a, b) {
@@ -101,8 +104,40 @@ class SyncManager {
 
       await SyncQueue.replaceAll(kept);
       _updatePendingCount();
+
+      // Après avoir poussé les écritures locales, récupérer les changements
+      // serveur pour alimenter le miroir hors-ligne (voir OfflineMirror).
+      await _pullChanges();
     } finally {
       _syncing = false;
+    }
+  }
+
+  /// Pull delta des changements serveur vers le miroir local. Silencieux :
+  /// réessaie au prochain cycle en cas d'erreur réseau.
+  Future<void> _pullChanges() async {
+    final token = await TokenStorage.getToken();
+    if (token == null || token.isEmpty) return; // non authentifié
+
+    try {
+      final result = await SyncApi.pull(
+        lastPulledRev: OfflineMirror.lastPulledRev,
+      );
+
+      final changes = result['changes'];
+      if (changes is Map) {
+        await OfflineMirror.applyPull(Map<String, dynamic>.from(changes));
+      }
+
+      final rev = result['server_rev'];
+      final parsed = rev is int ? rev : int.tryParse(rev?.toString() ?? '');
+      if (parsed != null) {
+        await OfflineMirror.setLastPulledRev(parsed);
+      }
+    } on DioException catch (_) {
+      // Ignoré : nouvelle tentative au prochain cycle de synchro.
+    } catch (_) {
+      // Idem.
     }
   }
 

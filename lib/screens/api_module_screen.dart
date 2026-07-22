@@ -10,6 +10,7 @@ import '../core/api/api_client.dart';
 import '../core/offline/local_store.dart';
 import '../core/offline/sync_manager.dart';
 import '../core/offline/sync_queue.dart';
+import '../services/geolocation_service.dart';
 import '../services/local_notification_service.dart';
 
 part 'api_module_screen_form.dart';
