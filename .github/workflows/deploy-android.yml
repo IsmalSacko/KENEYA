@@ -56,7 +56,19 @@ jobs:
           EOF
 
       - name: Restauration du compte de service Google Play
-        run: echo '${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}' > android/fastlane/play-service-account.json
+        env:
+          SA_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          printf '%s' "$SA_JSON" > android/fastlane/play-service-account.json
+          # Validation immédiate (sans divulguer le contenu du secret)
+          if python3 -c "import json,sys; json.load(open('android/fastlane/play-service-account.json'))" 2>/dev/null; then
+            echo "✅ Compte de service : JSON valide"
+          else
+            echo "::error::Le secret PLAY_SERVICE_ACCOUNT_JSON n'est pas un JSON valide."
+            echo "Taille du fichier écrit : $(wc -c < android/fastlane/play-service-account.json) octets"
+            echo "1re ligne (masquée) : $(head -c 30 android/fastlane/play-service-account.json | tr -d '\n')..."
+            exit 1
+          fi
 
       - name: Dépendances Flutter
         run: flutter pub get
