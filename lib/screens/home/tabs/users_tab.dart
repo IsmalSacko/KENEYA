@@ -2,7 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:keneya_plus/common/utils/kcolors.dart';
 import 'package:keneya_plus/common/utils/role_ui.dart';
+import 'package:keneya_plus/common/utils/roles.dart';
+import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/controllers/user_controller.dart';
+import 'package:provider/provider.dart';
 
 class UsersTab extends StatefulWidget {
   const UsersTab({super.key, required this.userCtrl});
@@ -18,7 +21,7 @@ class _UsersTabState extends State<UsersTab> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
-  String _role = 'admin';
+  String _role = AppRoles.medecin;
 
   @override
   void dispose() {
@@ -64,6 +67,14 @@ class _UsersTabState extends State<UsersTab> {
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 1000;
 
+    // Rôles que l'utilisateur courant a le droit d'attribuer (un admin
+    // d'établissement ne peut pas créer d'admin d'instance).
+    final currentRole = context.read<AuthController>().currentUser?.role;
+    final assignableRoles = AppRoles.assignableBy(currentRole);
+    if (!assignableRoles.contains(_role) && assignableRoles.isNotEmpty) {
+      _role = assignableRoles.first;
+    }
+
     final formCard = Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -93,15 +104,13 @@ class _UsersTabState extends State<UsersTab> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: _role,
-                decoration: const InputDecoration(labelText: 'Role'),
-                items: const [
-                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                  DropdownMenuItem(value: 'medecin', child: Text('Medecin')),
-                  DropdownMenuItem(
-                    value: 'pharmacien',
-                    child: Text('Pharmacien'),
-                  ),
-                  DropdownMenuItem(value: 'caissier', child: Text('Caissier')),
+                decoration: const InputDecoration(labelText: 'Rôle'),
+                items: [
+                  for (final r in assignableRoles)
+                    DropdownMenuItem(
+                      value: r,
+                      child: Text(AppRoles.labelOf(r)),
+                    ),
                 ],
                 onChanged: (v) {
                   if (v == null) return;

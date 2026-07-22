@@ -215,7 +215,8 @@ class AuthController extends ChangeNotifier {
           etablissementId: null,
           name: name,
           telephone: telephone,
-          role: 'admin',
+          // L'inscription crée un admin d'établissement (aligné sur le backend).
+          role: 'admin_etablissement',
           actif: true,
         );
         offlineProvisionalSession = true;

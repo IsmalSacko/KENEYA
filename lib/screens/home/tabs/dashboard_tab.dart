@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:keneya_plus/common/utils/kcolors.dart';
 import 'package:keneya_plus/common/utils/role_ui.dart';
+import 'package:keneya_plus/common/utils/roles.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/screens/dashboard/alertes_screen.dart';
 import 'package:keneya_plus/screens/dashboard/caisse_screen.dart';
@@ -411,16 +412,18 @@ class _QuickActions extends StatelessWidget {
       ),
     );
 
+    // Les statistiques sont réservées aux administrateurs (endpoint admin-only).
+    final canAdmin = AppRoles.canAdministerEtablissement(role);
     final List<Widget> cards;
     switch (role) {
-      case 'pharmacien':
-        cards = [alertes, caisse, stats];
+      case AppRoles.pharmacien:
+        cards = [alertes, caisse, if (canAdmin) stats];
         break;
-      case 'caissier':
-        cards = [caisse, alertes, stats];
+      case AppRoles.caissier:
+        cards = [caisse, alertes, if (canAdmin) stats];
         break;
       default:
-        cards = [stats, alertes, caisse];
+        cards = [if (canAdmin) stats, alertes, caisse];
     }
 
     return Row(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:keneya_plus/common/utils/roles.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/controllers/etablissement_controller.dart';
 import 'package:keneya_plus/screens/dashboard/user_stats_screen.dart';
@@ -39,27 +40,39 @@ class ModulesTab extends StatelessWidget {
         etablissementTypes.any(
           (type) => type == 'pharmacie' || type == 'cabinet_pharmacie',
         );
-    final isAdmin = role == 'admin';
-    final isMedecin = role == 'medecin';
-    final isPharmacien = role == 'pharmacien';
-    final isCaissier = role == 'caissier';
-    final enforceRoleFilter = const {
-      'admin',
-      'medecin',
-      'pharmacien',
-      'caissier',
-    }.contains(role);
+    // Un admin d'établissement a les mêmes pouvoirs que l'admin d'instance,
+    // mais limités à son établissement : dans cette app (mono-établissement
+    // côté utilisateur), les deux se comportent donc de la même façon.
+    final isAdmin = AppRoles.canAdministerEtablissement(role);
+    final isInstanceAdmin = AppRoles.isInstanceAdmin(role);
+    final isMedecin = role == AppRoles.medecin;
+    final isInfirmier = role == AppRoles.infirmier;
+    final isSageFemme = role == AppRoles.sageFemme;
+    final isPharmacien = role == AppRoles.pharmacien;
+    final isCaissier = role == AppRoles.caissier;
+    // Personnel soignant : accès aux consultations.
+    final isSoignant = isMedecin || isInfirmier || isSageFemme;
+    // On applique le filtre par rôle dès que le rôle est connu.
+    final enforceRoleFilter = role != null && AppRoles.all.contains(role);
 
     final modules = <_ModuleItem>[
       _ModuleItem(
         title: 'Consultations',
         subtitle: 'Suivi des consultations medicales',
         icon: Icons.medical_information_outlined,
-        allowedRoles: const {'admin', 'medecin', 'caissier'},
+        allowedRoles: const {
+          AppRoles.admin,
+          AppRoles.adminEtablissement,
+          AppRoles.medecin,
+          AppRoles.infirmier,
+          AppRoles.sageFemme,
+          AppRoles.laborantin,
+          AppRoles.caissier,
+        },
         requiresCabinet: true,
         builder: (_) => ConsultationsScreen(
-          allowCreate: isAdmin || isMedecin || isCaissier,
-          allowUpdate: isAdmin || isMedecin,
+          allowCreate: isAdmin || isSoignant || isCaissier,
+          allowUpdate: isAdmin || isSoignant,
           allowDelete: isAdmin,
         ),
       ),
@@ -67,7 +80,13 @@ class ModulesTab extends StatelessWidget {
         title: 'Medicaments',
         subtitle: 'Catalogue et suivi des stocks',
         icon: Icons.medication_outlined,
-        allowedRoles: const {'admin', 'medecin', 'pharmacien', 'caissier'},
+        allowedRoles: const {
+          AppRoles.admin,
+          AppRoles.adminEtablissement,
+          AppRoles.medecin,
+          AppRoles.pharmacien,
+          AppRoles.caissier,
+        },
         requiresPharmacie: true,
         builder: (_) => MedicamentsScreen(
           allowCreate: isAdmin || isPharmacien,
@@ -79,7 +98,12 @@ class ModulesTab extends StatelessWidget {
         title: 'Mouvements Stock',
         subtitle: 'Entrees, sorties et ajustements',
         icon: Icons.inventory_2_outlined,
-        allowedRoles: const {'admin', 'pharmacien', 'caissier'},
+        allowedRoles: const {
+          AppRoles.admin,
+          AppRoles.adminEtablissement,
+          AppRoles.pharmacien,
+          AppRoles.caissier,
+        },
         requiresPharmacie: true,
         builder: (_) => MouvementsStockScreen(
           allowCreate: isAdmin || isPharmacien || isCaissier,
@@ -91,7 +115,13 @@ class ModulesTab extends StatelessWidget {
         title: 'Paiements',
         subtitle: 'Reglement consultations et ventes',
         icon: Icons.payments_outlined,
-        allowedRoles: const {'admin', 'pharmacien', 'caissier'},
+        allowedRoles: const {
+          AppRoles.admin,
+          AppRoles.adminEtablissement,
+          AppRoles.pharmacien,
+          AppRoles.caissier,
+          AppRoles.gestionnaire,
+        },
         builder: (_) => PaiementsScreen(
           hasCabinet: hasCabinet,
           hasPharmacie: hasPharmacie,
@@ -104,7 +134,12 @@ class ModulesTab extends StatelessWidget {
         title: 'Ventes Pharmacie',
         subtitle: 'Operations de vente pharmacie',
         icon: Icons.point_of_sale_outlined,
-        allowedRoles: const {'admin', 'pharmacien', 'caissier'},
+        allowedRoles: const {
+          AppRoles.admin,
+          AppRoles.adminEtablissement,
+          AppRoles.pharmacien,
+          AppRoles.caissier,
+        },
         requiresPharmacie: true,
         builder: (_) => VentesPharmacieScreen(
           allowCreate: isAdmin || isPharmacien || isCaissier,
@@ -115,7 +150,12 @@ class ModulesTab extends StatelessWidget {
         title: 'Articles Vente',
         subtitle: 'Lignes detaillees de vente',
         icon: Icons.receipt_long_outlined,
-        allowedRoles: const {'admin', 'pharmacien', 'caissier'},
+        allowedRoles: const {
+          AppRoles.admin,
+          AppRoles.adminEtablissement,
+          AppRoles.pharmacien,
+          AppRoles.caissier,
+        },
         requiresPharmacie: true,
         builder: (_) => VenteArticlesScreen(
           allowCreate: isAdmin || isPharmacien || isCaissier,
@@ -127,25 +167,30 @@ class ModulesTab extends StatelessWidget {
         title: 'Journal Audits',
         subtitle: 'Historique des actions',
         icon: Icons.history_outlined,
-        allowedRoles: const {'admin'},
+        allowedRoles: const {
+          AppRoles.admin,
+          AppRoles.adminEtablissement,
+          AppRoles.gestionnaire,
+        },
         builder: (_) => JournalAuditsScreen(allowDelete: isAdmin),
       ),
       _ModuleItem(
         title: 'Etablissements',
         subtitle: 'Gestion des structures',
         icon: Icons.local_hospital_outlined,
-        allowedRoles: const {'admin'},
+        allowedRoles: const {AppRoles.admin, AppRoles.adminEtablissement},
         builder: (_) => EtablissementsScreen(
-          allowCreate: isAdmin,
+          // Créer / supprimer un établissement = action d'instance uniquement.
+          allowCreate: isInstanceAdmin,
           allowUpdate: isAdmin,
-          allowDelete: isAdmin,
+          allowDelete: isInstanceAdmin,
         ),
       ),
       _ModuleItem(
         title: 'Statistiques utilisateurs',
         subtitle: 'Effectifs, activité, inscriptions',
         icon: Icons.insights_rounded,
-        allowedRoles: const {'admin'},
+        allowedRoles: const {AppRoles.admin, AppRoles.adminEtablissement},
         builder: (_) => const UserStatsScreen(),
       ),
     ];
@@ -215,7 +260,13 @@ class _ModuleItem {
     required this.subtitle,
     required this.icon,
     required this.builder,
-    this.allowedRoles = const {'admin', 'medecin', 'pharmacien', 'caissier'},
+    this.allowedRoles = const {
+      AppRoles.admin,
+      AppRoles.adminEtablissement,
+      AppRoles.medecin,
+      AppRoles.pharmacien,
+      AppRoles.caissier,
+    },
     this.requiresCabinet = false,
     this.requiresPharmacie = false,
   });

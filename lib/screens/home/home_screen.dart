@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:keneya_plus/common/utils/roles.dart';
 import 'package:keneya_plus/screens/home/tabs/dashboard_tab.dart';
 import 'package:keneya_plus/screens/home/tabs/modules_tab.dart';
 import 'package:keneya_plus/screens/home/tabs/patients_tab.dart';
@@ -94,33 +95,65 @@ class _HomeScreenState extends State<HomeScreen> {
     final etablissementCtrl = context.watch<EtablissementController>();
     final userCtrl = context.watch<UserController>();
 
-    final tabTitles = isFrench
-        ? ['Accueil', 'Patients', 'Utilisateurs', 'Ressources', 'Profil']
-        : ['Home', 'Patients', 'Users', 'Resources', 'Profile'];
-    final compactNavLabels = isFrench
-        ? ['Accueil', 'Patients', 'Utilis.', 'Ress.', 'Profil']
-        : ['Home', 'Patients', 'Users', 'Res.', 'Profile'];
-    final bottomNavLabels = shouldUseCompactNavLabels
-        ? compactNavLabels
-        : tabTitles;
+    // L'onglet "Utilisateurs" (gestion du personnel) n'est visible que pour les
+    // administrateurs (instance ou établissement).
+    final canManageUsers = AppRoles.canAdministerEtablissement(
+      auth.currentUser?.role,
+    );
 
-    final pages = [
-      DashboardTab(
-        auth: auth,
-        patientCtrl: patientCtrl,
-        medicamentCtrl: medicamentCtrl,
-        etablissementCtrl: etablissementCtrl,
-        userCtrl: userCtrl,
-        onRefresh: _refreshAll,
+    final navTabs = <_NavTab>[
+      _NavTab(
+        title: isFrench ? 'Accueil' : 'Home',
+        shortLabel: isFrench ? 'Accueil' : 'Home',
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+        page: DashboardTab(
+          auth: auth,
+          patientCtrl: patientCtrl,
+          medicamentCtrl: medicamentCtrl,
+          etablissementCtrl: etablissementCtrl,
+          userCtrl: userCtrl,
+          onRefresh: _refreshAll,
+        ),
       ),
-      PatientsTab(
-        patientCtrl: patientCtrl,
-        onRefresh: () => context.read<PatientController>().fetchPatients(),
+      _NavTab(
+        title: 'Patients',
+        shortLabel: 'Patients',
+        icon: Icons.people_outline,
+        selectedIcon: Icons.people,
+        page: PatientsTab(
+          patientCtrl: patientCtrl,
+          onRefresh: () => context.read<PatientController>().fetchPatients(),
+        ),
       ),
-      UsersTab(userCtrl: userCtrl),
-      const ModulesTab(),
-      const ProfileTab(),
+      if (canManageUsers)
+        _NavTab(
+          title: isFrench ? 'Utilisateurs' : 'Users',
+          shortLabel: isFrench ? 'Utilis.' : 'Users',
+          icon: Icons.person_add_alt_outlined,
+          selectedIcon: Icons.person_add_alt_1,
+          page: UsersTab(userCtrl: userCtrl),
+        ),
+      _NavTab(
+        title: isFrench ? 'Ressources' : 'Resources',
+        shortLabel: isFrench ? 'Ress.' : 'Res.',
+        icon: Icons.widgets_outlined,
+        selectedIcon: Icons.widgets,
+        page: const ModulesTab(),
+      ),
+      _NavTab(
+        title: isFrench ? 'Profil' : 'Profile',
+        shortLabel: isFrench ? 'Profil' : 'Profile',
+        icon: Icons.account_circle_outlined,
+        selectedIcon: Icons.account_circle,
+        page: const ProfileTab(),
+      ),
     ];
+
+    // Le rôle peut changer le nombre d'onglets : on borne l'index courant.
+    final safeIndex = navTabs.isEmpty
+        ? 0
+        : _tabIndex.clamp(0, navTabs.length - 1);
 
     final content = Column(
       children: [
@@ -158,48 +191,29 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           },
         ),
-        Expanded(child: pages[_tabIndex]),
+        Expanded(child: navTabs[safeIndex].page),
       ],
     );
 
     if (isDesktop || isTablet) {
       return Scaffold(
-        appBar: AppBar(title: Text(tabTitles[_tabIndex])),
+        appBar: AppBar(title: Text(navTabs[safeIndex].title)),
         body: Row(
           children: [
             NavigationRail(
-              selectedIndex: _tabIndex,
+              selectedIndex: safeIndex,
               onDestinationSelected: (value) =>
                   setState(() => _tabIndex = value),
               labelType: isDesktop
                   ? NavigationRailLabelType.all
                   : NavigationRailLabelType.selected,
               destinations: [
-                NavigationRailDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: Text(tabTitles[0]),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.people_outline),
-                  selectedIcon: Icon(Icons.people),
-                  label: Text(tabTitles[1]),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.person_add_alt_outlined),
-                  selectedIcon: Icon(Icons.person_add_alt_1),
-                  label: Text(tabTitles[2]),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.widgets_outlined),
-                  selectedIcon: Icon(Icons.widgets),
-                  label: Text(tabTitles[3]),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.account_circle_outlined),
-                  selectedIcon: Icon(Icons.account_circle),
-                  label: Text(tabTitles[4]),
-                ),
+                for (final t in navTabs)
+                  NavigationRailDestination(
+                    icon: Icon(t.icon),
+                    selectedIcon: Icon(t.selectedIcon),
+                    label: Text(t.title),
+                  ),
               ],
             ),
             const VerticalDivider(width: 1),
@@ -210,40 +224,38 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(tabTitles[_tabIndex])),
+      appBar: AppBar(title: Text(navTabs[safeIndex].title)),
       body: content,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex,
+        selectedIndex: safeIndex,
         onDestinationSelected: (value) => setState(() => _tabIndex = value),
         labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         destinations: [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: bottomNavLabels[0],
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: bottomNavLabels[1],
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_add_alt_outlined),
-            selectedIcon: Icon(Icons.person_add_alt_1),
-            label: bottomNavLabels[2],
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.widgets_outlined),
-            selectedIcon: Icon(Icons.widgets),
-            label: bottomNavLabels[3],
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_circle_outlined),
-            selectedIcon: Icon(Icons.account_circle),
-            label: bottomNavLabels[4],
-          ),
+          for (final t in navTabs)
+            NavigationDestination(
+              icon: Icon(t.icon),
+              selectedIcon: Icon(t.selectedIcon),
+              label: shouldUseCompactNavLabels ? t.shortLabel : t.title,
+            ),
         ],
       ),
     );
   }
+}
+
+/// Description d'un onglet de navigation de l'accueil.
+class _NavTab {
+  const _NavTab({
+    required this.title,
+    required this.shortLabel,
+    required this.icon,
+    required this.selectedIcon,
+    required this.page,
+  });
+
+  final String title;
+  final String shortLabel;
+  final IconData icon;
+  final IconData selectedIcon;
+  final Widget page;
 }

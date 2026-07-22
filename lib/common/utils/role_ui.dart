@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'kcolors.dart';
+import 'roles.dart';
 
 /// Représentation visuelle d'un rôle utilisateur (icône, couleur, libellé).
 class RoleUi {
@@ -12,29 +13,59 @@ class RoleUi {
 
   static RoleUi of(String? role) {
     switch (role) {
-      case 'admin':
+      case AppRoles.admin:
         return const RoleUi(
-          'Admin',
+          'Administrateur',
           Icons.admin_panel_settings_rounded,
           Kolors.kPrimaryDark,
         );
-      case 'medecin':
+      case AppRoles.adminEtablissement:
+        return const RoleUi(
+          "Admin d'établissement",
+          Icons.manage_accounts_rounded,
+          Kolors.kPrimary,
+        );
+      case AppRoles.medecin:
         return const RoleUi(
           'Médecin',
           Icons.medical_services_rounded,
           Kolors.kBlue,
         );
-      case 'pharmacien':
+      case AppRoles.infirmier:
+        return const RoleUi(
+          'Infirmier',
+          Icons.vaccines_rounded,
+          Kolors.kSuccess,
+        );
+      case AppRoles.sageFemme:
+        return const RoleUi(
+          'Sage-femme',
+          Icons.pregnant_woman_rounded,
+          Kolors.kGold,
+        );
+      case AppRoles.pharmacien:
         return const RoleUi(
           'Pharmacien',
           Icons.local_pharmacy_rounded,
-          Kolors.kSuccess,
+          Kolors.kPrimaryLight,
         );
-      case 'caissier':
+      case AppRoles.laborantin:
+        return const RoleUi(
+          'Laborantin',
+          Icons.science_rounded,
+          Kolors.kBlue,
+        );
+      case AppRoles.caissier:
         return const RoleUi(
           'Caissier',
           Icons.point_of_sale_rounded,
           Kolors.kWarning,
+        );
+      case AppRoles.gestionnaire:
+        return const RoleUi(
+          'Gestionnaire',
+          Icons.badge_rounded,
+          Kolors.kGray,
         );
       default:
         return RoleUi(
