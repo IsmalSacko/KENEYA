@@ -211,6 +211,15 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                   ],
                 ),
               ),
+              if (_canRouteTo(item))
+                IconButton(
+                  tooltip: 'Itinéraire',
+                  icon: const Icon(
+                    Icons.directions_rounded,
+                    color: Color(0xFF2563EB),
+                  ),
+                  onPressed: () => _openItinerary(item),
+                ),
               if (widget.allowUpdate || widget.allowDelete) _actionsMenu(item),
             ],
           ),
@@ -235,22 +244,10 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
       icon: const Icon(Icons.more_vert, color: Color(0xFF4B6358)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (value) {
-        if (value == 'itineraire') _openItinerary(item);
         if (value == 'update') _update(item);
         if (value == 'delete') _delete(item);
       },
       itemBuilder: (context) => [
-        if (_canRouteTo(item))
-          const PopupMenuItem<String>(
-            value: 'itineraire',
-            child: Row(
-              children: [
-                Icon(Icons.directions_rounded, size: 18, color: Color(0xFF2563EB)),
-                SizedBox(width: 10),
-                Text('Itinéraire', style: TextStyle(color: Color(0xFF2563EB))),
-              ],
-            ),
-          ),
         if (widget.allowUpdate)
           const PopupMenuItem<String>(
             value: 'update',

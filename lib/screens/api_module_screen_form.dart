@@ -59,6 +59,37 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (widget.endpoint == '/etablissements') ...[
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.my_location_rounded, size: 18),
+                          label: const Text('Utiliser ma position'),
+                          onPressed: () async {
+                            final pos =
+                                await GeolocationService.currentPosition();
+                            if (pos == null) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Position indisponible (permission refusée ou GPS désactivé).',
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+                            textControllers['latitude']?.text = pos.latitude
+                                .toStringAsFixed(7);
+                            textControllers['longitude']?.text = pos.longitude
+                                .toStringAsFixed(7);
+                            setModalState(() {});
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     for (final f in fields) ...[
                       if (_isVisible(f, values))
                         _buildField(
