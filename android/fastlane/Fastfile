@@ -1,20 +1,20 @@
 default_platform(:android)
 
 platform :android do
-  desc "Déploie l'App Bundle sur la piste interne du Play Store"
-  lane :internal do
+  desc "Déploie l'App Bundle sur la piste de test fermé (closed) du Play Store"
+  lane :closed do
     upload_to_play_store(
-      track: "internal",
+      track: "alpha",
       aab: "../build/app/outputs/bundle/release/app-release.aab",
       skip_upload_apk: true,
       release_status: "draft"
     )
   end
 
-  desc "Promeut la dernière version de la piste interne vers la production"
+  desc "Promeut la dernière version de la piste de test fermé vers la production"
   lane :promote_to_production do
     upload_to_play_store(
-      track: "internal",
+      track: "alpha",
       track_promote_to: "production",
       skip_upload_aab: true,
       skip_upload_apk: true,
