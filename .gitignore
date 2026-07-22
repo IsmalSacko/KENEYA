@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Clés de compte de service Google (ne jamais committer)
+/*-*.json
+keneya-*.json
+terres-*.json
+play-service-account.json
