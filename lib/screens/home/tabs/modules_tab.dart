@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/controllers/etablissement_controller.dart';
+import 'package:keneya_plus/screens/dashboard/user_stats_screen.dart';
 import 'package:keneya_plus/screens/home/widgets/module_card.dart';
 import 'package:keneya_plus/screens/modules/consultations_screen.dart';
 import 'package:keneya_plus/screens/modules/etablissements_screen.dart';
@@ -139,6 +140,13 @@ class ModulesTab extends StatelessWidget {
           allowUpdate: isAdmin,
           allowDelete: isAdmin,
         ),
+      ),
+      _ModuleItem(
+        title: 'Statistiques utilisateurs',
+        subtitle: 'Effectifs, activité, inscriptions',
+        icon: Icons.insights_rounded,
+        allowedRoles: const {'admin'},
+        builder: (_) => const UserStatsScreen(),
       ),
     ];
     final visibleModules = modules.where((module) {
