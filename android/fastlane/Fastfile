@@ -1,0 +1,26 @@
+default_platform(:android)
+
+platform :android do
+  desc "Déploie l'App Bundle sur la piste interne du Play Store"
+  lane :internal do
+    upload_to_play_store(
+      track: "internal",
+      aab: "../build/app/outputs/bundle/release/app-release.aab",
+      skip_upload_apk: true,
+      release_status: "draft"
+    )
+  end
+
+  desc "Promeut la dernière version de la piste interne vers la production"
+  lane :promote_to_production do
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to: "production",
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end
