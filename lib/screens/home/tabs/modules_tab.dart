@@ -134,8 +134,11 @@ class ModulesTab extends StatelessWidget {
         subtitle: 'Gestion des structures',
         icon: Icons.local_hospital_outlined,
         allowedRoles: const {'admin'},
-        builder: (_) =>
-            EtablissementsScreen(allowUpdate: isAdmin, allowDelete: isAdmin),
+        builder: (_) => EtablissementsScreen(
+          allowCreate: isAdmin,
+          allowUpdate: isAdmin,
+          allowDelete: isAdmin,
+        ),
       ),
     ];
     final visibleModules = modules.where((module) {
