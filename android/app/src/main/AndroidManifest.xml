@@ -9,6 +9,17 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
+        <!--
+          Impeller désactivé. Il suppose que le pilote graphique fournit une
+          configuration EGL hors écran ; les PowerVR anciens n'en fournissent
+          pas, et Flutter déréférence alors un pointeur nul dans son fil de
+          rendu. Constaté sur un PowerVR Rogue GE8100 avec un pilote de 2018 :
+          l'application se fermait au lancement, sans message, sur un matériel
+          où tout le reste fonctionnait. Skia n'a pas cette exigence.
+        -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
