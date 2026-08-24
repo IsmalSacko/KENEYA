@@ -16,6 +16,15 @@
           rendu. Constaté sur un PowerVR Rogue GE8100 avec un pilote de 2018 :
           l'application se fermait au lancement, sans message, sur un matériel
           où tout le reste fonctionnait. Skia n'a pas cette exigence.
+
+          Vérifié le 24/08/2026 sur un Android 10 (API 29, armeabi-v7a) du Play
+          Store : sans ce drapeau, SIGSEGV dans le fil « 1.raster » 800 ms après
+          le lancement ; avec, l'application démarre normalement.
+
+          Attention : le moteur signale désormais « Impeller opt-out deprecated » —
+          ce drapeau disparaîtra dans une prochaine version de Flutter. Il faudra
+          soit remonter le bug en amont, soit vérifier le comportement d'Impeller
+          sur ce matériel avant de monter de version majeure de Flutter.
         -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
