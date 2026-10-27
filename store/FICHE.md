@@ -134,10 +134,27 @@ est tracée. Suppression du compte : par la page ci-dessus.
 
 ---
 
-## Ce qui manque avant de publier
+## Déclarations à remplir dans la console (à recopier)
 
-1. **Déployer l'API** : la page `/confidentialite` doit répondre avant de
-   l'indiquer à Play (une application de santé est refusée sans elle).
-2. **L'e-mail de contact** de la fiche.
-3. **La déclaration « applications de santé »** dans la console (Contenu de
-   l'application).
+**Contenu de l'application › Règles de confidentialité**
+`https://keneya.ismaeldev.fr/confidentialite` (en ligne).
+
+**Contenu de l'application › Applications de santé**
+- Fonctionnalités à cocher : *Dossiers médicaux et de santé*, *Gestion
+  d'établissement de santé* (cabinet, clinique, hôpital), *Prise de
+  rendez-vous*, *Pharmacie et médicaments*, *Santé maternelle et infantile*.
+- Dispositif médical réglementé : **Non** (aucun diagnostic, aucune décision
+  de traitement automatique).
+- Application d'un organisme public : **Non**.
+- Données de santé : collectées par l'établissement, chiffrées en transit,
+  jamais vendues ni partagées à des tiers ; le patient ouvre lui-même son
+  dossier à un autre établissement et peut retirer l'accès.
+
+**Contenu de l'application › Suppression des données**
+`https://keneya.ismaeldev.fr/suppression-compte` (en ligne).
+
+**Coordonnées**
+E-mail de contact : à choisir (celui qui répondra aux utilisateurs).
+
+Ensuite : valider le brouillon Alpha, puis « Promouvoir la version » vers
+Production quand l'essai en centre est concluant.
