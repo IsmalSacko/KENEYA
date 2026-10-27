@@ -188,11 +188,16 @@ class Personne {
     required this.nom,
     required this.paysCode,
     required this.telephone,
+    this.pro = false,
   });
 
   final String uuid;
   final String nom;
   final String paysCode;
+
+  /// Professionnel de santé : il voit aussi la partie pro (son établissement).
+  /// « Ma santé » reste à tout le monde : un soignant est aussi un patient.
+  final bool pro;
 
   /// Format international : +22376123456.
   final String telephone;
@@ -204,6 +209,7 @@ class Personne {
     nom: (j['nom'] ?? '').toString(),
     paysCode: (j['pays_code'] ?? Pays.defaut).toString(),
     telephone: (j['telephone'] ?? '').toString(),
+    pro: j['pro'] == true || j['pro'] == 1,
   );
 
   Map<String, dynamic> toJson() => {
@@ -211,6 +217,7 @@ class Personne {
     'nom': nom,
     'pays_code': paysCode,
     'telephone': telephone,
+    'pro': pro,
   };
 }
 
@@ -226,6 +233,7 @@ class Espace {
     required this.profil,
     required this.modules,
     required this.devise,
+    this.valide = true,
   });
 
   final String membreUuid;
@@ -237,6 +245,10 @@ class Espace {
   final String profil;
   final List<String> modules;
   final String devise;
+
+  /// Créé depuis l'app : invisible des patients tant que Ngoni Santé ne l'a
+  /// pas vérifié.
+  final bool valide;
 
   String get profilLabel => ProfilEtablissement.labelDe(profil);
 
@@ -254,6 +266,7 @@ class Espace {
       profil: (e['profil'] ?? '').toString(),
       modules: _strings(e['modules']),
       devise: (e['devise'] ?? '').toString(),
+      valide: e['valide'] != false,
     );
   }
 
@@ -268,6 +281,7 @@ class Espace {
       'profil': profil,
       'modules': modules,
       'devise': devise,
+      'valide': valide,
     },
   };
 }

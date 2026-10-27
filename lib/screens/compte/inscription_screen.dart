@@ -26,6 +26,10 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
   final _code = TextEditingController();
   String _pays = Pays.defaut;
 
+  /// Professionnel de santé : il verra aussi la partie pro. « Ma santé »
+  /// reste à tous.
+  bool _pro = false;
+
   /// Le serveur exige le code SMS : on l'a envoyé, on le demande.
   bool _codeDemande = false;
 
@@ -48,6 +52,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
       nom: _nom.text.trim(),
       pin: _pin.text,
       code: _codeDemande ? _code.text.trim() : null,
+      pro: _pro,
     );
     if (!mounted) return;
     switch (resultat) {
@@ -74,6 +79,38 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const Text(
+                'Vous êtes :',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.person_outline_rounded),
+                    label: Text('Patient'),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.medical_services_outlined),
+                    label: Text('Professionnel'),
+                  ),
+                ],
+                selected: {_pro},
+                onSelectionChanged: (s) => setState(() => _pro = s.first),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _pro
+                    ? 'Vous gardez « Ma santé » pour vous soigner, et vous pourrez créer votre établissement. Si votre établissement vous a déjà ajouté, votre espace apparaîtra tout seul.'
+                    : 'Rendez-vous, tickets, ordonnances et dossier : tout au même endroit.',
+                style: const TextStyle(
+                  color: Kolors.kTextMuted,
+                  fontSize: 12.5,
+                ),
+              ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _nom,
                 textCapitalization: TextCapitalization.words,

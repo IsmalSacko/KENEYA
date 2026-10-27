@@ -160,34 +160,51 @@ class MaSanteScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const CarteSanteScreen()),
               ),
             ),
-            const SizedBox(height: 20),
-            const _Titre('Espace pro'),
-            for (final espace in compte.espaces)
-              _Tuile(
-                icone: Icons.local_hospital_rounded,
-                titre: espace.etablissementNom,
-                texte: '${espace.roleLabel} · ${espace.profilLabel}',
-                onTap: espace.actif
-                    ? () => ouvrirEspace(context, espace)
-                    : null,
-              ),
-            _Tuile(
-              icone: Icons.add_business_rounded,
-              titre: 'Créer mon établissement',
-              texte: 'Cabinet, pharmacie, centre de santé, clinique…',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const CreerEtablissementScreen(),
+            // La partie pro : pour les professionnels, ou ceux qu'un
+            // établissement a déjà ajoutés. « Ma santé » reste à tous.
+            if (compte.personne?.pro == true || compte.espaces.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const _Titre('Espace pro'),
+              for (final espace in compte.espaces)
+                _Tuile(
+                  icone: Icons.local_hospital_rounded,
+                  titre: espace.etablissementNom,
+                  texte: [
+                    '${espace.roleLabel} · ${espace.profilLabel}',
+                    if (!espace.valide) 'en attente de vérification',
+                  ].join(' · '),
+                  onTap: espace.actif
+                      ? () => ouvrirEspace(context, espace)
+                      : null,
+                ),
+              if (compte.personne?.pro == true)
+                _Tuile(
+                  icone: Icons.add_business_rounded,
+                  titre: 'Créer mon établissement',
+                  texte: 'Cabinet, pharmacie, centre de santé, clinique…',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CreerEtablissementScreen(),
+                    ),
+                  ),
+                ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(4, 4, 4, 0),
+                child: Text(
+                  'Vous travaillez dans un établissement ? Demandez à son responsable de vous ajouter avec votre numéro : il apparaîtra ici.',
+                  style: TextStyle(color: Kolors.kTextMuted, fontSize: 12.5),
                 ),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(4, 4, 4, 0),
-              child: Text(
-                'Vous travaillez dans un établissement ? Demandez à son responsable de vous ajouter avec votre numéro : il apparaîtra ici.',
-                style: TextStyle(color: Kolors.kTextMuted, fontSize: 12.5),
+            ] else ...[
+              const SizedBox(height: 20),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => _devenirPro(context, compte),
+                  icon: const Icon(Icons.medical_services_outlined, size: 18),
+                  label: const Text('Vous êtes professionnel de santé ?'),
+                ),
               ),
-            ),
+            ],
             if (compte.chargement)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -338,4 +355,29 @@ class _MesTicketsState extends State<_MesTickets> {
       ],
     );
   }
+}
+
+/// Un patient qui est aussi soignant : la partie pro s'ouvre sur le même
+/// compte (pas de second compte).
+Future<void> _devenirPro(BuildContext context, CompteController compte) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Professionnel de santé'),
+      content: const Text(
+        'Vous gardez « Ma santé » pour vous soigner. En plus, vous pourrez créer votre établissement (vérifié par Ngoni Santé avant d’être visible des patients).\n\nSi votre établissement vous ajoute avec votre numéro, votre espace apparaît tout seul : rien à faire.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Oui, je suis professionnel'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true) await compte.devenirPro();
 }

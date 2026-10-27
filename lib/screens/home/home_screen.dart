@@ -299,6 +299,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final content = Column(
       children: [
+        if (!auth.etablissementValide)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            color: Kolors.kJauneDoux,
+            child: const Text(
+              'En attente de vérification par Ngoni Santé : configurez tout, les patients verront votre établissement une fois vérifié.',
+            ),
+          ),
         if (_isOffline)
           Container(
             width: double.infinity,

@@ -64,12 +64,14 @@ class CompteApi {
     required String nom,
     required String pin,
     String? code,
+    bool pro = false,
   }) => _post('/compte/inscription', {
     'pays_code': paysCode,
     'telephone': telephone,
     'nom': nom,
     'pin': pin,
     'code': ?code,
+    'pro': pro,
   });
 
   /// [objet] : `inscription` ou `pin`.
@@ -96,6 +98,11 @@ class CompteApi {
     'pin': pin,
   });
 
+  /// La personne indique qu'elle est professionnelle de santé.
+  Future<void> devenirPro() async {
+    await _dio.patch('/compte', data: {'pro': true});
+  }
+
   Future<Map<String, dynamic>> moi() async {
     final res = await _dio.get('/compte');
     return Map<String, dynamic>.from(res.data as Map);
@@ -109,11 +116,15 @@ class CompteApi {
     required String profil,
     required String uuid,
     required String membreUuid,
+    required String autorisation,
+    required String responsable,
   }) => _post('/compte/etablissements', {
     'nom': nom,
     'profil': profil,
     'uuid': uuid,
     'membre_uuid': membreUuid,
+    'autorisation': autorisation,
+    'responsable': responsable,
   });
 
   // ------------------------------------------------------------ tickets

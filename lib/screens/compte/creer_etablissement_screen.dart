@@ -20,6 +20,8 @@ class CreerEtablissementScreen extends StatefulWidget {
 class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nom = TextEditingController();
+  final _autorisation = TextEditingController();
+  final _responsable = TextEditingController();
   String? _profil;
 
   static const _icones = <String, IconData>{
@@ -36,6 +38,8 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
   @override
   void dispose() {
     _nom.dispose();
+    _autorisation.dispose();
+    _responsable.dispose();
     super.dispose();
   }
 
@@ -49,11 +53,17 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
     final ok = await compte.creerEtablissement(
       nom: _nom.text.trim(),
       profil: _profil!,
+      autorisation: _autorisation.text.trim(),
+      responsable: _responsable.text.trim(),
       auth: context.read<AuthController>(),
     );
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).popUntil((route) => route.isFirst);
+      afficherMessage(
+        context,
+        'Demande envoyée : configurez votre établissement dès maintenant. Les patients le verront après vérification par Ngoni Santé.',
+      );
     } else {
       afficherMessage(context, compte.erreur ?? 'Création impossible.');
     }
@@ -105,9 +115,38 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
               validator: (v) =>
                   (v ?? '').trim().length < 2 ? 'Indiquez le nom' : null,
             ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _autorisation,
+              decoration: const InputDecoration(
+                labelText: 'N° d’autorisation, d’agrément ou d’ordre',
+                hintText: 'ex. arrêté d’ouverture, licence de pharmacie',
+                prefixIcon: Icon(Icons.verified_outlined),
+              ),
+              validator: (v) =>
+                  (v ?? '').trim().length < 3 ? 'Indiquez le numéro' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _responsable,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Responsable (nom et titre)',
+                hintText: 'ex. Dr Fatoumata Diarra, médecin-chef',
+                prefixIcon: Icon(Icons.person_pin_outlined),
+              ),
+              validator: (v) => (v ?? '').trim().length < 3
+                  ? 'Indiquez le responsable'
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Ngoni Santé vérifie chaque établissement avant de le montrer aux patients. En attendant, vous pouvez déjà tout configurer.',
+              style: TextStyle(color: Kolors.kTextMuted, fontSize: 12.5),
+            ),
             const SizedBox(height: 18),
             BoutonAcces(
-              label: 'Créer et ouvrir mon espace',
+              label: 'Envoyer la demande et ouvrir mon espace',
               chargement: compte.chargement,
               onPressed: _valider,
             ),

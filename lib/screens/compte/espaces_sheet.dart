@@ -105,16 +105,17 @@ class _FeuilleEspaces extends StatelessWidget {
                   onTap: () =>
                       _ouvrir(context, () => compte.ouvrirEspace(espace, auth)),
                 ),
-              _Ligne(
-                icone: Icons.add_business_rounded,
-                titre: 'Créer mon établissement',
-                sousTitre: 'Cabinet, pharmacie, centre de santé…',
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const CreerEtablissementScreen(),
+              if (compte.personne?.pro == true)
+                _Ligne(
+                  icone: Icons.add_business_rounded,
+                  titre: 'Créer mon établissement',
+                  sousTitre: 'Cabinet, pharmacie, centre de santé…',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CreerEtablissementScreen(),
+                    ),
                   ),
                 ),
-              ),
             ],
             if (compte.chargement)
               const Padding(

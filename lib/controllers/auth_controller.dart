@@ -26,6 +26,9 @@ class AuthController extends ChangeNotifier {
   /// Officine où le client paie au caissier (le vendeur n'encaisse pas).
   bool caisseSeparee = false;
 
+  /// Vérifié par Ngoni Santé : visible des patients (recherche, tickets, RDV).
+  bool etablissementValide = true;
+
   /// Pharmacie ou dépôt : un commerce, où l'on vend plutôt qu'on soigne.
   bool get estOfficine =>
       profil == 'pharmacie' || profil == 'depot_medicaments';
@@ -283,6 +286,9 @@ class AuthController extends ChangeNotifier {
       profil = e['profil']?.toString();
       devise = (e['devise'] ?? devise).toString();
       caisseSeparee = e['caisse_separee'] == true;
+      if (e.containsKey('valide_at')) {
+        etablissementValide = e['valide_at'] != null;
+      }
     }
   }
 
@@ -293,6 +299,7 @@ class AuthController extends ChangeNotifier {
       'profil': profil,
       'devise': devise,
       'caisse_separee': caisseSeparee,
+      'valide_at': etablissementValide ? 'oui' : null,
     },
   };
 

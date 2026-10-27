@@ -164,6 +164,7 @@ class CompteController extends ChangeNotifier {
     required String nom,
     required String pin,
     String? code,
+    bool pro = false,
   }) async {
     var resultat = ResultatInscription.echec;
     await _action(() async {
@@ -174,6 +175,7 @@ class CompteController extends ChangeNotifier {
           nom: nom,
           pin: pin,
           code: code,
+          pro: pro,
         );
         await _enregistrerConnexion(data, paysCode, telephone, pin);
         resultat = ResultatInscription.reussie;
@@ -256,10 +258,20 @@ class CompteController extends ChangeNotifier {
     return true;
   });
 
+  /// « Je suis professionnel de santé » : la partie pro s'ouvre, sans second
+  /// compte (« Ma santé » reste la sienne).
+  Future<bool> devenirPro() => _action(() async {
+    await _api.devenirPro();
+    await rafraichir();
+    return true;
+  });
+
   /// La personne crée son établissement et ouvre aussitôt son espace.
   Future<bool> creerEtablissement({
     required String nom,
     required String profil,
+    required String autorisation,
+    required String responsable,
     required AuthController auth,
   }) => _action(() async {
     if (!await _envoyerEnAttente()) return false;
@@ -269,6 +281,8 @@ class CompteController extends ChangeNotifier {
       profil: profil,
       uuid: uuidV4(),
       membreUuid: membreUuid,
+      autorisation: autorisation,
+      responsable: responsable,
     );
     await auth.ouvrirSessionMembre(data, membreUuid);
     await rafraichir();
