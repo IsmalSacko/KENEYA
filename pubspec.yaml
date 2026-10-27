@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 4.0.2+11
+version: 4.0.3+12
 
 environment:
   sdk: ^3.10.7
@@ -102,7 +102,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/fonts/
+    # assets/fonts/ (Inter, 40 Mo) n'est pas livré : l'app utilise Poppins et
+    # Nunito Sans par google_fonts.
 
 flutter_launcher_icons:
   android: true
@@ -150,7 +151,7 @@ msix_config:
   publisher_display_name: Ismael Dev
   identity_name: A_RECOPIER_DEPUIS_PARTNER_CENTER
   publisher: CN=A_RECOPIER_DEPUIS_PARTNER_CENTER
-  msix_version: 4.0.2.0
+  msix_version: 4.0.3.0
   logo_path: assets/images/app_icon_1024.png
   languages: fr-fr
   capabilities: internetClient, location

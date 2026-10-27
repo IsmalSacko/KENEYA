@@ -74,4 +74,14 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // DataStore (préférences) 1.3 : sa bibliothèque native est recompilée
+    // avec le NDK r27. La 1.2 (NDK r20) peut planter sur les appareils à
+    // pages mémoire de 16 Ko (alerte Play).
+    constraints {
+        implementation("androidx.datastore:datastore-core-android:1.3.0")
+        implementation("androidx.datastore:datastore-preferences-core-android:1.3.0")
+        implementation("androidx.datastore:datastore-preferences-android:1.3.0")
+        implementation("androidx.datastore:datastore-android:1.3.0")
+    }
+    implementation("androidx.core:core-ktx:1.16.0")
 }

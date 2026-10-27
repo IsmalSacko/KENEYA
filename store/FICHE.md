@@ -89,7 +89,7 @@ Une question : keneya.ismaeldev.fr
 ## Notes de version (500 caractères)
 
 ```
-Rapport du mois en tableau de bord (indicateurs, graphiques, comparaison au mois précédent). Pharmacie : vente à crédit, annulation d'une vente, inventaire complet. Équipe : ajout d'un membre avec invitation WhatsApp. Patients : fusion de deux fiches en double. Corrections.
+Application plus légère et plus stable : compatible avec les nouveaux téléphones (mémoire 16 Ko), affichage bord à bord sur toutes les versions d'Android. Rapport du mois en tableau de bord, pharmacie (crédit, annulation, inventaire), invitation de l'équipe, fusion des fiches patient.
 ```
 
 ## Catégorie et classement

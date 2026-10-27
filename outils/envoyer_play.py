@@ -38,6 +38,9 @@ def main():
     if not AAB.exists():
         sys.exit('App Bundle introuvable : lancez d\'abord « flutter build appbundle --release ».')
 
+    # Un bundle plus ancien que la version du pubspec : la construction a échoué.
+    if AAB.stat().st_mtime < (PROJET / 'pubspec.yaml').stat().st_mtime:
+        sys.exit('L\'App Bundle est plus ancien que pubspec.yaml : relancez « flutter build appbundle --release ».')
     version = re.search(r'^version:\s*([\d.]+)\+(\d+)', (PROJET / 'pubspec.yaml').read_text(), re.M)
     nom, build_ = version.group(1), version.group(2)
     notes_fichier = NOTES / f'{build_}.txt'

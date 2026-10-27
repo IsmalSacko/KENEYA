@@ -1,1 +1,0 @@
-Rapport du mois en tableau de bord (indicateurs, graphiques, comparaison au mois précédent). Pharmacie : vente à crédit, annulation d'une vente, inventaire complet. Équipe : ajout d'un membre avec invitation WhatsApp. Patients : fusion de deux fiches en double. Corrections.
