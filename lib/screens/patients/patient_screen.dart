@@ -16,6 +16,7 @@ import '../../dossier/dossier_models.dart';
 import '../../file/file_service.dart';
 import '../../patients/patients_service.dart';
 import '../caisse/visite_screen.dart';
+import '../commun/scanner_qr_screen.dart';
 import '../dossier/dossier_screen.dart';
 import '../dossier/dossier_widgets.dart';
 import '../hospitalisation/sejour_screen.dart';
@@ -497,6 +498,24 @@ class _PatientScreenState extends State<PatientScreen> {
     }
   }
 
+  /// Le patient a l'app : il montre « Ma carte », l'accueil la scanne, et
+  /// cette fiche rejoint son dossier Ngoni Santé (il la voit dans l'app).
+  Future<void> _relier() async {
+    final qr = await scannerQr(
+      context,
+      titre: 'Carte santé',
+      consigne: 'Le patient ouvre « Ma carte » dans l’app Ngoni Santé.',
+    );
+    if (qr == null || !mounted) return;
+    try {
+      final p = await _service.relier(_p.uuid, qr);
+      if (mounted) setState(() => _p = p);
+      _dire('Fiche reliée à son compte Ngoni Santé.');
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
   /// Deux fiches pour la même personne : on choisit le doublon, il rejoint
   /// cette fiche (visites, examens, numéro gardé) puis disparaît.
   Future<void> _fusionner() async {
@@ -630,6 +649,9 @@ class _PatientScreenState extends State<PatientScreen> {
           'Dossier médical',
           () => _ouvrir(ecranDossier()),
         ),
+      // Il a l'app : sa fiche d'ici rejoint son dossier Ngoni Santé.
+      if (!p.aUnCompte && auth.peut('patients.gerer'))
+        _Action(Icons.link_rounded, 'Relier à son compte', _relier),
       if (p.telephone != null)
         _Action(
           Icons.chat_outlined,

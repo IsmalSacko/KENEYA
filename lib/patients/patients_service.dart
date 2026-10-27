@@ -190,6 +190,15 @@ class PatientsService {
     return '${(res.data as Map)['pin']}';
   }
 
+  /// Le patient montre sa carte santé : la fiche rejoint son compte.
+  Future<Patient> relier(String uuid, String qrCarte) async {
+    final res = await ApiClient.dio.post(
+      '/patients/$uuid/relier',
+      data: {'qr': qrCarte},
+    );
+    return _p(res.data);
+  }
+
   /// [doublon] rejoint cette fiche (visites, examens…) puis disparaît.
   Future<Patient> fusionner(String uuid, String doublon) async {
     final res = await ApiClient.dio.post(
