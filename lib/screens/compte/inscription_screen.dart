@@ -84,17 +84,26 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
+              // Sur un petit écran, « Professionnel » se coupait en deux :
+              // pas de coche en plus de l'icône, et le mot rétrécit au besoin.
               SegmentedButton<bool>(
+                showSelectedIcon: false,
                 segments: const [
                   ButtonSegment(
                     value: false,
                     icon: Icon(Icons.person_outline_rounded),
-                    label: Text('Patient'),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Patient', maxLines: 1),
+                    ),
                   ),
                   ButtonSegment(
                     value: true,
                     icon: Icon(Icons.medical_services_outlined),
-                    label: Text('Professionnel'),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Professionnel', maxLines: 1),
+                    ),
                   ),
                 ],
                 selected: {_pro},
