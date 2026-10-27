@@ -77,6 +77,16 @@ def main():
             **({'releaseNotes': [{'language': 'fr-FR', 'text': notes}]} if notes else {}),
         }],
     }).execute()
+    # La fiche (titre, descriptions) part avec la version.
+    fiche = PROJET / 'android/fastlane/metadata/android/fr-FR'
+    if (fiche / 'full_description.txt').exists():
+        edits.listings().update(packageName=PAQUET, editId=edit, language='fr-FR', body={
+            'language': 'fr-FR',
+            'title': (fiche / 'title.txt').read_text().strip(),
+            'shortDescription': (fiche / 'short_description.txt').read_text().strip(),
+            'fullDescription': (fiche / 'full_description.txt').read_text().strip(),
+        }).execute()
+        print('  fiche Play mise à jour (titre, descriptions)')
     edits.commit(packageName=PAQUET, editId=edit).execute()
     print(f'✓ {nom} (build {code}) envoyée sur la piste « {piste} », en brouillon : à valider dans la Play Console.')
 

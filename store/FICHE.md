@@ -35,61 +35,58 @@ Ngoni Santé
 ## Description courte (80 caractères)
 
 ```
-Accueil, consultation, labo, maternité, caisse : le centre de santé en une app.
+Le logiciel des centres de santé : accueil, file, consultation, labo, caisse.
 ```
 
 ## Description complète (4 000 caractères)
 
 ```
-Ngoni Santé fait tourner un centre de santé, un cabinet, une clinique ou une pharmacie dans une seule application — et donne au patient, dans la même application, son ticket, ses rendez-vous et son dossier.
+Ngoni Santé est le logiciel de gestion des établissements de santé : centre de santé (CSCom), cabinet médical ou dentaire, clinique, maternité, laboratoire, pharmacie et dépôt de médicaments. Une seule application pour toute l'équipe — accueil, soignants, laboratoire, pharmacie, caisse — chacun avec ses droits.
 
-UNE JOURNÉE AU CENTRE DE SANTÉ
+UNE JOURNÉE DANS L'ÉTABLISSEMENT
 
-• L'accueil — Le patient est enregistré une seule fois : nom, âge, téléphone, quartier. Le lendemain, on le retrouve en tapant trois lettres de son nom. Un enfant amené avec le téléphone de sa mère reste un patient à part.
+• L'accueil — Chaque patient a son dossier numéroté, créé une fois : on le retrouve en tapant trois lettres de son nom, son téléphone ou son numéro. Les doublons se fusionnent.
 
-• La file d'attente — Un ticket par service, l'urgence et les femmes enceintes d'abord, sans oublier ceux qui attendent depuis le matin. Écran d'appel en salle, borne, ticket imprimé avec QR, et SMS « c'est bientôt à vous » : plus personne ne fait le pied de grue devant la porte.
+• La file d'attente — Un ticket par service, priorité aux urgences et aux femmes enceintes, écran d'appel en salle, borne d'entrée, ticket imprimé avec QR. Un seul ticket par patient, même s'il l'a pris depuis chez lui.
 
-• Le tri — L'infirmier note la tension, la température, le poids. Le médecin les retrouve dans sa consultation, déjà remplies.
+• Le tri et la consultation — Constantes prises au tri, retrouvées par le médecin. Motif, examen, diagnostic (CIM-10), conclusion, rendez-vous de contrôle.
 
-• La consultation — Motif, examen, diagnostic (CIM-10 au besoin), conclusion, date à revoir. Le dossier montre les allergies en rouge.
+• Le laboratoire — Analyses demandées en consultation, étiquette QR sur le tube, résultat hors normes en rouge, validation.
 
-• Le dossier qui suit le patient — D'un centre à l'autre, avec son accord : il montre un QR ou dicte un code reçu par SMS, et le soignant voit son historique pendant 7 jours. Le patient voit qui a ouvert son dossier.
+• L'ordonnance — Prescrite dans le catalogue de la pharmacie, avec prix et stock ; signée numériquement, elle se vérifie par QR, même sans connexion.
 
-• Le laboratoire — Le médecin coche les analyses, elles arrivent au labo et sur la facture. Étiquette QR sur le tube, résultat hors normes en rouge, validation, et le patient est prévenu par SMS que ses résultats sont prêts.
+• La maternité et la vaccination — Grossesse, consultations prénatales, accouchement, carnet de vaccination selon le PEV.
 
-• L'ordonnance — Signée numériquement : n'importe quelle pharmacie Ngoni Santé la vérifie en scannant son QR, même sans connexion.
+• L'hospitalisation — Lits et chambres, plan de soins, bracelet QR scanné avant chaque soin.
 
-• La maternité — Grossesse et terme, consultations prénatales (TPI, VAT, fer), accouchement, dossier du nouveau-né, carnet de vaccination selon le PEV avec rappel SMS la veille.
+• La caisse — Une facture par passage, Mobile Money (Orange, Moov, Wave), part de l'assurance, reçu imprimé ou envoyé par WhatsApp, clôture de caisse.
 
-• L'hospitalisation — Lits et chambres, plan de soins heure par heure, bracelet QR scanné au lit avant chaque soin : si ce n'est pas le bon patient, l'application refuse.
+• La pharmacie — Écran de vente comme une caisse de boutique : code-barres, panier, encaissement en un geste, vente à crédit. Lots et péremption, inventaire, liste à commander au grossiste.
 
-• La caisse — Une seule facture pour toute la visite. Le ticket de consultation est facturé dès l'accueil. Espèces, Orange Money, Moov, Wave ; part de l'assurance déduite ; clôture de caisse avec l'écart du tiroir.
+• Le pilotage — Rapport du mois : fréquentation, consultations par âge et sexe, diagnostics, paludisme, CPN, vaccins, recettes, comparés au mois précédent.
 
-• La pharmacie — Lots et dates de péremption (le plus proche sort d'abord, jamais un périmé), vente au comptoir, délivrance d'ordonnance par scan, alertes de stock.
+POUR LES PATIENTS DE L'ÉTABLISSEMENT
 
-• L'équipe — Chacun voit ce qui le concerne : la caisse ne lit pas les dossiers médicaux. Badges QR pour le pointage, visiteurs enregistrés à l'entrée.
+Les patients peuvent suivre leur ticket depuis leur téléphone, prendre rendez-vous, signaler leur arrivée et retrouver leurs ordonnances. Leur dossier médical reste fermé aux autres établissements sauf s'ils l'ouvrent eux-mêmes.
 
-POUR LE PATIENT
+PENSÉ POUR NOS ÉTABLISSEMENTS
 
-La même application lui donne son ticket depuis chez lui, ses rendez-vous et leurs rappels, sa carte santé QR, ses ordonnances, ses résultats d'analyses, le suivi de sa grossesse et le carnet de vaccination de ses enfants. Il garde la main sur son dossier : c'est lui qui l'ouvre à un nouveau soignant, et il peut retirer cet accès.
-
-PENSÉE POUR NOS CENTRES
-
-• En français, montants en francs CFA et dans la devise de chaque pays.
-• Le numéro de téléphone suffit : pas d'adresse e-mail.
-• Faite pour les téléphones et tablettes d'entrée de gamme.
+• En français, montants en francs CFA.
+• Le numéro de téléphone suffit pour se connecter.
+• Rappels par WhatsApp et notifications, sans frais de SMS.
+• Fait pour les téléphones et tablettes d'entrée de gamme.
 
 À SAVOIR
 
-Ngoni Santé est un outil de travail pour les soignants et un carnet pour le patient. L'application ne pose pas de diagnostic et ne remplace pas une consultation.
+Ngoni Santé est un outil de travail pour les professionnels de santé. Ce n'est pas un dispositif médical : il ne pose pas de diagnostic et ne remplace pas l'avis d'un soignant.
 
-Une question : keneya.ismaeldev.fr
+Une question : ismael-dev.com
 ```
 
 ## Notes de version (500 caractères)
 
 ```
-À l'inscription, choisissez Patient ou Professionnel : un seul compte, « Ma santé » pour tous. Les nouveaux établissements sont vérifiés avant d'être visibles des patients. À l'accueil, la fiche d'un patient se relie à son compte en scannant sa carte santé : il retrouve tout dans l'app.
+Reçu après chaque encaissement : numéro de facture, imprimé, en PDF ou par WhatsApp. Un seul ticket par patient, même pris depuis chez lui. « Je suis arrivé » à portée de main pour les patients. Appairage des écrans et bornes plus clair. Corrections d'affichage (affiche de l'accueil, ordonnance).
 ```
 
 ## Catégorie et classement
@@ -97,14 +94,14 @@ Une question : keneya.ismaeldev.fr
 | Champ | Valeur |
 | --- | --- |
 | Type d'application | Application |
-| Catégorie | Médecine |
-| Balises | Gestion d'entreprise, Santé |
+| Catégorie | Entreprise (outil de gestion pour les professionnels de santé) |
+| Balises | Gestion d'entreprise, Productivité |
 | Classification du contenu | Tout public (aucun contenu sensible) |
 | Public cible | 18 ans et plus |
 | Application conçue pour les familles | Non |
 | Contient des annonces | Non |
 | Achats intégrés | Non |
-| Déclaration « applications de santé » | Oui : gestion d'établissement de santé et dossier patient ; ce n'est pas un dispositif médical, il ne pose pas de diagnostic |
+| Déclaration « applications de santé » | Obligatoire pour toutes les apps : on y déclare un outil pour professionnels (gestion d'établissement), pas une app santé grand public ni un dispositif médical |
 
 ## Coordonnées
 
@@ -140,15 +137,17 @@ est tracée. Suppression du compte : par la page ci-dessus.
 `https://keneya.ismaeldev.fr/confidentialite` (en ligne).
 
 **Contenu de l'application › Applications de santé**
-- Fonctionnalités à cocher : *Dossiers médicaux et de santé*, *Gestion
-  d'établissement de santé* (cabinet, clinique, hôpital), *Prise de
-  rendez-vous*, *Pharmacie et médicaments*, *Santé maternelle et infantile*.
-- Dispositif médical réglementé : **Non** (aucun diagnostic, aucune décision
-  de traitement automatique).
+Google pose ce questionnaire à **toutes** les apps. Ngoni Santé n'est pas une
+app santé grand public : c'est un outil pour les professionnels de santé.
+- Fonctionnalités à cocher, et seulement elles : *Gestion des services de
+  santé* (gestion d'établissement, prise de rendez-vous, dossiers tenus par
+  les soignants). Ne pas cocher le suivi de la santé, le bien-être, la
+  forme, ni la santé mentale.
+- Dispositif médical réglementé : **Non** (aucun diagnostic, aucune
+  décision de traitement automatique).
 - Application d'un organisme public : **Non**.
-- Données de santé : collectées par l'établissement, chiffrées en transit,
-  jamais vendues ni partagées à des tiers ; le patient ouvre lui-même son
-  dossier à un autre établissement et peut retirer l'accès.
+- Données de santé : saisies par les soignants de l'établissement, chiffrées
+  en transit, jamais vendues ni partagées à des tiers.
 
 **Contenu de l'application › Suppression des données**
 `https://keneya.ismaeldev.fr/suppression-compte` (en ligne).
