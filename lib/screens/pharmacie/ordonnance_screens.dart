@@ -2,17 +2,25 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../caisse/caisse_models.dart';
 import '../../common/utils/kcolors.dart';
+import '../../common/widgets/feuille.dart';
+import '../../controllers/auth_controller.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../compte/compte_api.dart';
 import '../../core/api/api_client.dart';
 import '../../pharmacie/pharmacie_models.dart';
 import '../../pharmacie/pharmacie_service.dart';
+import 'delivrance_screen.dart';
 
-/// Le médecin prescrit : produit, posologie, quantité. L'ordonnance est
-/// signée ; son QR se délivre dans n'importe quelle pharmacie Ngoni Santé.
+/// Le médecin prescrit : produit (pris dans la pharmacie de l'établissement,
+/// avec son prix et son stock, ou écrit librement), posologie, quantité.
+/// L'ordonnance est signée ; son QR se délivre dans n'importe quelle
+/// pharmacie Ngoni Santé. Le prix va sur la facture quand la pharmacie
+/// délivre : on ne paie que ce qu'on emporte.
 class PrescrireScreen extends StatefulWidget {
   const PrescrireScreen({this.visiteUuid, this.patient, super.key});
 
@@ -25,6 +33,9 @@ class PrescrireScreen extends StatefulWidget {
 
 class _LignePrescrite {
   final produit = TextEditingController();
+
+  /// Le produit de la pharmacie, s'il a été choisi dans la liste.
+  Produit? choisi;
   final posologie = TextEditingController();
   final quantite = TextEditingController(text: '1');
 }
@@ -32,7 +43,44 @@ class _LignePrescrite {
 class _PrescrireScreenState extends State<PrescrireScreen> {
   late final _patient = TextEditingController(text: widget.patient);
   final List<_LignePrescrite> _lignes = [_LignePrescrite()];
+  List<Produit> _catalogue = [];
   bool _envoi = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sans pharmacie (ou sans droit), on écrit le produit librement.
+    PharmacieService()
+        .produits()
+        .then((l) {
+          if (mounted) setState(() => _catalogue = l);
+        })
+        .catchError((Object _) {});
+  }
+
+  Future<void> _choisir(_LignePrescrite l) async {
+    final p = await feuille<Produit>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => ChoixProduit(produits: _catalogue),
+    );
+    if (p == null) return;
+    setState(() {
+      l.choisi = p;
+      l.produit.text = p.nom;
+      if ((int.tryParse(l.quantite.text) ?? 0) <= 1 && p.conditionnement > 1) {
+        l.quantite.text = '${p.conditionnement}';
+      }
+    });
+  }
+
+  /// Ce que le patient paiera à la pharmacie, si tout est délivré ici.
+  double get _total => [
+    for (final l in _lignes)
+      if (l.choisi != null)
+        prixPrescrit(l.choisi!, int.tryParse(l.quantite.text) ?? 0),
+  ].fold(0, (a, b) => a + b);
 
   Future<void> _valider() async {
     final lignes = [
@@ -43,6 +91,7 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
             'produit': l.produit.text.trim(),
             'posologie': l.posologie.text.trim(),
             'quantite': int.parse(l.quantite.text),
+            'medicament_uuid': ?l.choisi?.uuid,
           },
     ];
     if (lignes.isEmpty) return;
@@ -68,6 +117,8 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final devise = context.read<AuthController>().devise;
+    final total = _total;
     return Scaffold(
       appBar: AppBar(title: const Text('Ordonnance')),
       body: ListView(
@@ -96,17 +147,51 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
                   children: [
                     TextField(
                       controller: _lignes[i].produit,
+                      // Écrit à la main : ce n'est plus le produit choisi.
+                      onChanged: (v) {
+                        if (_lignes[i].choisi?.nom != v) {
+                          setState(() => _lignes[i].choisi = null);
+                        }
+                      },
                       decoration: InputDecoration(
                         labelText: 'Produit ${i + 1} (ex. Paracétamol 500 mg)',
-                        suffixIcon: _lignes.length > 1
-                            ? IconButton(
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_catalogue.isNotEmpty)
+                              IconButton(
+                                tooltip: 'Choisir dans la pharmacie',
+                                icon: const Icon(Icons.medication_outlined),
+                                onPressed: () => _choisir(_lignes[i]),
+                              ),
+                            if (_lignes.length > 1)
+                              IconButton(
                                 icon: const Icon(Icons.close_rounded),
                                 onPressed: () =>
                                     setState(() => _lignes.removeAt(i)),
-                              )
-                            : null,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
+                    if (_lignes[i].choisi case final p?)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            p.stockUnites == 0
+                                ? '${prixProduit(p, devise)} · rupture : à acheter ailleurs'
+                                : '${prixProduit(p, devise)} · ${p.stockLabel}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: p.stockUnites == 0
+                                  ? Kolors.kRed
+                                  : Kolors.kTextMuted,
+                            ),
+                          ),
+                        ),
+                      ),
                     TextField(
                       controller: _lignes[i].posologie,
                       decoration: const InputDecoration(
@@ -116,6 +201,7 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
                     ),
                     TextField(
                       controller: _lignes[i].quantite,
+                      onChanged: (_) => setState(() {}),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: const InputDecoration(
@@ -131,6 +217,20 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
             icon: const Icon(Icons.add),
             label: const Text('Ajouter un produit'),
           ),
+          if (total > 0) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Total prévu à la pharmacie : ${formatMontant(lireMontant('$total', devise) ?? 0, devise)}',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Text(
+              'Il s’ajoute à la facture quand la pharmacie délivre.',
+              style: TextStyle(color: Kolors.kTextMuted),
+            ),
+          ],
           const SizedBox(height: 16),
           SizedBox(
             height: 52,

@@ -160,6 +160,37 @@ class OrdonnanceRx {
   );
 }
 
+/// Un patient attendu à la pharmacie : son ticket (s'il fait la queue) et
+/// ses ordonnances du jour qui restent à servir.
+class PatientAServir {
+  const PatientAServir({
+    required this.patient,
+    required this.ordonnances,
+    this.visiteUuid,
+    this.ticketCode,
+    this.ticketStatut,
+  });
+
+  final String patient;
+  final List<OrdonnanceRx> ordonnances;
+  final String? visiteUuid;
+  final String? ticketCode;
+  final String? ticketStatut;
+
+  factory PatientAServir.fromJson(Map<String, dynamic> j) {
+    final t = j['ticket'] is Map
+        ? Map<String, dynamic>.from(j['ticket'] as Map)
+        : null;
+    return PatientAServir(
+      patient: (j['patient'] ?? '').toString(),
+      ordonnances: _maps(j['ordonnances']).map(OrdonnanceRx.fromJson).toList(),
+      visiteUuid: j['visite_uuid']?.toString(),
+      ticketCode: t?['code']?.toString(),
+      ticketStatut: t?['statut']?.toString(),
+    );
+  }
+}
+
 int _int(dynamic v, [int defaut = 0]) =>
     v is int ? v : int.tryParse(v?.toString() ?? '') ?? defaut;
 

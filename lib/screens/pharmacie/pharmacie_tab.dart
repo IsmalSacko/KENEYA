@@ -13,6 +13,7 @@ import '../../pharmacie/pharmacie_service.dart';
 import '../../pharmacie/verification_ordonnance.dart';
 import '../commun/scanner_qr_screen.dart';
 import 'delivrance_screen.dart';
+import '../../common/widgets/feuille.dart';
 import '../../common/widgets/formulaire.dart';
 
 /// La pharmacie : délivrer (ordonnance scannée ou comptoir), et le stock
@@ -28,6 +29,7 @@ class _PharmacieTabState extends State<PharmacieTab> {
   final _service = PharmacieService();
   final _recherche = TextEditingController();
   List<Produit> _produits = [];
+  List<PatientAServir> _aServir = [];
   Map<String, dynamic>? _alertes;
   bool _chargement = true;
 
@@ -45,9 +47,11 @@ class _PharmacieTabState extends State<PharmacieTab> {
   }
 
   Future<void> _charger() async {
+    final delivre = context.read<AuthController>().peut('pharmacie.delivrer');
     try {
       _produits = await _service.produits(recherche: _recherche.text.trim());
       _alertes = await _service.alertes();
+      if (delivre) _aServir = await _service.aServir();
     } on DioException catch (e) {
       _dire(messageErreur(e));
     } finally {
@@ -118,6 +122,41 @@ class _PharmacieTabState extends State<PharmacieTab> {
     }
   }
 
+  /// Servir un patient de la liste : son ordonnance s'ouvre telle quelle,
+  /// sans scanner ; s'il n'en a pas, une vente sur sa facture.
+  Future<void> _servir(PatientAServir p) async {
+    var o = p.ordonnances.firstOrNull;
+    if (p.ordonnances.length > 1) {
+      o = await feuille<OrdonnanceRx>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final x in p.ordonnances)
+                ListTile(
+                  leading: const Icon(Icons.receipt_long_rounded),
+                  title: Text(x.prescripteur ?? 'Ordonnance'),
+                  subtitle: Text(x.lignes.map((l) => l.produit).join(', ')),
+                  onTap: () => Navigator.pop(ctx, x),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (o == null) return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            DelivranceScreen(ordonnance: o, visiteUuid: p.visiteUuid),
+      ),
+    );
+    _charger();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
@@ -135,6 +174,10 @@ class _PharmacieTabState extends State<PharmacieTab> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (delivre && _aServir.isNotEmpty) ...[
+            _AServir(patients: _aServir, onServir: _servir),
+            const SizedBox(height: 16),
+          ],
           if (delivre) ...[
             SizedBox(
               height: 56,
@@ -304,6 +347,69 @@ class _PharmacieTabState extends State<PharmacieTab> {
     } on DioException catch (e) {
       _dire(messageErreur(e));
     }
+  }
+}
+
+/// Les patients envoyés à la pharmacie : un toucher pour les servir.
+class _AServir extends StatelessWidget {
+  const _AServir({required this.patients, required this.onServir});
+
+  final List<PatientAServir> patients;
+  final ValueChanged<PatientAServir> onServir;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'À servir (${patients.length})',
+          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Card(
+          child: Column(
+            children: [
+              for (final p in patients)
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Kolors.kJauneDoux,
+                    foregroundColor: Kolors.kPrimaryDark,
+                    child: p.ticketCode == null
+                        ? const Icon(Icons.receipt_long_rounded, size: 20)
+                        : Text(
+                            p.ticketCode!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                  ),
+                  title: Text(
+                    p.patient,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    p.ordonnances.isEmpty
+                        ? 'Sans ordonnance : vente sur sa facture'
+                        : [
+                            for (final o in p.ordonnances)
+                              for (final l in o.lignes.where(
+                                (l) => l.reste > 0,
+                              ))
+                                '${l.produit} × ${l.reste}',
+                          ].join(' · '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => onServir(p),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

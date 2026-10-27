@@ -1,8 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
+import '../../caisse/caisse_models.dart';
 import '../../common/utils/kcolors.dart';
+import '../../controllers/auth_controller.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../core/api/api_client.dart';
 import '../../pharmacie/pharmacie_models.dart';
@@ -14,9 +17,17 @@ import '../../common/widgets/feuille.dart';
 /// qui reste), ou au comptoir. La délivrance facture sur la visite ; la
 /// caisse encaisse ensuite.
 class DelivranceScreen extends StatefulWidget {
-  const DelivranceScreen({this.ordonnance, this.horsLigne = false, super.key});
+  const DelivranceScreen({
+    this.ordonnance,
+    this.visiteUuid,
+    this.horsLigne = false,
+    super.key,
+  });
 
   final OrdonnanceRx? ordonnance;
+
+  /// La visite du patient qui attend : la délivrance s'ajoute à sa facture.
+  final String? visiteUuid;
 
   /// Ordonnance vérifiée sans internet : on montre, on ne délivre pas.
   final bool horsLigne;
@@ -109,7 +120,7 @@ class _DelivranceScreenState extends State<DelivranceScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _ChoixProduit(produits: _produits),
+      builder: (_) => ChoixProduit(produits: _produits),
     );
   }
 
@@ -120,15 +131,19 @@ class _DelivranceScreenState extends State<DelivranceScreen> {
     if (pretes.isEmpty) return;
     setState(() => _envoi = true);
     try {
-      final visite = await _service.delivrer([
-        for (final l in pretes)
-          {
-            'medicament_uuid': l.produit!.uuid,
-            'quantite': l.quantite,
-            'unite': l.unite,
-            'ordonnance_ligne_uuid': ?l.prescrite?.uuid,
-          },
-      ], ordonnance: widget.ordonnance?.uuid);
+      final visite = await _service.delivrer(
+        [
+          for (final l in pretes)
+            {
+              'medicament_uuid': l.produit!.uuid,
+              'quantite': l.quantite,
+              'unite': l.unite,
+              'ordonnance_ligne_uuid': ?l.prescrite?.uuid,
+            },
+        ],
+        ordonnance: widget.ordonnance?.uuid,
+        visite: widget.visiteUuid,
+      );
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => VisiteScreen(uuid: visite.uuid)),
@@ -357,16 +372,17 @@ class _DelivranceScreenState extends State<DelivranceScreen> {
   }
 }
 
-class _ChoixProduit extends StatefulWidget {
-  const _ChoixProduit({required this.produits});
+/// Choisir un produit de la pharmacie : nom ou molécule, avec prix et stock.
+class ChoixProduit extends StatefulWidget {
+  const ChoixProduit({required this.produits, super.key});
 
   final List<Produit> produits;
 
   @override
-  State<_ChoixProduit> createState() => _ChoixProduitState();
+  State<ChoixProduit> createState() => ChoixProduitState();
 }
 
-class _ChoixProduitState extends State<_ChoixProduit> {
+class ChoixProduitState extends State<ChoixProduit> {
   String _q = '';
 
   @override
@@ -403,6 +419,7 @@ class _ChoixProduitState extends State<_ChoixProduit> {
                     subtitle: Text(
                       [
                         p.description,
+                        prixProduit(p, context.read<AuthController>().devise),
                         p.stockLabel,
                       ].where((s) => s.isNotEmpty).join(' · '),
                     ),
@@ -422,3 +439,22 @@ class _ChoixProduitState extends State<_ChoixProduit> {
     );
   }
 }
+
+/// « 1 500 FCFA la boîte de 10 · 200 FCFA l'unité ».
+String prixProduit(Produit p, String devise) {
+  String m(double v) => formatMontant(lireMontant('$v', devise) ?? 0, devise);
+  return [
+    p.conditionnement > 1
+        ? '${m(p.prixBoite)} la boîte de ${p.conditionnement}'
+        : m(p.prixBoite),
+    if (p.venteUnite && p.prixUnite != null) "${m(p.prixUnite!)} l'unité",
+  ].join(' · ');
+}
+
+/// Le prix de [unites] unités prescrites : à l'unité si elle se vend ainsi,
+/// sinon en boîtes entières.
+double prixPrescrit(Produit p, int unites) =>
+    p.venteUnite && p.prixUnite != null
+    ? p.prixUnite! * unites
+    : p.prixBoite *
+          (unites / (p.conditionnement < 1 ? 1 : p.conditionnement)).ceil();

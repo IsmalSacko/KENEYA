@@ -300,10 +300,14 @@ class _CaisseTabState extends State<CaisseTab> {
                       trailing: Text(
                         v.reste > 0
                             ? formatMontant(v.reste, v.devise)
-                            : (v.total > 0 ? 'Payé' : 'Rien à facturer'),
+                            : (v.total > 0 ? 'Payé' : 'Pas encore facturé'),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
-                          color: v.reste > 0 ? Kolors.kGold : Kolors.kSuccess,
+                          color: v.reste > 0
+                              ? Kolors.kGold
+                              : v.total > 0
+                              ? Kolors.kSuccess
+                              : Kolors.kTextMuted,
                         ),
                       ),
                       onTap: () async {

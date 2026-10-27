@@ -63,6 +63,12 @@ class PharmacieService {
     return Map<String, dynamic>.from(res.data as Map);
   }
 
+  /// Qui attend à la pharmacie aujourd'hui, avec ses ordonnances.
+  Future<List<PatientAServir>> aServir() async {
+    final res = await ApiClient.dio.get('/pharmacie/a-servir');
+    return _liste(res.data).map(PatientAServir.fromJson).toList();
+  }
+
   Future<OrdonnanceRx> lireOrdonnance(String qr) async {
     final res = await ApiClient.dio.post(
       '/pharmacie/ordonnances/lire',
@@ -92,7 +98,8 @@ class PharmacieService {
     );
   }
 
-  /// [lignes] : produit, posologie, quantite.
+  /// [lignes] : produit, posologie, quantite, medicament_uuid (produit de la
+  /// pharmacie).
   Future<OrdonnanceRx> prescrire(
     List<Map<String, dynamic>> lignes, {
     String? visite,
