@@ -463,11 +463,7 @@ class _PatientScreenState extends State<PatientScreen> {
 
     final tuiles = <_Action>[
       if (envoyer && duJour != null)
-        _Action(
-          Icons.confirmation_number_outlined,
-          'Autre service',
-          _envoyer,
-        ),
+        _Action(Icons.confirmation_number_outlined, 'Autre service', _envoyer),
       if (visite != null && auth.peut('ordonnance.prescrire'))
         _Action(
           Icons.receipt_long_outlined,
@@ -597,6 +593,15 @@ class _PatientScreenState extends State<PatientScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (p.numero != null)
+                          Text(
+                            'Dossier N° ${p.numero}',
+                            style: TextStyle(
+                              color: Kolors.kWhite.withValues(alpha: 0.85),
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         if (p.resume.isNotEmpty)
                           Text(
                             p.resume,
