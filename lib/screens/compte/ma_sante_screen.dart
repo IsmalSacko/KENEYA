@@ -102,6 +102,17 @@ class MaSanteScreen extends StatelessWidget {
               ),
             ),
             const _MesTickets(),
+            const SizedBox(height: 12),
+            // À l'accueil, le patient qui a rendez-vous scanne l'affiche :
+            // le geste doit être à portée de main, pas au fond d'un menu.
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              onPressed: () => jeSuisArrive(context),
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('J’ai rendez-vous : je suis arrivé'),
+            ),
             const SizedBox(height: 20),
             const _Titre('Mes services'),
             _Tuile(
