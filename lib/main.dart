@@ -24,6 +24,7 @@ import 'controllers/user_controller.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth_gateway_screen.dart';
 import 'screens/compte/ma_sante_screen.dart';
+import 'common/widgets/tout_selectionnable.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/local_notification_service.dart';
 
@@ -100,6 +101,8 @@ class KeneyaPlusApp extends StatelessWidget {
             // L'app est en français : calendriers et boutons système aussi,
             // même sur un téléphone réglé en anglais.
             locale: const Locale('fr'),
+            builder: (context, child) =>
+                ToutSelectionnable(child: child ?? const SizedBox.shrink()),
             home: const _AppEntryPoint(),
           );
         },
