@@ -9,6 +9,7 @@ import '../../common/utils/kcolors.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/options_serveur.dart';
 import '../../dossier/dossier_models.dart';
 import '../../dossier/dossier_service.dart';
 import '../commun/scanner_qr_screen.dart';
@@ -72,6 +73,37 @@ class _DossierScreenState extends State<DossierScreen> {
   void _message(String texte) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(texte)));
+
+  Future<void> _accordSurPlace(DossierPatient d) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Accord du patient'),
+        content: const Text(
+          'Le patient est devant vous et accepte que vous voyiez son historique pendant 7 jours. '
+          'C’est noté, et il le verra dans son app.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Il est d’accord'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final ouvert = await _service.accorderSurPlace(d.uuid);
+      if (mounted) setState(() => _d = ouvert);
+      _message('Historique ouvert pour 7 jours.');
+    } on DioException catch (e) {
+      _message(messageErreur(e));
+    }
+  }
 
   Future<void> _demanderParSms(DossierPatient d) async {
     try {
@@ -271,7 +303,10 @@ class _DossierScreenState extends State<DossierScreen> {
                   if (!d.accesHistorique && d.peutDemanderAcces)
                     _DemandeAcces(
                       ailleurs: d.consultationsAilleurs,
-                      onSms: () => _demanderParSms(d),
+                      onSms: OptionsServeur.sms
+                          ? () => _demanderParSms(d)
+                          : null,
+                      onSurPlace: () => _accordSurPlace(d),
                       onQr: _scannerAccord,
                     ),
                   if ((widget.visiteUuid != null &&
@@ -378,11 +413,15 @@ class _DemandeAcces extends StatelessWidget {
   const _DemandeAcces({
     required this.ailleurs,
     required this.onSms,
+    required this.onSurPlace,
     required this.onQr,
   });
 
   final int ailleurs;
-  final VoidCallback onSms;
+
+  /// Null quand les SMS ne partent pas.
+  final VoidCallback? onSms;
+  final VoidCallback onSurPlace;
   final VoidCallback onQr;
 
   @override
@@ -413,10 +452,16 @@ class _DemandeAcces extends StatelessWidget {
                   icon: const Icon(Icons.qr_code_scanner_rounded),
                   label: const Text('Scanner son QR'),
                 ),
+                if (onSms != null)
+                  OutlinedButton.icon(
+                    onPressed: onSms,
+                    icon: const Icon(Icons.sms_outlined),
+                    label: const Text('Code par SMS'),
+                  ),
                 OutlinedButton.icon(
-                  onPressed: onSms,
-                  icon: const Icon(Icons.sms_outlined),
-                  label: const Text('Code par SMS'),
+                  onPressed: onSurPlace,
+                  icon: const Icon(Icons.record_voice_over_outlined),
+                  label: const Text('Il est là et d’accord'),
                 ),
               ],
             ),

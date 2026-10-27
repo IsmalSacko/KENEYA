@@ -120,6 +120,7 @@ class DemandeLabo {
     required this.etablissement,
     required this.lignes,
     this.dossierUuid,
+    this.telephone,
     this.qr,
     this.date,
     this.prescripteur,
@@ -134,6 +135,7 @@ class DemandeLabo {
   final String etablissement;
   final List<LigneLabo> lignes;
   final String? dossierUuid;
+  final String? telephone;
   final String? qr;
   final DateTime? date;
   final String? prescripteur;
@@ -158,6 +160,7 @@ class DemandeLabo {
           LigneLabo.fromJson(Map<String, dynamic>.from(l)),
     ],
     dossierUuid: _texte(j['dossier_uuid']),
+    telephone: _texte(j['telephone']),
     qr: _texte(j['qr']),
     date: DateTime.tryParse((j['date'] ?? '').toString())?.toLocal(),
     prescripteur: _texte(j['prescripteur']),

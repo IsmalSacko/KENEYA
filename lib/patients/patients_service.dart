@@ -150,6 +150,12 @@ class PatientsService {
   Future<Patient> modifier(String uuid, Map<String, dynamic> identite) async =>
       _p((await ApiClient.dio.patch('/patients/$uuid', data: identite)).data);
 
+  /// PIN oublié : un nouveau PIN, remis par l'accueil.
+  Future<String> nouveauPin(String uuid) async {
+    final res = await ApiClient.dio.post('/patients/$uuid/nouveau-pin');
+    return '${(res.data as Map)['pin']}';
+  }
+
   Patient _p(Object? data) => Patient.fromJson(
     Map<String, dynamic>.from((data as Map)['patient'] as Map),
   );

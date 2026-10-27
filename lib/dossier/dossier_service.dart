@@ -53,6 +53,11 @@ class DossierService {
         )).data,
       );
 
+  /// Le patient est là et d'accord, de vive voix (sans SMS).
+  Future<DossierPatient> accorderSurPlace(String uuid) async => _dossier(
+    (await ApiClient.dio.post('/dossiers/$uuid/acces/sur-place')).data,
+  );
+
   Future<DossierPatient> accorderParQr(String qr) async => _dossier(
     (await ApiClient.dio.post('/dossiers/acces-qr', data: {'qr': qr})).data,
   );

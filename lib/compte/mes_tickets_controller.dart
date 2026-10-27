@@ -21,6 +21,9 @@ class MesTicketsController extends ChangeNotifier {
   /// Statut connu de chaque ticket, pour ne notifier qu'au changement.
   final Map<String, String> _statuts = {};
 
+  /// Tickets déjà prévenus que leur tour approche (une seule fois).
+  final Set<String> _bientot = {};
+
   Future<void> rafraichir() async {
     try {
       final data = await _api.mesTickets();
@@ -33,6 +36,18 @@ class MesTicketsController extends ChangeNotifier {
             body: t.salle == null
                 ? '${t.serviceNom}, ${t.etablissementNom}'
                 : 'Allez à ${t.salle} (${t.serviceNom})',
+          );
+        }
+        // Deux personnes avant soi : il est temps de revenir près de la salle.
+        if (!t.appele &&
+            t.position != null &&
+            t.position! <= 2 &&
+            _bientot.add(t.uuid)) {
+          LocalNotificationService.show(
+            title: 'Bientôt à vous — ticket ${t.code}',
+            body: t.position == 0
+                ? 'Vous êtes le prochain (${t.serviceNom}).'
+                : '${t.position} personne(s) avant vous (${t.serviceNom}).',
           );
         }
         _statuts[t.uuid] = t.statut;

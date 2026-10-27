@@ -195,6 +195,56 @@ class _PatientScreenState extends State<PatientScreen> {
     }
   }
 
+  Future<void> _nouveauPin() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('PIN oublié'),
+        content: const Text(
+          'Vérifiez sa pièce d’identité. Un nouveau PIN va s’afficher : donnez-le lui, il pourra le changer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Pièce vérifiée'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final pin = await _service.nouveauPin(_p.uuid);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Nouveau PIN'),
+          content: Text(
+            pin,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 40,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 8,
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('C’est noté'),
+            ),
+          ],
+        ),
+      );
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
   Future<void> _rendezVous() async {
     try {
       final agendas = await RdvService().agendas();
@@ -237,6 +287,12 @@ class _PatientScreenState extends State<PatientScreen> {
               tooltip: 'Corriger la fiche',
               icon: const Icon(Icons.edit_rounded),
               onPressed: _modifier,
+            ),
+          if (auth.peut('patients.gerer') && _p.aUnCompte)
+            IconButton(
+              tooltip: 'PIN oublié',
+              icon: const Icon(Icons.password_rounded),
+              onPressed: _nouveauPin,
             ),
         ],
       ),

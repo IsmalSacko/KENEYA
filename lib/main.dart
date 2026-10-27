@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -7,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'common/utils/app_theme.dart';
 import 'core/api/changement_api.dart';
+import 'core/api/options_serveur.dart';
 import 'core/offline/local_store.dart';
 import 'core/offline/sync_manager.dart';
 import 'compte/compte_controller.dart';
@@ -30,6 +32,8 @@ Future<void> main() async {
   // « lundi 2 novembre » : les dates s'écrivent en français partout.
   await initializeDateFormatting('fr');
   await LocalStore.init();
+  // Les SMS partent-ils ? (sinon WhatsApp, QR et accueil)
+  unawaited(OptionsServeur.charger());
   await ChangementApi.verifier();
   await SyncManager.instance.init();
   await LocalNotificationService.init();

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../common/utils/kcolors.dart';
+import '../../common/whatsapp.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
 import '../../rdv/rdv_models.dart';
@@ -58,6 +59,15 @@ class _RdvTabState extends State<RdvTab> {
   }
 
   Future<void> _action(RendezVousRdv r, String action) async {
+    if (action == 'whatsapp') {
+      await envoyerWhatsApp(
+        context,
+        r.patientTelephone!,
+        'Ngoni Santé : rappel de votre rendez-vous le ${r.jour.split('-').reversed.join('/')} à ${r.heure}'
+        '${r.agendaNom == null ? '' : ' (${r.agendaNom})'}, ${r.etablissementNom}. Empêché ? Prévenez-nous.',
+      );
+      return;
+    }
     try {
       if (action == 'arrivee') {
         final ticket = await _service.arrivee(r.uuid);
@@ -262,6 +272,8 @@ class _LigneRdv extends StatelessWidget {
       if (gere && rdv.statut == 'demande') ('refuser', 'Refuser'),
       if (gere && rdv.actif) ('absent', 'Absent'),
       if (gere && rdv.actif) ('annuler', 'Annuler'),
+      if (rdv.actif && (rdv.patientTelephone ?? '').isNotEmpty)
+        ('whatsapp', 'Rappel WhatsApp'),
     ];
     return ListTile(
       leading: Text(

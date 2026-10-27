@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../common/utils/kcolors.dart';
+import '../../common/whatsapp.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
@@ -302,6 +303,20 @@ class _DemandeLaboScreenState extends State<DemandeLaboScreen> {
               ),
             ),
           ],
+          if (d.validee && (d.telephone ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton.icon(
+                onPressed: () => envoyerWhatsApp(
+                  context,
+                  d.telephone!,
+                  'Ngoni Santé : vos résultats d’analyses sont prêts (${d.etablissement}). '
+                  'Passez les chercher ou ouvrez « Mon dossier » dans l’app.',
+                ),
+                icon: const Icon(Icons.chat_rounded),
+                label: const Text('Prévenir sur WhatsApp'),
+              ),
+            ),
           if (d.validee && d.validePar != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),

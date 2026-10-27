@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../common/utils/kcolors.dart';
+import '../../common/whatsapp.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/offline/local_store.dart';
@@ -453,6 +454,17 @@ class _FileTabState extends State<FileTab> {
                   Icons.campaign_rounded,
                   () => _sur('rappeler'),
                 ),
+                if (courant.telephone != null && courant.telephone!.isNotEmpty)
+                  _BoutonClair(
+                    'WhatsApp',
+                    Icons.chat_rounded,
+                    () => envoyerWhatsApp(
+                      context,
+                      courant.telephone!,
+                      'Ngoni Santé : c’est à vous ! Ticket ${courant.code}'
+                      '${courant.salle == null ? '' : ', ${courant.salle}'} (${courant.serviceNom}).',
+                    ),
+                  ),
                 if (courant.appele)
                   _BoutonClair(
                     'Absent',
