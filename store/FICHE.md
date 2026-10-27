@@ -89,7 +89,7 @@ Une question : keneya.ismaeldev.fr
 ## Notes de version (500 caractères)
 
 ```
-Pharmacies : écran Vendre (panier, code-barres, ordonnance scannée, encaissement, reçu imprimé ou WhatsApp), rayons, marge, ventes du jour, liste à commander, caisse séparée. Patients : dossiers numérotés, recherche rapide, fiche avec les bons gestes selon le métier. Caisse : vente ou facture sans ticket. File : scanner le ticket du patient. Rappels par WhatsApp et notifications, sans SMS. Corrections.
+Rapport du mois en tableau de bord (indicateurs, graphiques, comparaison au mois précédent). Pharmacie : vente à crédit, annulation d'une vente, inventaire complet. Équipe : ajout d'un membre avec invitation WhatsApp. Patients : fusion de deux fiches en double. Corrections.
 ```
 
 ## Catégorie et classement
