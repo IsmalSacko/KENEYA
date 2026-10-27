@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../common/utils/kcolors.dart';
@@ -122,7 +124,7 @@ class _PatientsTabState extends State<PatientsTab> {
                     controller: _recherche,
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.search_rounded),
-                      labelText: 'Nom ou téléphone',
+                      labelText: 'Nom, téléphone ou N°',
                     ),
                     onChanged: (_) {
                       _attente?.cancel();
@@ -162,33 +164,190 @@ class _PatientsTabState extends State<PatientsTab> {
                   style: const TextStyle(color: Kolors.kTextMuted),
                 ),
               )
-            else
-              for (final p in l)
-                Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Kolors.kSecondaryLight,
-                      child: Text(
-                        p.nom.isEmpty ? '?' : p.nom.characters.first,
-                        style: const TextStyle(
-                          color: Kolors.kPrimary,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    title: Text(p.nom),
-                    subtitle: Text(
-                      [
-                        p.resume,
-                        ?p.telephone,
-                      ].where((x) => x.isNotEmpty).join(' · '),
-                    ),
-                    onTap: () => _ouvrir(p),
+            else ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                child: Text(
+                  _recherche.text.isEmpty
+                      ? 'Dossiers patients · ${l.length}${l.length == 100 ? '+' : ''}'
+                      : '${l.length} dossier${l.length > 1 ? 's' : ''} trouvé${l.length > 1 ? 's' : ''}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Kolors.kPrimary,
                   ),
                 ),
+              ),
+              LayoutBuilder(
+                builder: (context, c) {
+                  final colonnes = c.maxWidth >= 1100
+                      ? 3
+                      : (c.maxWidth >= 640 ? 2 : 1);
+                  final largeur = (c.maxWidth - 12 * (colonnes - 1)) / colonnes;
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 14,
+                    children: [
+                      for (final p in l)
+                        SizedBox(
+                          width: largeur,
+                          child: CarteDossier(p, onTap: () => _ouvrir(p)),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Un dossier patient, comme une chemise cartonnée : l'onglet avec son
+/// numéro, l'icône du dossier, qui il est, et quand il est venu.
+class CarteDossier extends StatelessWidget {
+  const CarteDossier(this.patient, {required this.onTap, super.key});
+
+  final Patient patient;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = patient;
+    final couleur = p.enCours ? Kolors.kJaune : Kolors.kPrimary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // L'onglet de la chemise.
+        Container(
+          margin: const EdgeInsets.only(left: 14),
+          padding: const EdgeInsets.fromLTRB(12, 4, 14, 4),
+          decoration: BoxDecoration(
+            color: couleur,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+          ),
+          child: Text(
+            p.numero == null ? 'Dossier' : 'N° ${p.numero}',
+            style: TextStyle(
+              color: p.enCours ? Kolors.kPrimaryDark : Kolors.kWhite,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        Material(
+          color: Kolors.kWhite,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: couleur, width: 1.5),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: p.enCours
+                          ? Kolors.kJauneDoux
+                          : Kolors.kSecondaryLight,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.folder_shared_rounded,
+                      color: Kolors.kPrimary,
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.nom,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Kolors.kPrimaryDark,
+                          ),
+                        ),
+                        if (p.resume.isNotEmpty || p.telephone != null)
+                          Text(
+                            [
+                              p.resume,
+                              ?p.telephone,
+                            ].where((x) => x.isNotEmpty).join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Kolors.kTextMuted),
+                          ),
+                        const SizedBox(height: 6),
+                        _Etat(p),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Kolors.kTextMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// « Dans le centre aujourd'hui », « Venu le 12 oct. », ou « Jamais venu ».
+class _Etat extends StatelessWidget {
+  const _Etat(this.p);
+
+  final Patient p;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icone, texte, couleur) = p.enCours
+        ? (Icons.circle, 'Dans le centre aujourd’hui', Kolors.kGold)
+        : p.derniereVisite != null
+        ? (
+            Icons.history_rounded,
+            'Dernière visite : ${DateFormat('d MMM y', 'fr').format(p.derniereVisite!)}',
+            Kolors.kTextMuted,
+          )
+        : (
+            Icons.info_outline_rounded,
+            'Pas encore venu ici',
+            Kolors.kTextMuted,
+          );
+    return Row(
+      children: [
+        Icon(icone, size: p.enCours ? 10 : 16, color: couleur),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            texte,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: couleur,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -85,6 +85,9 @@ class Patient {
     this.sexe,
     this.dateNaissance,
     this.age,
+    this.numero,
+    this.derniereVisite,
+    this.enCours = false,
     this.visites = const [],
     this.rendezVous = const [],
   });
@@ -98,6 +101,13 @@ class Patient {
   final String? sexe;
   final String? dateNaissance;
   final int? age;
+
+  /// Le numéro de dossier (« 000012 »).
+  final String? numero;
+
+  /// Sa dernière visite ici, et s'il est dans le centre aujourd'hui (liste).
+  final DateTime? derniereVisite;
+  final bool enCours;
   final List<VisitePatient> visites;
   final List<RdvPatient> rendezVous;
 
@@ -130,6 +140,9 @@ class Patient {
     sexe: _texte(j['sexe']),
     dateNaissance: _texte(j['date_naissance']),
     age: int.tryParse('${j['age']}'),
+    numero: _texte(j['numero']),
+    derniereVisite: DateTime.tryParse('${j['derniere_visite']}')?.toLocal(),
+    enCours: j['en_cours'] == true,
     visites: [
       if (j['visites'] is List)
         for (final v in (j['visites'] as List).whereType<Map>())
