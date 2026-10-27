@@ -10,6 +10,7 @@ import '../../common/widgets/carte_marque.dart';
 import '../../compte/compte_api.dart';
 import '../../compte/mes_tickets_controller.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/options_serveur.dart';
 import '../../file/file_models.dart';
 import '../../ma_sante/etablissement_public.dart';
 import '../../rdv/rdv_models.dart';
@@ -135,12 +136,14 @@ class _PrendreRdvScreenState extends State<PrendreRdvScreen> {
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 10),
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
             child: Text(
-              'Vous recevrez un rappel par SMS la veille et peu avant.',
+              OptionsServeur.sms
+                  ? 'Vous recevrez un rappel par SMS la veille et peu avant.'
+                  : 'Votre rendez-vous sera dans « Mes rendez-vous ». Le centre peut vous le rappeler sur WhatsApp.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Kolors.kTextMuted),
+              style: const TextStyle(color: Kolors.kTextMuted),
             ),
           ),
         ],

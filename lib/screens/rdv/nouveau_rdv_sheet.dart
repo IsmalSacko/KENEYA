@@ -153,7 +153,7 @@ class _NouveauRdvState extends State<_NouveauRdv> {
                 controller: _telephone,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                  labelText: 'Téléphone (pour le rappel par SMS)',
+                  labelText: 'Téléphone (pour le rappel)',
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
               ),

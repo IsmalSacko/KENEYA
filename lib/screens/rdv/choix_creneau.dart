@@ -34,11 +34,9 @@ class _ChoixCreneauState extends State<ChoixCreneau> {
     _charger();
   }
 
-  @override
-  void didUpdateWidget(covariant ChoixCreneau old) {
-    super.didUpdateWidget(old);
-    if (old.charger != widget.charger) _charger();
-  }
+  // Pas de rechargement à chaque reconstruction du parent : sa fonction
+  // [charger] est recréée à chaque fois, et choisir une heure le reconstruit.
+  // Un autre agenda passe une autre clé, qui recrée ce widget.
 
   Future<void> _charger() async {
     setState(() {
