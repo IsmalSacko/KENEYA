@@ -190,6 +190,15 @@ class PatientsService {
     return '${(res.data as Map)['pin']}';
   }
 
+  /// [doublon] rejoint cette fiche (visites, examens…) puis disparaît.
+  Future<Patient> fusionner(String uuid, String doublon) async {
+    final res = await ApiClient.dio.post(
+      '/patients/$uuid/fusionner',
+      data: {'doublon_uuid': doublon},
+    );
+    return _p(res.data);
+  }
+
   Patient _p(Object? data) => Patient.fromJson(
     Map<String, dynamic>.from((data as Map)['patient'] as Map),
   );

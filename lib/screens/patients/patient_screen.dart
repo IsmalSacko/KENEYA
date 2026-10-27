@@ -26,6 +26,7 @@ import '../pharmacie/ordonnance_screens.dart';
 import '../../rdv/rdv_service.dart';
 import '../file/donner_ticket_sheet.dart';
 import '../rdv/nouveau_rdv_sheet.dart';
+import '../../common/widgets/feuille.dart';
 import '../../common/widgets/formulaire.dart';
 
 /// Nouveau patient à l'accueil. Pendant qu'on tape, ceux déjà enregistrés
@@ -173,6 +174,84 @@ Future<Map<String, dynamic>?> editerPatient(
       ),
     ],
   );
+}
+
+/// Chercher la fiche en double (autre que celle qu'on garde).
+class _ChoixDoublon extends StatefulWidget {
+  const _ChoixDoublon({required this.garde});
+
+  final Patient garde;
+
+  @override
+  State<_ChoixDoublon> createState() => _ChoixDoublonState();
+}
+
+class _ChoixDoublonState extends State<_ChoixDoublon> {
+  late final _q = TextEditingController(
+    text: widget.garde.nom.split(' ').first,
+  );
+  List<Patient> _trouves = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _chercher();
+  }
+
+  Future<void> _chercher() async {
+    try {
+      final l = await PatientsService().rechercher(_q.text.trim());
+      if (mounted) {
+        setState(
+          () => _trouves = l.where((p) => p.uuid != widget.garde.uuid).toList(),
+        );
+      }
+    } on DioException {
+      // Pas de réseau : la liste reste vide.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.7,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _q,
+              autofocus: true,
+              onChanged: (_) => _chercher(),
+              decoration: const InputDecoration(
+                labelText: 'La fiche en double (nom, téléphone, N°)',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              children: [
+                for (final p in _trouves)
+                  ListTile(
+                    leading: const Icon(Icons.folder_shared_outlined),
+                    title: Text(p.nom),
+                    subtitle: Text(
+                      [
+                        if (p.numero != null) 'N° ${p.numero}',
+                        p.resume,
+                        ?p.telephone,
+                      ].where((x) => x.isNotEmpty).join(' · '),
+                    ),
+                    onTap: () => Navigator.pop(context, p),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Une action de la fiche : icône et mot, un toucher.
@@ -418,6 +497,47 @@ class _PatientScreenState extends State<PatientScreen> {
     }
   }
 
+  /// Deux fiches pour la même personne : on choisit le doublon, il rejoint
+  /// cette fiche (visites, examens, numéro gardé) puis disparaît.
+  Future<void> _fusionner() async {
+    final doublon = await feuille<Patient>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _ChoixDoublon(garde: _p),
+    );
+    if (doublon == null || !mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Fusionner les deux fiches ?'),
+        content: Text(
+          'On garde « ${_p.nom} »${_p.numero == null ? '' : ' (N° ${_p.numero})'}. '
+          'Les visites, rendez-vous et examens de « ${doublon.nom} » y sont rangés, '
+          'puis la fiche « ${doublon.nom} » disparaît. On ne peut pas revenir en arrière.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Fusionner'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final p = await _service.fusionner(_p.uuid, doublon.uuid);
+      if (mounted) setState(() => _p = p);
+      _dire('Fiches fusionnées.');
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
   Future<void> _rendezVous() async {
     try {
       final agendas = await RdvService().agendas();
@@ -565,6 +685,12 @@ class _PatientScreenState extends State<PatientScreen> {
               tooltip: 'Corriger la fiche',
               icon: const Icon(Icons.edit_rounded),
               onPressed: _modifier,
+            ),
+          if (auth.peut('patients.gerer'))
+            IconButton(
+              tooltip: 'Fusionner une fiche en double',
+              icon: const Icon(Icons.merge_rounded),
+              onPressed: _fusionner,
             ),
           if (auth.peut('patients.gerer') && _p.aUnCompte)
             IconButton(
