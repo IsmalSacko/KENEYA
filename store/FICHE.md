@@ -18,6 +18,12 @@ des données de démonstration (un CSCom de Bamako) :
 `outils/polices.sh` (une fois), puis `flutter test tool/captures_store.dart`.
 L'icône et l'image de présentation : `python3 outils/marque.py`.
 
+**La fiche part avec l'app.** `python3 outils/fiche_play.py` range ces textes
+et ces visuels dans `android/fastlane/metadata/android/fr-FR/` (notes de
+version au numéro de build du `pubspec.yaml`) ; le workflow de déploiement les
+envoie au Play Store avec l'App Bundle. Après une retouche de cette fiche ou
+des captures : relancer le script, committer, déployer.
+
 ---
 
 ## Nom de l'application (30 caractères)

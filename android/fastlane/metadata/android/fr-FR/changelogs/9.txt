@@ -1,0 +1,1 @@
+KENEYA+ devient Ngoni Santé : une seule application pour l'établissement et le patient. Fiche patient et tri, file d'attente avec SMS, rendez-vous, consultation, dossier partagé avec l'accord du patient, laboratoire, maternité et vaccination, hospitalisation avec bracelet QR, caisse unique avec Mobile Money et assurances, pharmacie par lots.

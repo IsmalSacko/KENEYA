@@ -1,13 +1,16 @@
 default_platform(:android)
 
 platform :android do
-  desc "Déploie l'App Bundle sur la piste choisie (défaut: alpha = test fermé)"
+  desc "Déploie l'App Bundle sur la piste choisie (défaut: alpha = test fermé), avec la fiche Play"
   lane :deploy do |options|
     track = options[:track] || "alpha"
+    # La fiche (textes, icône, captures) part avec l'app : elle est rangée
+    # dans fastlane/metadata par `python3 outils/fiche_play.py`.
     upload_to_play_store(
       track: track,
       aab: "../build/app/outputs/bundle/release/app-release.aab",
       skip_upload_apk: true,
+      metadata_path: "fastlane/metadata/android",
       release_status: "draft"
     )
   end
