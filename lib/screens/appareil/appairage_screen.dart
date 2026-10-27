@@ -27,7 +27,11 @@ class _AppairageScreenState extends State<AppairageScreen> {
   }
 
   Future<void> _appairer(String code) async {
-    if (code.length != 6 || _envoi) return;
+    if (_envoi) return;
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      afficherMessage(context, 'Le code d’appairage a 6 chiffres.');
+      return;
+    }
     setState(() => _envoi = true);
     try {
       await AppareilApi.appairer(code);
@@ -46,11 +50,21 @@ class _AppairageScreenState extends State<AppairageScreen> {
     final lu = await Navigator.of(
       context,
     ).push<String>(MaterialPageRoute(builder: (_) => const _Scanner()));
+    if (lu == null || !mounted) return;
     // QR créé par l'espace pro : « ngoni-sante:appairer:123456 ».
-    final code = lu?.split(':').last;
+    final code = RegExp(
+      r'^ngoni-sante:appairer:(\d{6})$',
+    ).firstMatch(lu.trim())?.group(1);
     if (code != null) {
       _code.text = code;
       await _appairer(code);
+    } else if (lu.startsWith('ngoni-sante:etab:')) {
+      afficherMessage(
+        context,
+        'C’est l’affiche de l’accueil, pour les patients. Pour appairer : dans l’espace pro, « Régler la file › Ajouter un écran » (ou une borne), puis scannez le QR qui s’affiche alors.',
+      );
+    } else {
+      afficherMessage(context, 'Ce QR n’est pas un code d’appairage.');
     }
   }
 
