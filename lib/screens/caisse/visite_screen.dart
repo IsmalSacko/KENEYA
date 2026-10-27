@@ -131,6 +131,34 @@ class _VisiteScreenState extends State<VisiteScreen> {
     }
   }
 
+  /// Clôturer, c'est « le patient est parti » : on prévient s'il lui reste
+  /// une ordonnance à prendre à la pharmacie.
+  Future<void> _cloturer(Visite v) async {
+    if (v.ordonnancesAServir > 0) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Ordonnance pas encore servie'),
+          content: const Text(
+            'Les médicaments ne sont pas encore facturés. Envoyez d’abord le patient à la pharmacie.\n\nS’il les achète ailleurs, clôturez : il pourra revenir avec le QR de son ordonnance.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Attendre'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Clôturer quand même'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    await _faire(() => _service.cloturerVisite(v.uuid));
+  }
+
   Future<void> _ajouter() async {
     final v = _visite!;
     final choix = await feuille<Object>(
@@ -328,6 +356,22 @@ class _VisiteScreenState extends State<VisiteScreen> {
                       ],
                     ),
                   ),
+                  if (v.ouverte && v.ordonnancesAServir > 0) ...[
+                    const SizedBox(height: 12),
+                    Card(
+                      color: Kolors.kJauneDoux,
+                      child: const ListTile(
+                        leading: Icon(
+                          Icons.medication_rounded,
+                          color: Kolors.kPrimaryDark,
+                        ),
+                        title: Text('Ordonnance pas encore servie'),
+                        subtitle: Text(
+                          'Le patient passe d’abord à la pharmacie : les médicaments s’ajoutent à cette facture quand elle les délivre.',
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Card(
                     child: Column(
@@ -542,8 +586,7 @@ class _VisiteScreenState extends State<VisiteScreen> {
                       v.total > 0) ...[
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () =>
-                          _faire(() => _service.cloturerVisite(v.uuid)),
+                      onPressed: () => _cloturer(v),
                       child: const Text('Clôturer la visite'),
                     ),
                   ],

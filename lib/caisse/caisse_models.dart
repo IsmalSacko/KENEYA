@@ -129,6 +129,7 @@ class Visite {
     this.etablissement,
     this.ouverteAt,
     this.partAssureur = 0,
+    this.ordonnancesAServir = 0,
     this.assureur,
     this.tauxAssurance,
     this.numeroAssure,
@@ -151,6 +152,9 @@ class Visite {
 
   /// La part payée par l'assureur, déjà retirée du reste.
   final int partAssureur;
+
+  /// Prescrites, pas encore servies : le médicament n'est pas encore facturé.
+  final int ordonnancesAServir;
   final String? assureur;
   final int? tauxAssurance;
   final String? numeroAssure;
@@ -183,6 +187,7 @@ class Visite {
     etablissement: j['etablissement']?.toString(),
     ouverteAt: DateTime.tryParse((j['ouverte_at'] ?? '').toString())?.toLocal(),
     partAssureur: _int(j['part_assureur']),
+    ordonnancesAServir: _int(j['ordonnances_a_servir']),
     assureur: j['assurance'] is Map
         ? (j['assurance'] as Map)['nom']?.toString()
         : null,
