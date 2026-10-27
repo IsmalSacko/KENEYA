@@ -143,7 +143,10 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12),
+                // De l'air entre les champs : sinon l'étiquette d'un champ
+                // mord sur le bord de celui du dessus.
                 child: Column(
+                  spacing: 12,
                   children: [
                     TextField(
                       controller: _lignes[i].produit,
@@ -176,7 +179,7 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
                     ),
                     if (_lignes[i].choisi case final p?)
                       Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
@@ -212,6 +215,7 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
                 ),
               ),
             ),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => setState(() => _lignes.add(_LignePrescrite())),
             icon: const Icon(Icons.add),
