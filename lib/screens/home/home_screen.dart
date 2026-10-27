@@ -39,6 +39,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isOffline = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   int _tabIndex = 0;
+
+  /// L'onglet choisi, retenu par son nom : quand un module s'allume ou
+  /// s'éteint, la liste change, mais on reste sur le même onglet.
+  String? _ongletChoisi;
   late final VoidCallback _pendingListener;
 
   @override
@@ -115,8 +119,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    if (choix != null) setState(() => _tabIndex = choix);
+    if (choix != null) _choisir(onglets, choix);
   }
+
+  void _choisir(List<_NavTab> onglets, int index) => setState(() {
+    _tabIndex = index;
+    _ongletChoisi = onglets[index].title;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -270,9 +279,10 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     // Le rôle peut changer le nombre d'onglets : on borne l'index courant.
+    final retenu = navTabs.indexWhere((t) => t.title == _ongletChoisi);
     final safeIndex = navTabs.isEmpty
         ? 0
-        : _tabIndex.clamp(0, navTabs.length - 1);
+        : (retenu >= 0 ? retenu : _tabIndex.clamp(0, navTabs.length - 1));
 
     final content = Column(
       children: [
@@ -331,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: NavigationRail(
                       selectedIndex: safeIndex,
                       onDestinationSelected: (value) =>
-                          setState(() => _tabIndex = value),
+                          _choisir(navTabs, value),
                       labelType: isDesktop
                           ? NavigationRailLabelType.all
                           : NavigationRailLabelType.selected,
@@ -370,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (navTabs.length > _visibles + 1 && value == _visibles) {
             _plus(navTabs);
           } else {
-            setState(() => _tabIndex = value);
+            _choisir(navTabs, value);
           }
         },
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
