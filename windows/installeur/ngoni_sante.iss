@@ -8,7 +8,7 @@
 
 #define Nom "Ngoni Santé"
 #define Version "4.0.2"
-#define Editeur "Rosebud"
+#define Editeur "IsmaelDev"
 #define Exe "ngoni_sante.exe"
 
 [Setup]

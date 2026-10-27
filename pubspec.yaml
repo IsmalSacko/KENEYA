@@ -147,7 +147,7 @@ flutter_native_splash:
 # produit) : à recopier tels quels.
 msix_config:
   display_name: Ngoni Santé
-  publisher_display_name: Rosebud
+  publisher_display_name: IsmaelDev
   identity_name: A_RECOPIER_DEPUIS_PARTNER_CENTER
   publisher: CN=A_RECOPIER_DEPUIS_PARTNER_CENTER
   msix_version: 4.0.2.0
