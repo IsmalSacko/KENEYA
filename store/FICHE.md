@@ -89,7 +89,7 @@ Une question : keneya.ismaeldev.fr
 ## Notes de version (500 caractères)
 
 ```
-KENEYA+ devient Ngoni Santé : une seule application pour l'établissement et le patient. Fiche patient et tri, file d'attente avec SMS, rendez-vous, consultation, dossier partagé avec l'accord du patient, laboratoire, maternité et vaccination, hospitalisation avec bracelet QR, caisse unique avec Mobile Money et assurances, pharmacie par lots.
+Pharmacies : écran Vendre (panier, code-barres, ordonnance scannée, encaissement, reçu imprimé ou WhatsApp), rayons, marge, ventes du jour, liste à commander, caisse séparée. Patients : dossiers numérotés, recherche rapide, fiche avec les bons gestes selon le métier. Caisse : vente ou facture sans ticket. File : scanner le ticket du patient. Rappels par WhatsApp et notifications, sans SMS. Corrections.
 ```
 
 ## Catégorie et classement
