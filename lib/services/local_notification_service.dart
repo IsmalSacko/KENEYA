@@ -9,7 +9,9 @@ class LocalNotificationService {
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: android);
+    // Sur Linux, le module refuse de démarrer sans ses réglages.
+    const linux = LinuxInitializationSettings(defaultActionName: 'Ouvrir');
+    const settings = InitializationSettings(android: android, linux: linux);
     await _plugin.initialize(settings);
   }
 
