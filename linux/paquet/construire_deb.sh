@@ -14,20 +14,26 @@ BUNDLE=build/linux/x64/release/bundle
 RACINE=build/linux/deb
 rm -rf "$RACINE"
 mkdir -p "$RACINE/DEBIAN" "$RACINE/opt/ngoni-sante" "$RACINE/usr/bin" \
-  "$RACINE/usr/share/applications" "$RACINE/usr/share/icons/hicolor/512x512/apps"
+  "$RACINE/usr/share/applications"
 
 cp -r "$BUNDLE"/. "$RACINE/opt/ngoni-sante/"
 ln -s /opt/ngoni-sante/ngoni_sante "$RACINE/usr/bin/ngoni-sante"
-convert assets/images/app_icon_1024.png -resize 512x512 \
-  "$RACINE/usr/share/icons/hicolor/512x512/apps/ngoni-sante.png"
+# Le bureau relie la fenêtre à son icône par l'identifiant de l'app : le
+# fichier .desktop et l'icône portent donc ce nom.
+ID=com.ismaeldev.keneya
+for t in 48 64 128 256 512; do
+  mkdir -p "$RACINE/usr/share/icons/hicolor/${t}x${t}/apps"
+  convert assets/images/app_icon_1024.png -resize ${t}x${t} \
+    "$RACINE/usr/share/icons/hicolor/${t}x${t}/apps/$ID.png"
+done
 
-cat > "$RACINE/usr/share/applications/ngoni-sante.desktop" <<DESKTOP
+cat > "$RACINE/usr/share/applications/$ID.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Ngoni Santé
 Comment=Gestion des établissements de santé
 Exec=/opt/ngoni-sante/ngoni_sante
-Icon=ngoni-sante
+Icon=$ID
 Terminal=false
 Categories=Office;MedicalSoftware;
 StartupWMClass=ngoni_sante

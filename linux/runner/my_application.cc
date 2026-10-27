@@ -54,6 +54,20 @@ static void my_application_activate(GApplication* application) {
 
   gtk_window_set_default_size(window, 1280, 720);
 
+  // L'icône de la fenêtre : celle du thème une fois le paquet installé,
+  // sinon celle livrée à côté de l'exécutable.
+  gtk_window_set_icon_name(window, "com.ismaeldev.keneya");
+  g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe != nullptr) {
+    g_autofree gchar* dossier = g_path_get_dirname(exe);
+    g_autofree gchar* icone = g_build_filename(
+        dossier, "data", "flutter_assets", "assets", "images",
+        "app_icon_1024.png", nullptr);
+    if (g_file_test(icone, G_FILE_TEST_EXISTS)) {
+      gtk_window_set_icon_from_file(window, icone, nullptr);
+    }
+  }
+
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);

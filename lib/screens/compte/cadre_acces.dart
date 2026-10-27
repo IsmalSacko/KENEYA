@@ -1,3 +1,4 @@
+import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -127,14 +128,23 @@ class ChampTelephone extends StatelessWidget {
           onSelected: onPays,
           itemBuilder: (_) => [
             for (final p in pays)
-              PopupMenuItem(value: p.code, child: Text(p.libelle)),
+              PopupMenuItem(
+                value: p.code,
+                child: Row(
+                  children: [
+                    _Drapeau(p.code),
+                    const SizedBox(width: 10),
+                    Text('${p.nom} (+${p.indicatif})'),
+                  ],
+                ),
+              ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(courant.drapeau, style: const TextStyle(fontSize: 20)),
+                _Drapeau(courant.code),
                 const SizedBox(width: 6),
                 Text(
                   '+${courant.indicatif}',
@@ -245,4 +255,18 @@ class BoutonAcces extends StatelessWidget {
 
 void afficherMessage(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Le drapeau du pays, dessiné : l'émoji ne s'affiche ni sur Windows ni sur
+/// Linux.
+class _Drapeau extends StatelessWidget {
+  const _Drapeau(this.code);
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) => CountryFlag.fromCountryCode(
+    code,
+    theme: const ImageTheme(width: 26, height: 18, shape: RoundedRectangle(3)),
+  );
 }
