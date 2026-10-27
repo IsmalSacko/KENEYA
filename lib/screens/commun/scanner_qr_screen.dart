@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -59,12 +60,49 @@ class _ScannerQrScreenState extends State<ScannerQrScreen> {
   }
 }
 
-/// Ouvre le scanner et renvoie le contenu lu.
+/// Ouvre le scanner et renvoie le contenu lu. Sur ordinateur (pas de
+/// caméra pour lire les codes), on scanne avec une douchette USB, qui tape
+/// le code dans le champ et valide d'elle-même ; on peut aussi le coller.
 Future<String?> scannerQr(
   BuildContext context, {
   String? titre,
   String? consigne,
 }) {
+  if (defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.linux) {
+    final saisie = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(titre ?? 'Scanner le QR'),
+        content: TextField(
+          controller: saisie,
+          autofocus: true,
+          onSubmitted: (v) =>
+              Navigator.pop(ctx, v.trim().isEmpty ? null : v.trim()),
+          decoration: InputDecoration(
+            labelText: 'Scannez avec la douchette, ou collez le code',
+            helperText: consigne,
+            prefixIcon: const Icon(Icons.barcode_reader),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(
+              ctx,
+              saisie.text.trim().isEmpty ? null : saisie.text.trim(),
+            ),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+  }
   return Navigator.of(context).push<String>(
     MaterialPageRoute(
       builder: (_) =>

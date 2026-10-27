@@ -89,6 +89,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  msix: ^3.18.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -138,3 +139,19 @@ flutter_native_splash:
     image: assets/images/logo_ngoni_sante_icon.png
     color: "#0F2A5C"
     icon_background_color: "#0F2A5C"
+
+# Version Windows pour le Microsoft Store (sur un PC Windows :
+# `flutter build windows` puis `dart run msix:create`). Le Store signe le
+# paquet : aucun avertissement à l'installation. identity_name et publisher
+# viennent de l'Espace développeur (Partner Center › l'app › Identité du
+# produit) : à recopier tels quels.
+msix_config:
+  display_name: Ngoni Santé
+  publisher_display_name: Rosebud
+  identity_name: A_RECOPIER_DEPUIS_PARTNER_CENTER
+  publisher: CN=A_RECOPIER_DEPUIS_PARTNER_CENTER
+  msix_version: 4.0.2.0
+  logo_path: assets/images/app_icon_1024.png
+  languages: fr-fr
+  capabilities: internetClient, location
+  store: true
