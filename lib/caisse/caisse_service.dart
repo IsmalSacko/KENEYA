@@ -85,6 +85,15 @@ class CaisseService {
     return _visite(res.data);
   }
 
+  /// Une vente ou une facture sans ticket (le client du comptoir).
+  Future<Visite> nouvelleVisite({String? nom, String? telephone}) async {
+    final res = await ApiClient.dio.post(
+      '/visites',
+      data: {'nom': ?nom, 'telephone': ?telephone},
+    );
+    return _visite(res.data);
+  }
+
   Future<Visite> cloturerVisite(String visite) async {
     final res = await ApiClient.dio.post('/visites/$visite/cloturer');
     return _visite(res.data);

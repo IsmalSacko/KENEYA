@@ -145,6 +145,11 @@ class _DelivranceScreenState extends State<DelivranceScreen> {
         visite: widget.visiteUuid,
       );
       if (!mounted) return;
+      // Ouverte depuis la visite : on y revient, elle se relit.
+      if (widget.visiteUuid != null) {
+        Navigator.of(context).pop(true);
+        return;
+      }
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => VisiteScreen(uuid: visite.uuid)),
       );

@@ -10,6 +10,7 @@ import '../../common/utils/kcolors.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
+import '../pharmacie/delivrance_screen.dart';
 import 'assureurs_screen.dart';
 import 'tarifs_screen.dart';
 import 'visite_screen.dart';
@@ -146,6 +147,68 @@ class _CaisseTabState extends State<CaisseTab> {
     }
   }
 
+  /// Quelqu'un vient payer sans ticket : son nom (facultatif), puis la
+  /// facture où l'on ajoute les actes.
+  Future<void> _nouvelleFacture() async {
+    final nom = TextEditingController();
+    final telephone = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nouvelle facture'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nom,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nom du client (facultatif)',
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: telephone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Téléphone (facultatif)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Créer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final v = await _service.nouvelleVisite(
+        nom: nom.text.trim().isEmpty ? null : nom.text.trim(),
+        telephone: telephone.text.trim().isEmpty ? null : telephone.text.trim(),
+      );
+      if (!mounted) return;
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => VisiteScreen(uuid: v.uuid)));
+      _charger();
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
@@ -235,6 +298,42 @@ class _CaisseTabState extends State<CaisseTab> {
                     ),
             ),
           const SizedBox(height: 12),
+          // La caisse prend aussi la main : une vente au comptoir, ou une
+          // facture pour quelqu'un venu sans ticket.
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (auth.aModule('pharmacie') && auth.peut('pharmacie.delivrer'))
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Kolors.kJaune,
+                    foregroundColor: Kolors.kPrimaryDark,
+                    minimumSize: const Size(0, 52),
+                  ),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const DelivranceScreen(),
+                      ),
+                    );
+                    _charger();
+                  },
+                  icon: const Icon(Icons.shopping_basket_outlined),
+                  label: const Text('Nouvelle vente'),
+                ),
+              if (encaisse)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 52),
+                  ),
+                  onPressed: _nouvelleFacture,
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Nouvelle facture'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -277,11 +376,13 @@ class _CaisseTabState extends State<CaisseTab> {
           if (_chargement)
             const Center(child: CircularProgressIndicator())
           else if (_visites.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                'Aucune visite ouverte.',
-                style: TextStyle(color: Kolors.kTextMuted),
+                encaisse
+                    ? 'Aucune visite ouverte. Un client sans ticket : le bouton ci-dessus.'
+                    : 'Aucune visite ouverte.',
+                style: const TextStyle(color: Kolors.kTextMuted),
               ),
             )
           else

@@ -14,6 +14,7 @@ import '../../dossier/dossier_models.dart';
 import '../../dossier/dossier_service.dart';
 import '../dossier/champs_constantes.dart';
 import '../dossier/dossier_screen.dart';
+import '../pharmacie/delivrance_screen.dart';
 import '../pharmacie/ordonnance_screens.dart';
 import '../../common/widgets/formulaire.dart';
 import '../../common/widgets/feuille.dart';
@@ -551,6 +552,20 @@ class _VisiteScreenState extends State<VisiteScreen> {
                       ),
                       icon: const Icon(Icons.edit_note_rounded),
                       label: const Text('Ordonnance'),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (v.ouverte &&
+                      auth.aModule('pharmacie') &&
+                      auth.peut('pharmacie.delivrer')) ...[
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      onPressed: () =>
+                          _ouvrir(DelivranceScreen(visiteUuid: v.uuid)),
+                      icon: const Icon(Icons.medication_outlined),
+                      label: const Text('Médicaments'),
                     ),
                     const SizedBox(height: 10),
                   ],
