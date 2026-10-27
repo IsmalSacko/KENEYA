@@ -365,6 +365,10 @@ Future<void> editerProduit(BuildContext context, [Produit? p]) async {
   final seuil = TextEditingController(text: '${p?.seuilAlerte ?? 5}');
   var venteUnite = p?.venteUnite ?? false;
   var ordonnance = p?.ordonnanceRequise ?? false;
+  // Le stock déjà en rayon, à la création : une première réception.
+  final boites = TextEditingController();
+  final lot = TextEditingController();
+  DateTime? peremption;
 
   final donnees = await formulaire<Map<String, dynamic>>(
     context,
@@ -433,6 +437,70 @@ Future<void> editerProduit(BuildContext context, [Produit? p]) async {
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(labelText: 'Alerte sous (unités)'),
         ),
+        const Divider(height: 24),
+        if (p != null)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.inventory_2_outlined),
+            title: Text(
+              'En stock : ${p.stockBoites} boîte${p.stockBoites > 1 ? 's' : ''}'
+              '${p.conditionnement > 1 ? ' (${p.stockUnites} unités)' : ''}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: const Text(
+              'Pour ajouter : « Réception ». Pour corriger : « Inventaire » sur le lot.',
+            ),
+          )
+        else ...[
+          const Text(
+            'Stock actuel (facultatif)',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const Text(
+            'Ce que vous avez déjà en rayon. Ensuite, le stock bouge tout seul : réceptions, ventes, délivrances.',
+            style: TextStyle(color: Kolors.kTextMuted, fontSize: 12.5),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: boites,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'Boîtes en stock',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: lot,
+                  decoration: const InputDecoration(labelText: 'N° de lot'),
+                ),
+              ),
+            ],
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event_busy_outlined),
+            title: Text(
+              peremption == null
+                  ? 'Date de péremption'
+                  : 'Périme le ${peremption!.day.toString().padLeft(2, '0')}/${peremption!.month.toString().padLeft(2, '0')}/${peremption!.year}',
+            ),
+            onTap: () async {
+              final choix = await showDatePicker(
+                context: ctx,
+                initialDate: DateTime.now().add(const Duration(days: 365)),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 3650)),
+                initialDatePickerMode: DatePickerMode.year,
+              );
+              if (choix != null) setD(() => peremption = choix);
+            },
+          ),
+        ],
       ],
     ),
     actions: (ctx, setD) => [
@@ -443,7 +511,14 @@ Future<void> editerProduit(BuildContext context, [Produit? p]) async {
       TextButton(
         onPressed: () {
           final prix = double.tryParse(prixBoite.text.replaceAll(',', '.'));
-          if (nom.text.trim().isEmpty || prix == null) return;
+          if (nom.text.trim().isEmpty || prix == null) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text('Indiquez le nom et le prix de la boîte.'),
+              ),
+            );
+            return;
+          }
           Navigator.pop(ctx, {
             'nom': nom.text.trim(),
             'dci': dci.text.trim(),
@@ -466,7 +541,21 @@ Future<void> editerProduit(BuildContext context, [Produit? p]) async {
   );
   if (donnees == null || !context.mounted) return;
   try {
-    await PharmacieService().enregistrerProduit(donnees, uuid: p?.uuid);
+    final service = PharmacieService();
+    final uuid = await service.enregistrerProduit(donnees, uuid: p?.uuid);
+    final enStock = int.tryParse(boites.text) ?? 0;
+    if (p == null && enStock > 0 && uuid.isNotEmpty) {
+      await service.recevoir([
+        {
+          'medicament_uuid': uuid,
+          'boites': enStock,
+          if (lot.text.trim().isNotEmpty) 'numero': lot.text.trim(),
+          if (peremption != null)
+            'peremption':
+                '${peremption!.year}-${peremption!.month.toString().padLeft(2, '0')}-${peremption!.day.toString().padLeft(2, '0')}',
+        },
+      ]);
+    }
   } on DioException catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(

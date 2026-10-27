@@ -14,15 +14,16 @@ class PharmacieService {
     return _liste(res.data).map(Produit.fromJson).toList();
   }
 
-  Future<void> enregistrerProduit(
+  /// Crée ou modifie le produit ; renvoie son identifiant.
+  Future<String> enregistrerProduit(
     Map<String, dynamic> donnees, {
     String? uuid,
   }) async {
-    if (uuid == null) {
-      await ApiClient.dio.post('/pharmacie/produits', data: donnees);
-    } else {
-      await ApiClient.dio.patch('/pharmacie/produits/$uuid', data: donnees);
-    }
+    final res = uuid == null
+        ? await ApiClient.dio.post('/pharmacie/produits', data: donnees)
+        : await ApiClient.dio.patch('/pharmacie/produits/$uuid', data: donnees);
+    final produit = res.data is Map ? (res.data as Map)['produit'] : null;
+    return produit is Map ? '${produit['uuid']}' : (uuid ?? '');
   }
 
   Future<List<Map<String, dynamic>>> fournisseurs() async {
