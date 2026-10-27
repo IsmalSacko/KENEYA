@@ -77,11 +77,12 @@ class _FileTabState extends State<FileTab> {
   Future<void> _charger() async {
     try {
       _services = await _service.services();
-      // Premier passage : on propose tous les services, et la première salle.
+      // Premier passage sur cet appareil : tous les services, pour que
+      // personne en attente ne soit caché ; chacun réduit ensuite à son poste.
       final connus = _services.map((s) => s.uuid).toSet();
       _mesServices = _mesServices.where(connus.contains).toList();
       if (_mesServices.isEmpty && _services.isNotEmpty) {
-        _mesServices = [_services.first.uuid];
+        _mesServices = [for (final s in _services) s.uuid];
         _maSalle = _services.first.salles.firstOrNull?.uuid;
         await _memoriserPoste();
       }
@@ -115,6 +116,16 @@ class _FileTabState extends State<FileTab> {
     final t = _tickets.where((t) => t.uuid == _courant).firstOrNull;
     return t != null && (t.appele || t.enService) ? t : null;
   }
+
+  /// « Pédiatrie 2 · Labo 1 » : ce qui attend hors de mon poste.
+  String get _ailleurs => [
+    for (final x in _services)
+      if (!_mesServices.contains(x.uuid))
+        (
+          x.nom,
+          _tickets.where((t) => t.enAttente && t.serviceUuid == x.uuid).length,
+        ),
+  ].where((e) => e.$2 > 0).map((e) => '${e.$1} ${e.$2}').join(' · ');
 
   List<TicketFile> get _enAttente => _tickets
       .where((t) => t.enAttente && _mesServices.contains(t.serviceUuid))
@@ -401,15 +412,12 @@ class _FileTabState extends State<FileTab> {
               color: Kolors.kTextHigh,
             ),
           ),
-          // Ce qui attend dans les autres services : l'accueil compte tout.
-          if (_services.any(
-            (x) => !_mesServices.contains(x.uuid) && x.enAttente > 0,
-          ))
+          // Ce qui attend dans les autres services, d'après la file à jour.
+          if (_ailleurs.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                'Ailleurs : ${[for (final x in _services)
-                  if (!_mesServices.contains(x.uuid) && x.enAttente > 0) '${x.nom} ${x.enAttente}'].join(' · ')}',
+                'Ailleurs : $_ailleurs',
                 style: const TextStyle(color: Kolors.kTextMuted),
               ),
             ),
