@@ -26,6 +26,20 @@ class VisitePatient {
 
   bool get ouverte => statut == 'ouverte';
 
+  /// « Consultation › Pharmacie » puis ce qui a été facturé en plus
+  /// (« Paracétamol 500 mg · 2 unité(s) »), sans redire le nom du service.
+  String get resume {
+    final enPlus = [
+      for (final a in actes.toSet())
+        if (!services.contains(a)) a,
+    ];
+    if (services.isEmpty && enPlus.isEmpty) return 'Rien de facturé';
+    return [
+      if (services.isNotEmpty) services.join(' › '),
+      if (enPlus.isNotEmpty) enPlus.join(', '),
+    ].join('\n');
+  }
+
   factory VisitePatient.fromJson(Map<String, dynamic> j) => VisitePatient(
     uuid: (j['uuid'] ?? '').toString(),
     statut: (j['statut'] ?? '').toString(),

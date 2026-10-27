@@ -581,12 +581,7 @@ class _PatientScreenState extends State<PatientScreen> {
                   ),
                   title: Text(dateCourte(v.date)),
                   subtitle: Text(
-                    v.services.isEmpty && v.actes.isEmpty
-                        ? 'Rien de facturé'
-                        : [
-                            if (v.services.isNotEmpty) v.services.join(' › '),
-                            if (v.actes.isNotEmpty) v.actes.join(', '),
-                          ].join('\n'),
+                    v.resume,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
