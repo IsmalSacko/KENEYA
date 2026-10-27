@@ -19,11 +19,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<_OnboardingPageData> _pages = const [
     _OnboardingPageData(
-      title: 'Bienvenue sur KENEYA+',
+      title: 'Bienvenue sur Ngoni Santé',
       description:
           'La solution simple et fiable pour gérer vos activités de santé.',
       icon: Icons.health_and_safety_rounded,
-      colors: [Kolors.kPrimary, Kolors.kBlue],
+      colors: [Kolors.kPrimaryLight, Kolors.kPrimaryDark],
     ),
     _OnboardingPageData(
       title: 'Patients centralisés',
@@ -117,8 +117,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       itemBuilder: (context, index) {
                         final page = _pages[index];
                         final illustrationSize =
-                            (isDesktop ? 320.0 : size.width * 0.62)
-                                .clamp(200.0, 340.0);
+                            (isDesktop ? 320.0 : size.width * 0.62).clamp(
+                              200.0,
+                              340.0,
+                            );
                         return Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 28,
@@ -172,7 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               width: active ? 26 : 8,
                               decoration: BoxDecoration(
                                 color: active
-                                    ? Kolors.kWhite
+                                    ? Kolors.kJaune
                                     : Kolors.kWhite.withValues(alpha: 0.40),
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -191,8 +193,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: Kolors.kWhite,
                                       side: BorderSide(
-                                        color: Kolors.kWhite
-                                            .withValues(alpha: 0.8),
+                                        color: Kolors.kWhite.withValues(
+                                          alpha: 0.8,
+                                        ),
                                       ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
@@ -217,7 +220,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 child: ElevatedButton(
                                   onPressed: _next,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Kolors.kWhite,
+                                    backgroundColor: Kolors.kJaune,
                                     foregroundColor: Kolors.kPrimaryDark,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(

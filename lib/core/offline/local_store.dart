@@ -23,4 +23,6 @@ class LocalStore {
   static Future<void> remove(String key) async {
     await _box.remove(key);
   }
+
+  static Iterable<String> keys() => _box.getKeys<Iterable<String>>();
 }

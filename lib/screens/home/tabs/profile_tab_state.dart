@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:keneya_plus/common/utils/kcolors.dart';
+import 'package:keneya_plus/common/widgets/carte_marque.dart';
 import 'package:keneya_plus/common/utils/role_ui.dart';
+import 'package:keneya_plus/compte/compte_controller.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/core/offline/local_store.dart';
 import 'package:provider/provider.dart';
@@ -103,38 +106,13 @@ class ProfileTabState extends State<ProfileTab> {
     final isDesktop = MediaQuery.sizeOf(context).width >= 1000;
 
     final role = RoleUi.of(user?.role);
-    final profileInfoCard = Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Kolors.kPrimary, Kolors.kBlue],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Kolors.kPrimary.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
+    final profileInfoCard = CarteMarque(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                height: 60,
-                width: 60,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Kolors.kWhite.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(role.icon, color: Kolors.kWhite, size: 30),
-              ),
+              AvatarMarque(role.icon, size: 62),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -144,17 +122,17 @@ class ProfileTabState extends State<ProfileTab> {
                       user?.name ?? '-',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Kolors.kWhite,
                         fontSize: 19,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       user?.telephone ?? '-',
                       style: TextStyle(
-                        color: Kolors.kWhite.withValues(alpha: 0.9),
+                        color: Kolors.kWhite.withValues(alpha: 0.85),
                         fontSize: 13,
                       ),
                     ),
@@ -181,8 +159,7 @@ class ProfileTabState extends State<ProfileTab> {
                 icon: user?.actif == true
                     ? Icons.check_circle_rounded
                     : Icons.block_rounded,
-                label:
-                    user?.actif == true ? 'Compte actif' : 'Compte inactif',
+                label: user?.actif == true ? 'Compte actif' : 'Compte inactif',
               ),
             ],
           ),
@@ -252,7 +229,11 @@ class ProfileTabState extends State<ProfileTab> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: auth.loading ? null : () => auth.logout(),
+                      onPressed: auth.loading
+                          ? null
+                          : () => context.read<CompteController>().deconnexion(
+                              auth,
+                            ),
                       // icon: const Icon(Icons.logout, color: Kolors.kOffWhite),
                       style: OutlinedButton.styleFrom(
                         backgroundColor: Kolors.kRed,
@@ -373,13 +354,13 @@ class _WhiteChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Kolors.kWhite.withValues(alpha: 0.18),
+        color: Kolors.kWhite.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: Kolors.kWhite),
+          Icon(icon, size: 15, color: Kolors.kJaune),
           const SizedBox(width: 6),
           Text(
             label,

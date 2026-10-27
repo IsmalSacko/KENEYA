@@ -25,4 +25,27 @@ class TokenStorage {
   static Future<void> clearToken() async {
     await _storage.delete(key: _tokenKey);
   }
+
+  // Jeton de la personne (espace « Ma santé », routes /compte). Le jeton
+  // ci-dessus reste celui du membre : il ouvre les routes pro.
+  static const _personneTokenKey = 'personne_token';
+
+  static Future<void> savePersonneToken(String token) async {
+    await _storage.write(key: _personneTokenKey, value: token);
+  }
+
+  static Future<String?> getPersonneToken() async {
+    try {
+      return await _storage.read(key: _personneTokenKey);
+    } on PlatformException {
+      await _storage.delete(key: _personneTokenKey);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> clearPersonneToken() async {
+    await _storage.delete(key: _personneTokenKey);
+  }
 }

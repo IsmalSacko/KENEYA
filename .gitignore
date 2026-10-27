@@ -49,3 +49,4 @@ app.*.map.json
 keneya-*.json
 terres-*.json
 play-service-account.json
+outils/polices/

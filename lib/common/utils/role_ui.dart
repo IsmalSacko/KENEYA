@@ -29,7 +29,7 @@ class RoleUi {
         return const RoleUi(
           'Médecin',
           Icons.medical_services_rounded,
-          Kolors.kBlue,
+          Kolors.kPrimaryLight,
         );
       case AppRoles.infirmier:
         return const RoleUi(
@@ -47,13 +47,13 @@ class RoleUi {
         return const RoleUi(
           'Pharmacien',
           Icons.local_pharmacy_rounded,
-          Kolors.kPrimaryLight,
+          Kolors.kTeal,
         );
       case AppRoles.laborantin:
         return const RoleUi(
           'Laborantin',
           Icons.science_rounded,
-          Kolors.kBlue,
+          Kolors.kViolet,
         );
       case AppRoles.caissier:
         return const RoleUi(
@@ -62,11 +62,7 @@ class RoleUi {
           Kolors.kWarning,
         );
       case AppRoles.gestionnaire:
-        return const RoleUi(
-          'Gestionnaire',
-          Icons.badge_rounded,
-          Kolors.kGray,
-        );
+        return const RoleUi('Gestionnaire', Icons.badge_rounded, Kolors.kGray);
       default:
         return RoleUi(
           role == null || role.isEmpty ? 'Utilisateur' : role,

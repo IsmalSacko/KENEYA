@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 3.0.0+8
+version: 4.0.0+9
 
 environment:
   sdk: ^3.10.7
@@ -50,6 +50,9 @@ dependencies:
   # Geolocalisation / itineraire
   geolocator: ^13.0.2
   url_launcher: ^6.3.1
+  # Carte des établissements (espace « Ma santé »)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # UI / i18n
   google_fonts: ^8.0.1
@@ -60,8 +63,22 @@ dependencies:
   flutter_local_notifications: ^17.2.4
   fl_chart: ^1.2.0
 
+  # File d'attente : QR, scan, ticket imprimé, annonces, écran allumé
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.2
+  print_bluetooth_thermal: ^1.2.4
+  esc_pos_utils_plus: ^2.0.4
+  flutter_tts: ^4.2.5
+  wakelock_plus: ^1.5.2
+
+  # Vérifier hors ligne la signature des ordonnances (Ed25519)
+  cryptography: ^2.9.0
+
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  # Parcours de l'app sur un émulateur, contre l'API locale
+  integration_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.6
@@ -93,7 +110,7 @@ flutter_launcher_icons:
     generate: true
     image_path: assets/images/app_icon_1024.png
     background_color: "#FFFFFF"
-    theme_color: "#4F46E5"
+    theme_color: "#0F2A5C"
   windows:
     generate: true
     image_path: assets/images/app_icon_1024.png
@@ -103,14 +120,14 @@ flutter_launcher_icons:
     image_path: assets/images/app_icon_1024.png
   image_path: assets/images/app_icon_1024.png
   remove_alpha_ios: true
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/images/logo_keneya_plus_icon.png
+  adaptive_icon_background: "#0F2A5C"
+  adaptive_icon_foreground: assets/images/logo_ngoni_sante_icon.png
 
 flutter_native_splash:
-  color: "#FFFFFF"
-  color_dark: "#0F172A"
-  image: assets/images/logo_keneya_plus_icon.png
-  image_dark: assets/images/logo_keneya_plus_icon.png
+  color: "#0F2A5C"
+  color_dark: "#0A1E45"
+  image: assets/images/logo_ngoni_sante_icon.png
+  image_dark: assets/images/logo_ngoni_sante_icon.png
   android: true
   ios: true
   web: true
@@ -118,6 +135,6 @@ flutter_native_splash:
   android_gravity: center
   ios_content_mode: center
   android_12:
-    image: assets/images/logo_keneya_plus_icon.png
-    color: "#FFFFFF"
-    icon_background_color: "#FFFFFF"
+    image: assets/images/logo_ngoni_sante_icon.png
+    color: "#0F2A5C"
+    icon_background_color: "#0F2A5C"

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:keneya_plus/common/utils/roles.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
-import 'package:keneya_plus/controllers/etablissement_controller.dart';
 import 'package:keneya_plus/screens/dashboard/user_stats_screen.dart';
 import 'package:keneya_plus/screens/home/widgets/module_card.dart';
 import 'package:keneya_plus/screens/modules/consultations_screen.dart';
@@ -24,22 +23,13 @@ class ModulesTab extends StatelessWidget {
         .currentUser
         ?.role
         .toLowerCase();
-    final etablissementTypes = context
-        .watch<EtablissementController>()
-        .etablissements
-        .map((e) => e.type.toLowerCase())
-        .toSet();
-    final hasTypeInfo = etablissementTypes.isNotEmpty;
+    // Modules actifs de l'établissement (profil Ngoni Santé). Sans
+    // information (session 3.x pas encore rafraîchie), on montre tout.
+    final modulesActifs = context.watch<AuthController>().modules;
     final hasCabinet =
-        !hasTypeInfo ||
-        etablissementTypes.any(
-          (type) => type == 'cabinet' || type == 'cabinet_pharmacie',
-        );
+        modulesActifs.isEmpty || modulesActifs.contains('consultation');
     final hasPharmacie =
-        !hasTypeInfo ||
-        etablissementTypes.any(
-          (type) => type == 'pharmacie' || type == 'cabinet_pharmacie',
-        );
+        modulesActifs.isEmpty || modulesActifs.contains('pharmacie');
     // Un admin d'établissement a les mêmes pouvoirs que l'admin d'instance,
     // mais limités à son établissement : dans cette app (mono-établissement
     // côté utilisateur), les deux se comportent donc de la même façon.
@@ -229,8 +219,8 @@ class ModulesTab extends StatelessWidget {
             childAspectRatio: columns == 1
                 ? 3.6
                 : columns == 2
-                    ? 2.4
-                    : 2.0,
+                ? 2.4
+                : 2.0,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),

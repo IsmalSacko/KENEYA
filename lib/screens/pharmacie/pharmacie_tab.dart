@@ -1,0 +1,674 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../../common/utils/kcolors.dart';
+import '../../controllers/auth_controller.dart';
+import '../../core/api/api_client.dart';
+import '../../pharmacie/pharmacie_models.dart';
+import '../../pharmacie/pharmacie_service.dart';
+import '../../pharmacie/verification_ordonnance.dart';
+import '../commun/scanner_qr_screen.dart';
+import 'delivrance_screen.dart';
+import '../../common/widgets/formulaire.dart';
+
+/// La pharmacie : délivrer (ordonnance scannée ou comptoir), et le stock
+/// par lots avec ses alertes.
+class PharmacieTab extends StatefulWidget {
+  const PharmacieTab({super.key});
+
+  @override
+  State<PharmacieTab> createState() => _PharmacieTabState();
+}
+
+class _PharmacieTabState extends State<PharmacieTab> {
+  final _service = PharmacieService();
+  final _recherche = TextEditingController();
+  List<Produit> _produits = [];
+  Map<String, dynamic>? _alertes;
+  bool _chargement = true;
+
+  @override
+  void initState() {
+    super.initState();
+    VerificationOrdonnance.rafraichirCle();
+    _charger();
+  }
+
+  @override
+  void dispose() {
+    _recherche.dispose();
+    super.dispose();
+  }
+
+  Future<void> _charger() async {
+    try {
+      _produits = await _service.produits(recherche: _recherche.text.trim());
+      _alertes = await _service.alertes();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    } finally {
+      if (mounted) setState(() => _chargement = false);
+    }
+  }
+
+  void _dire(String m) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    }
+  }
+
+  /// Scanner une ordonnance : le serveur dit ce qui reste à délivrer ; sans
+  /// internet, la signature se vérifie quand même sur le téléphone.
+  Future<void> _scannerOrdonnance() async {
+    final qr = await scannerQr(
+      context,
+      titre: 'Ordonnance',
+      consigne: 'Scannez le QR de l’ordonnance',
+    );
+    if (qr == null || !mounted) return;
+    try {
+      final o = await _service.lireOrdonnance(qr);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => DelivranceScreen(ordonnance: o)),
+      );
+      _charger();
+    } on DioException catch (e) {
+      if (!ApiClient.isNetworkError(e)) {
+        _dire(messageErreur(e));
+        return;
+      }
+      final contenu = await VerificationOrdonnance.verifier(qr);
+      if (!mounted) return;
+      if (contenu == null) {
+        _dire(
+          'Ordonnance non authentique (ou clé de vérification pas encore reçue).',
+        );
+        return;
+      }
+      final hl = OrdonnanceRx(
+        uuid: (contenu['u'] ?? '').toString(),
+        statut: 'emise',
+        patientNom: (contenu['p'] ?? '').toString(),
+        etablissement: (contenu['e'] ?? '').toString(),
+        prescripteur: contenu['m']?.toString(),
+        date: contenu['d']?.toString(),
+        qr: qr,
+        lignes: [
+          for (final l in (contenu['l'] as List? ?? const []))
+            LigneOrdonnance(
+              uuid: '',
+              produit: (l as List)[0].toString(),
+              quantite: (l[1] as num).toInt(),
+              delivree: 0,
+              reste: (l[1] as num).toInt(),
+              posologie: l.length > 2 ? l[2]?.toString() : null,
+            ),
+        ],
+      );
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DelivranceScreen(ordonnance: hl, horsLigne: true),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthController>();
+    final gereStock = auth.peut('stock.gerer');
+    final delivre = auth.peut('pharmacie.delivrer');
+    final a = _alertes;
+    final nbAlertes = a == null
+        ? 0
+        : (a['stock_bas'] as List).length +
+              (a['peremption_proche'] as List).length +
+              (a['perimes'] as List).length;
+
+    return RefreshIndicator(
+      onRefresh: _charger,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (delivre) ...[
+            SizedBox(
+              height: 56,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Kolors.kJaune,
+                  foregroundColor: Kolors.kPrimaryDark,
+                ),
+                onPressed: _scannerOrdonnance,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Scanner une ordonnance'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DelivranceScreen()),
+                );
+                _charger();
+              },
+              icon: const Icon(Icons.shopping_basket_outlined),
+              label: const Text('Vente au comptoir'),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (nbAlertes > 0) _Alertes(alertes: a!),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _recherche,
+                  onSubmitted: (_) => _charger(),
+                  decoration: const InputDecoration(
+                    hintText: 'Produit ou molécule',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                ),
+              ),
+              if (gereStock) ...[
+                IconButton(
+                  tooltip: 'Réception d’une livraison',
+                  icon: const Icon(Icons.local_shipping_outlined),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ReceptionScreen(produits: _produits),
+                      ),
+                    );
+                    _charger();
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Nouveau produit',
+                  icon: const Icon(Icons.add_box_outlined),
+                  onPressed: () async {
+                    await editerProduit(context);
+                    _charger();
+                  },
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_chargement)
+            const Center(child: CircularProgressIndicator())
+          else if (_produits.isEmpty)
+            const Text(
+              'Aucun produit. Ajoutez vos produits, puis la première livraison.',
+              style: TextStyle(color: Kolors.kTextMuted),
+            )
+          else
+            Card(
+              child: Column(
+                children: [
+                  for (final p in _produits)
+                    ExpansionTile(
+                      title: Text(
+                        p.nom,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        [
+                          if (p.description.isNotEmpty) p.description,
+                          p.stockLabel,
+                        ].join(' · '),
+                        style: TextStyle(
+                          color: p.stockBas ? Kolors.kRed : Kolors.kTextMuted,
+                        ),
+                      ),
+                      children: [
+                        for (final l in p.lots)
+                          ListTile(
+                            dense: true,
+                            leading: Icon(
+                              l.perime
+                                  ? Icons.dangerous_rounded
+                                  : Icons.inventory_2_outlined,
+                              color: l.perime ? Kolors.kRed : Kolors.kPrimary,
+                            ),
+                            title: Text(
+                              'Lot ${l.numero ?? 'sans numéro'} · ${l.quantite} unité(s)',
+                            ),
+                            subtitle: Text(
+                              l.peremption == null
+                                  ? 'Péremption inconnue'
+                                  : 'Périme le ${l.peremption}',
+                            ),
+                            trailing: gereStock
+                                ? TextButton(
+                                    onPressed: () => _inventaire(l),
+                                    child: const Text('Compter'),
+                                  )
+                                : null,
+                          ),
+                        if (gereStock)
+                          TextButton.icon(
+                            onPressed: () async {
+                              await editerProduit(context, p);
+                              _charger();
+                            },
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Modifier le produit'),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _inventaire(LotProduit l) async {
+    final ctrl = TextEditingController(text: '${l.quantite}');
+    final n = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Lot ${l.numero ?? 'sans numéro'}'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(labelText: 'Unités comptées'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text)),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+    if (n == null) return;
+    try {
+      await _service.inventorier(l.uuid, n);
+      await _charger();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+}
+
+class _Alertes extends StatelessWidget {
+  const _Alertes({required this.alertes});
+
+  final Map<String, dynamic> alertes;
+
+  @override
+  Widget build(BuildContext context) {
+    List<Map> liste(String cle) => (alertes[cle] as List).cast<Map>();
+    return Card(
+      color: Kolors.kJauneDoux,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'À surveiller',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
+            for (final p in liste('perimes'))
+              Text(
+                '⛔ ${p['medicament']} · lot ${p['lot'] ?? '—'} périmé (${p['quantite']})',
+                style: const TextStyle(color: Kolors.kRed),
+              ),
+            for (final p in liste('peremption_proche'))
+              Text(
+                '⏳ ${p['medicament']} · lot ${p['lot'] ?? '—'} périme le ${p['peremption']}',
+              ),
+            for (final p in liste('stock_bas'))
+              Text(
+                '📉 ${p['medicament']} : ${p['stock']} (seuil ${p['seuil']})',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Créer ou modifier un produit.
+Future<void> editerProduit(BuildContext context, [Produit? p]) async {
+  final nom = TextEditingController(text: p?.nom);
+  final dci = TextEditingController(text: p?.dci);
+  final forme = TextEditingController(text: p?.forme);
+  final dosage = TextEditingController(text: p?.dosage);
+  final cond = TextEditingController(text: '${p?.conditionnement ?? 1}');
+  final prixBoite = TextEditingController(
+    text: p == null ? '' : p.prixBoite.toStringAsFixed(0),
+  );
+  final prixUnite = TextEditingController(
+    text: p?.prixUnite?.toStringAsFixed(0) ?? '',
+  );
+  final seuil = TextEditingController(text: '${p?.seuilAlerte ?? 5}');
+  var venteUnite = p?.venteUnite ?? false;
+  var ordonnance = p?.ordonnanceRequise ?? false;
+
+  final donnees = await formulaire<Map<String, dynamic>>(
+    context,
+    titre: Text(p == null ? 'Nouveau produit' : 'Modifier le produit'),
+    corps: (ctx, setD) => Column(
+      spacing: 12,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: nom,
+          decoration: const InputDecoration(
+            labelText: 'Nom (ex. Doliprane 500 mg)',
+          ),
+        ),
+        TextField(
+          controller: dci,
+          decoration: const InputDecoration(labelText: 'Molécule (DCI)'),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: forme,
+                decoration: const InputDecoration(labelText: 'Forme'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: dosage,
+                decoration: const InputDecoration(labelText: 'Dosage'),
+              ),
+            ),
+          ],
+        ),
+        TextField(
+          controller: cond,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Unités par boîte'),
+        ),
+        TextField(
+          controller: prixBoite,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Prix de la boîte'),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Vendu aussi à l’unité'),
+          value: venteUnite,
+          onChanged: (v) => setD(() => venteUnite = v),
+        ),
+        if (venteUnite)
+          TextField(
+            controller: prixUnite,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Prix à l’unité'),
+          ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Sur ordonnance seulement'),
+          value: ordonnance,
+          onChanged: (v) => setD(() => ordonnance = v),
+        ),
+        TextField(
+          controller: seuil,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Alerte sous (unités)'),
+        ),
+      ],
+    ),
+    actions: (ctx, setD) => [
+      TextButton(
+        onPressed: () => Navigator.pop(ctx),
+        child: const Text('Annuler'),
+      ),
+      TextButton(
+        onPressed: () {
+          final prix = double.tryParse(prixBoite.text.replaceAll(',', '.'));
+          if (nom.text.trim().isEmpty || prix == null) return;
+          Navigator.pop(ctx, {
+            'nom': nom.text.trim(),
+            'dci': dci.text.trim(),
+            'forme': forme.text.trim(),
+            'dosage': dosage.text.trim(),
+            'conditionnement': int.tryParse(cond.text) ?? 1,
+            'prix_unitaire': prix,
+            'vente_unite': venteUnite,
+            if (venteUnite)
+              'prix_unite': double.tryParse(
+                prixUnite.text.replaceAll(',', '.'),
+              ),
+            'ordonnance_requise': ordonnance,
+            'seuil_alerte': int.tryParse(seuil.text) ?? 5,
+          });
+        },
+        child: const Text('Enregistrer'),
+      ),
+    ],
+  );
+  if (donnees == null || !context.mounted) return;
+  try {
+    await PharmacieService().enregistrerProduit(donnees, uuid: p?.uuid);
+  } on DioException catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+    }
+  }
+}
+
+/// Réception d'une livraison : produit, lot, péremption, nombre de boîtes.
+class ReceptionScreen extends StatefulWidget {
+  const ReceptionScreen({required this.produits, super.key});
+
+  final List<Produit> produits;
+
+  @override
+  State<ReceptionScreen> createState() => _ReceptionScreenState();
+}
+
+class _ReceptionScreenState extends State<ReceptionScreen> {
+  final List<Map<String, dynamic>> _lignes = [];
+  List<Map<String, dynamic>> _fournisseurs = [];
+  String? _fournisseur;
+  bool _envoi = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PharmacieService()
+        .fournisseurs()
+        .then((f) {
+          if (mounted) setState(() => _fournisseurs = f);
+        })
+        .catchError((_) {});
+  }
+
+  Future<void> _ajouterLigne() async {
+    Produit? produit = widget.produits.firstOrNull;
+    final numero = TextEditingController();
+    final boites = TextEditingController(text: '1');
+    DateTime? peremption;
+    final ligne = await formulaire<Map<String, dynamic>>(
+      context,
+      titre: const Text('Ligne de livraison'),
+      corps: (ctx, setD) => Column(
+        spacing: 12,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DropdownButtonFormField<Produit>(
+            initialValue: produit,
+            isExpanded: true,
+            items: [
+              for (final p in widget.produits)
+                DropdownMenuItem(value: p, child: Text(p.nom)),
+            ],
+            onChanged: (v) => setD(() => produit = v),
+          ),
+          TextField(
+            controller: numero,
+            decoration: const InputDecoration(labelText: 'N° de lot'),
+          ),
+          TextField(
+            controller: boites,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Boîtes reçues'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final d = await showDatePicker(
+                context: ctx,
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 3650)),
+                initialDate: DateTime.now().add(const Duration(days: 365)),
+                helpText: 'Date de péremption',
+              );
+              if (d != null) setD(() => peremption = d);
+            },
+            icon: const Icon(Icons.event_outlined),
+            label: Text(
+              peremption == null
+                  ? 'Péremption'
+                  : DateFormat('d/MM/yyyy').format(peremption!),
+            ),
+          ),
+        ],
+      ),
+      actions: (ctx, setD) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Annuler'),
+        ),
+        TextButton(
+          onPressed: () {
+            final n = int.tryParse(boites.text);
+            if (produit == null || n == null || n <= 0) return;
+            Navigator.pop(ctx, {
+              'medicament_uuid': produit!.uuid,
+              '_nom': produit!.nom,
+              'numero': numero.text.trim(),
+              if (peremption != null)
+                'peremption': DateFormat('yyyy-MM-dd').format(peremption!),
+              'boites': n,
+            });
+          },
+          child: const Text('Ajouter'),
+        ),
+      ],
+    );
+    if (ligne != null) setState(() => _lignes.add(ligne));
+  }
+
+  Future<void> _valider() async {
+    setState(() => _envoi = true);
+    try {
+      await PharmacieService().recevoir([
+        for (final l in _lignes) Map<String, dynamic>.from(l)..remove('_nom'),
+      ], fournisseur: _fournisseur);
+      if (mounted) Navigator.pop(context);
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() => _envoi = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Réception')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          DropdownButtonFormField<String?>(
+            initialValue: _fournisseur,
+            decoration: const InputDecoration(labelText: 'Grossiste'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('—')),
+              for (final f in _fournisseurs)
+                DropdownMenuItem(
+                  value: f['uuid'].toString(),
+                  child: Text(f['nom'].toString()),
+                ),
+            ],
+            onChanged: (v) => setState(() => _fournisseur = v),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              final nom = TextEditingController();
+              final n = await showDialog<String>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Nouveau grossiste'),
+                  content: TextField(controller: nom, autofocus: true),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, nom.text.trim()),
+                      child: const Text('Ajouter'),
+                    ),
+                  ],
+                ),
+              );
+              if (n == null || n.isEmpty) return;
+              await PharmacieService().creerFournisseur(n, null);
+              final f = await PharmacieService().fournisseurs();
+              if (mounted) setState(() => _fournisseurs = f);
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Nouveau grossiste'),
+          ),
+          const SizedBox(height: 8),
+          for (final l in _lignes)
+            Card(
+              child: ListTile(
+                title: Text(l['_nom'].toString()),
+                subtitle: Text(
+                  'Lot ${l['numero'] ?? '—'} · péremption ${l['peremption'] ?? '—'}',
+                ),
+                trailing: Text('${l['boites']} boîte(s)'),
+              ),
+            ),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+            ),
+            onPressed: widget.produits.isEmpty ? null : _ajouterLigne,
+            icon: const Icon(Icons.add),
+            label: const Text('Ajouter une ligne'),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _lignes.isEmpty || _envoi ? null : _valider,
+              child: const Text('Valider la réception'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

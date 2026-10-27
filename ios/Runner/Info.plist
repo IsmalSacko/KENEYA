@@ -7,7 +7,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>KENEYA+</string>
+		<string>Ngoni Santé</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>KENEYA+</string>
+		<string>Ngoni Santé</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -57,5 +57,9 @@
 			<key>NSAllowsArbitraryLoads</key>
 			<true/>
 		</dict>
+		<key>NSCameraUsageDescription</key>
+		<string>Pour scanner les QR codes : arrivée à un rendez-vous, ordonnance, appairage d'un écran.</string>
+		<key>NSBluetoothAlwaysUsageDescription</key>
+		<string>Pour imprimer les tickets de file d'attente sur une imprimante Bluetooth.</string>
 	</dict>
 </plist>

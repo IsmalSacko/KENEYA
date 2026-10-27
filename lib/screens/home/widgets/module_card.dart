@@ -28,13 +28,7 @@ class ModuleCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: Kolors.kBorder),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0A0E9F6E),
-                blurRadius: 14,
-                offset: Offset(0, 6),
-              ),
-            ],
+            boxShadow: Kolors.softShadow(),
           ),
           padding: const EdgeInsets.all(14),
           child: Row(

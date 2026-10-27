@@ -9,7 +9,10 @@ void main() {
     await tester.pump();
 
     final hasLogin = find.text('Connexion').evaluate().isNotEmpty;
-    final hasLoader = find.byType(CircularProgressIndicator).evaluate().isNotEmpty;
+    final hasLoader = find
+        .byType(CircularProgressIndicator)
+        .evaluate()
+        .isNotEmpty;
     expect(hasLogin || hasLoader, isTrue);
   });
 }

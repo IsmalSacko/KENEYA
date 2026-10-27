@@ -72,4 +72,15 @@ class OfflineMirror {
   static Future<void> clear() async {
     await LocalStore.remove(_revKey);
   }
+
+  /// Oublie tout le miroir (tables et curseur). Au changement d'espace pro :
+  /// le miroir ne contient qu'un établissement à la fois, le nouvel espace
+  /// repart d'une synchro complète.
+  static Future<void> viderTout() async {
+    await LocalStore.remove(_revKey);
+    for (final key
+        in LocalStore.keys().where((k) => k.startsWith('mirror_')).toList()) {
+      await LocalStore.remove(key);
+    }
+  }
 }

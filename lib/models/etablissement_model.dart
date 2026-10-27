@@ -1,7 +1,10 @@
+import '../compte/compte_models.dart';
+
 class EtablissementModel {
   final int id;
   final String nom;
   final String type;
+  final String? profil;
   final String? telephone;
   final bool actif;
   final String? adresse;
@@ -13,6 +16,7 @@ class EtablissementModel {
     required this.id,
     required this.nom,
     required this.type,
+    this.profil,
     required this.telephone,
     required this.actif,
     required this.adresse,
@@ -23,11 +27,17 @@ class EtablissementModel {
 
   bool get hasCoordinates => latitude != null && longitude != null;
 
+  /// « Centre de santé » plutôt que l'ancien type technique.
+  String get profilLabel => profil == null || profil!.isEmpty
+      ? type
+      : ProfilEtablissement.labelDe(profil);
+
   factory EtablissementModel.fromJson(Map<String, dynamic> json) {
     return EtablissementModel(
       id: _toInt(json['id']) ?? 0,
       nom: (json['nom'] ?? '').toString(),
       type: (json['type'] ?? '').toString(),
+      profil: json['profil']?.toString(),
       telephone: json['telephone']?.toString(),
       actif: _toBool(json['actif']),
       adresse: json['adresse']?.toString(),

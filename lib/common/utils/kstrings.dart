@@ -4,7 +4,7 @@ class AppText {
   // =========================
   // 🏷️ APP GLOBAL
   // =========================
-  static const String kAppName = 'KENEYA+';
+  static const String kAppName = 'Ngoni Santé';
   static const String kAppSlogan =
       'Gestion simple et fiable pour cabinets et pharmacies';
   static const String kLoading = 'Chargement...';
@@ -190,15 +190,16 @@ class AppText {
   static const String kBusinessAddress = 'Adresse de l\'entreprise';
   static const String kIsActive = 'Activer l\'entreprise ou non';
   static const String kOnboardHome =
-      'Gerez vos activites de sante facilement avec KENEYA+';
+      'Gerez vos activites de sante facilement avec Ngoni Santé';
   static const String kOnboardPaymentsMessage =
-      'KENEYA+ vous permet de gerer patients, medicaments et etablissements en toute simplicite.';
-  static const String kWelcomeHeader = 'Bienvenue sur KENEYA+';
+      'Ngoni Santé vous permet de gérer patients, médicaments et établissements en toute simplicité.';
+  static const String kWelcomeHeader = 'Bienvenue sur Ngoni Santé';
   static const String kWelcomeMessage =
       'La solution simple pour gerer vos activites medicales en toute securite';
   static const String kGetStarted = 'Commencer';
   // =========================
   // Welcome Screen Footer
   static final int now = DateTime.now().year;
-  static final String kWelcomeFooter = '© $now KENEYA+. Tous droits reserves.';
+  static final String kWelcomeFooter =
+      '© $now Ngoni Santé. Tous droits réservés.';
 }

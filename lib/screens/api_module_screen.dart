@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../common/utils/kcolors.dart';
 import '../core/api/api_client.dart';
 import '../core/offline/local_store.dart';
 import '../core/offline/sync_manager.dart';
@@ -124,8 +125,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
             .toList();
         setState(() {
           _items = parsed;
-          _error =
-              parsed.isEmpty ? 'Hors connexion. Aucune donnee locale disponible.' : null;
+          _error = parsed.isEmpty
+              ? 'Hors connexion. Aucune donnee locale disponible.'
+              : null;
         });
       } else {
         setState(() => _error = _extractMessage(e));
@@ -204,10 +206,14 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
     final normalizedPayload = _normalizePayload(payload);
 
     try {
-      final response = await ApiClient.dio.post(widget.endpoint, data: normalizedPayload);
+      final response = await ApiClient.dio.post(
+        widget.endpoint,
+        data: normalizedPayload,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Creation reussie.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Creation reussie.')));
       final createdId = _extractEntityId(response.data);
       await _recordAudit(action: 'creation', targetId: createdId);
       await _notifyAction('Creation', createdId);
@@ -238,7 +244,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
         return;
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
     }
   }
 
@@ -255,10 +263,14 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
     final normalizedPayload = _normalizePayload(payload);
 
     try {
-      await ApiClient.dio.patch('${widget.endpoint}/$id', data: normalizedPayload);
+      await ApiClient.dio.patch(
+        '${widget.endpoint}/$id',
+        data: normalizedPayload,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Mise a jour reussie.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mise a jour reussie.')));
       await _recordAudit(action: 'modification', targetId: _toInt(id));
       await _notifyAction('Modification', _toInt(id));
       await _load();
@@ -292,7 +304,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
         return;
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
     }
   }
 
@@ -321,8 +335,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
     try {
       await ApiClient.dio.delete('${widget.endpoint}/$id');
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Suppression reussie.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Suppression reussie.')));
       await _recordAudit(action: 'suppression', targetId: _toInt(id));
       await _notifyAction('Suppression', _toInt(id));
       await _load();
@@ -333,7 +348,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
           path: '${widget.endpoint}/$id',
           cacheInvalidateKey: _cacheKey,
         );
-        final next = _items.where((row) => row['id'].toString() != id.toString()).toList();
+        final next = _items
+            .where((row) => row['id'].toString() != id.toString())
+            .toList();
         setState(() => _items = next);
         await LocalStore.write(_cacheKey, next);
         await SyncManager.instance.syncNow();
@@ -350,7 +367,9 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
         return;
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
     }
   }
 
@@ -375,12 +394,12 @@ class _ApiModuleScreenState extends State<ApiModuleScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
-                : _items.isEmpty
-                    ? const Center(child: Text('Aucune donnee.'))
-                    : isDesktop
-                        ? _buildDesktopTable()
-                        : _buildMobileList(),
+            ? Center(child: Text(_error!))
+            : _items.isEmpty
+            ? const Center(child: Text('Aucune donnee.'))
+            : isDesktop
+            ? _buildDesktopTable()
+            : _buildMobileList(),
       ),
       floatingActionButton: widget.allowCreate
           ? FloatingActionButton.extended(

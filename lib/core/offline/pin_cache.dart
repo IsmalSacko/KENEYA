@@ -28,6 +28,16 @@ class PinCache {
     }
   }
 
+  /// PIN en cache pour ce numéro (connexion silencieuse au compte Ngoni
+  /// Santé après la mise à jour depuis l'app 3.x).
+  static Future<String?> lire(String telephone) async {
+    try {
+      return await _storage.read(key: _key(telephone));
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<bool> has(String telephone) async {
     try {
       return await _storage.read(key: _key(telephone)) != null;

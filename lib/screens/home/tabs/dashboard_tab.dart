@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:keneya_plus/common/utils/kcolors.dart';
+import 'package:keneya_plus/compte/compte_models.dart';
+import 'package:keneya_plus/common/widgets/carte_marque.dart';
 import 'package:keneya_plus/common/utils/role_ui.dart';
 import 'package:keneya_plus/common/utils/roles.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
@@ -53,17 +56,30 @@ class DashboardTab extends StatelessWidget {
               const SizedBox(height: 18),
               _StatsGrid(
                 stats: [
-                  _Stat('Patients', patientCtrl.patients.length,
-                      Icons.groups_rounded, Kolors.kPrimary),
-                  _Stat('Médicaments', medicamentCtrl.medicaments.length,
-                      Icons.medication_rounded, Kolors.kBlue),
-                  _Stat('Stock bas', stockBas, Icons.warning_amber_rounded,
-                      Kolors.kWarning),
                   _Stat(
-                      'Établissements',
-                      etablissementCtrl.etablissements.length,
-                      Icons.local_hospital_rounded,
-                      Kolors.kSuccess),
+                    'Patients',
+                    patientCtrl.patients.length,
+                    Icons.groups_rounded,
+                    Kolors.kPrimary,
+                  ),
+                  _Stat(
+                    'Médicaments',
+                    medicamentCtrl.medicaments.length,
+                    Icons.medication_rounded,
+                    Kolors.kBlue,
+                  ),
+                  _Stat(
+                    'Stock bas',
+                    stockBas,
+                    Icons.warning_amber_rounded,
+                    Kolors.kWarning,
+                  ),
+                  _Stat(
+                    'Établissements',
+                    etablissementCtrl.etablissements.length,
+                    Icons.local_hospital_rounded,
+                    Kolors.kSuccess,
+                  ),
                 ],
               ),
               const SizedBox(height: 22),
@@ -86,7 +102,9 @@ class DashboardTab extends StatelessWidget {
                             (p) => ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              leading: const _Avatar(icon: Icons.person_rounded),
+                              leading: const _Avatar(
+                                icon: Icons.person_rounded,
+                              ),
                               title: Text(p.nom),
                               subtitle: Text(p.telephone ?? '-'),
                             ),
@@ -142,8 +160,9 @@ class DashboardTab extends StatelessWidget {
                                 icon: Icons.local_hospital_rounded,
                               ),
                               title: Text(e.nom),
-                              subtitle:
-                                  Text('${e.type} · ${e.telephone ?? '-'}'),
+                              subtitle: Text(
+                                '${e.profilLabel} · ${e.telephone ?? '-'}',
+                              ),
                               trailing: _StatusDot(active: e.actif),
                             ),
                           )
@@ -157,20 +176,17 @@ class DashboardTab extends StatelessWidget {
                       loading: userCtrl.loading,
                       error: userCtrl.error,
                       emptyMessage: 'Aucun utilisateur.',
-                      children: userCtrl.users
-                          .take(5)
-                          .map((u) {
-                            final r = RoleUi.of(u.role);
-                            return ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              leading: _Avatar(icon: r.icon, color: r.color),
-                              title: Text(u.name),
-                              subtitle: Text('${r.label} · ${u.telephone}'),
-                              trailing: _StatusDot(active: u.actif),
-                            );
-                          })
-                          .toList(),
+                      children: userCtrl.users.take(5).map((u) {
+                        final r = RoleUi.of(u.role);
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: _Avatar(icon: r.icon, color: r.color),
+                          title: Text(u.name),
+                          subtitle: Text('${r.label} · ${u.telephone}'),
+                          trailing: _StatusDot(active: u.actif),
+                        );
+                      }).toList(),
                     ),
                   ),
                 ],
@@ -183,7 +199,7 @@ class DashboardTab extends StatelessWidget {
   }
 }
 
-/// En-tête de bienvenue en dégradé émeraude.
+/// En-tête de bienvenue, carte de tête Ngoni.
 class _WelcomeHeader extends StatelessWidget {
   const _WelcomeHeader({required this.name});
 
@@ -191,24 +207,8 @@ class _WelcomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prenom = name.trim().isEmpty ? '' : name.trim().split(' ').first;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Kolors.kPrimary, Kolors.kBlue],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Kolors.kPrimary.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
+    final prenom = prenomDe(name);
+    return CarteMarque(
       child: Row(
         children: [
           Expanded(
@@ -217,8 +217,8 @@ class _WelcomeHeader extends StatelessWidget {
               children: [
                 Text(
                   'Bonjour${prenom.isEmpty ? '' : ', $prenom'} !',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: GoogleFonts.poppins(
+                    color: Kolors.kWhite,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
@@ -227,7 +227,7 @@ class _WelcomeHeader extends StatelessWidget {
                 Text(
                   'Voici l’activité de votre établissement aujourd’hui.',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Kolors.kWhite.withValues(alpha: 0.85),
                     fontSize: 13,
                     height: 1.3,
                   ),
@@ -235,19 +235,7 @@ class _WelcomeHeader extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            height: 52,
-            width: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.health_and_safety_rounded,
-              color: Colors.white,
-              size: 30,
-            ),
-          ),
+          const AvatarMarque(Icons.health_and_safety_rounded, size: 54),
         ],
       ),
     );
@@ -277,7 +265,12 @@ class _StatsGrid extends StatelessWidget {
           spacing: spacing,
           runSpacing: spacing,
           children: stats
-              .map((s) => SizedBox(width: tileWidth, child: _StatTile(stat: s)))
+              .map(
+                (s) => SizedBox(
+                  width: tileWidth,
+                  child: _StatTile(stat: s),
+                ),
+              )
               .toList(),
         );
       },
@@ -391,25 +384,25 @@ class _QuickActions extends StatelessWidget {
       icon: Icons.insights_rounded,
       label: 'Statistiques',
       color: Kolors.kPrimary,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const StatsScreen())),
     );
     final alertes = _ActionCard(
       icon: Icons.warning_amber_rounded,
       label: 'Alertes stock',
       color: Kolors.kWarning,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const AlertesScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const AlertesScreen())),
     );
     final caisse = _ActionCard(
       icon: Icons.point_of_sale_rounded,
       label: 'Caisse du jour',
       color: Kolors.kSuccess,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const CaisseScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const CaisseScreen())),
     );
 
     // Les statistiques sont réservées aux administrateurs (endpoint admin-only).

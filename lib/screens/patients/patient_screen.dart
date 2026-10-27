@@ -1,0 +1,415 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+
+import '../../caisse/caisse_models.dart';
+import '../../common/utils/kcolors.dart';
+import '../../common/widgets/carte_marque.dart';
+import '../../controllers/auth_controller.dart';
+import '../../core/api/api_client.dart';
+import '../../dossier/dossier_models.dart';
+import '../../file/file_service.dart';
+import '../../patients/patients_service.dart';
+import '../caisse/visite_screen.dart';
+import '../dossier/dossier_screen.dart';
+import '../dossier/dossier_widgets.dart';
+import '../../rdv/rdv_service.dart';
+import '../file/donner_ticket_sheet.dart';
+import '../rdv/nouveau_rdv_sheet.dart';
+import '../../common/widgets/formulaire.dart';
+
+/// Créer ou corriger la fiche : nom, sexe, âge (ou date de naissance),
+/// téléphone, quartier. Renvoie les champs, ou null.
+Future<Map<String, dynamic>?> editerPatient(
+  BuildContext context, [
+  Patient? p,
+]) {
+  final nom = TextEditingController(text: p?.nom);
+  final age = TextEditingController(
+    text: p?.age == null || p!.naissanceEstimee == false ? '' : '${p.age}',
+  );
+  final telephone = TextEditingController(text: p?.telephone);
+  final adresse = TextEditingController(text: p?.adresse);
+  String? sexe = p?.sexe;
+  DateTime? naissance = p != null && !p.naissanceEstimee
+      ? DateTime.tryParse(p.dateNaissance ?? '')
+      : null;
+
+  return formulaire<Map<String, dynamic>>(
+    context,
+    titre: Text(p == null ? 'Nouveau patient' : 'Fiche du patient'),
+    corps: (ctx, setState) => Column(
+      spacing: 12,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: nom,
+          autofocus: p == null,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Prénom et nom'),
+        ),
+        const SizedBox(height: 12),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'F', label: Text('Femme')),
+            ButtonSegment(value: 'M', label: Text('Homme')),
+          ],
+          selected: {?sexe},
+          emptySelectionAllowed: true,
+          onSelectionChanged: (s) =>
+              setState(() => sexe = s.isEmpty ? null : s.first),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: age,
+                enabled: naissance == null,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(labelText: 'Âge (ans)'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: () async {
+                final choix = await showDatePicker(
+                  context: ctx,
+                  initialDate: naissance ?? DateTime(1990),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime.now(),
+                  initialDatePickerMode: DatePickerMode.year,
+                );
+                if (choix != null) setState(() => naissance = choix);
+              },
+              icon: const Icon(Icons.cake_outlined, size: 18),
+              label: Text(
+                naissance == null ? 'Date exacte' : dateCourte(naissance),
+              ),
+            ),
+          ],
+        ),
+        TextField(
+          controller: telephone,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(
+            labelText: 'Téléphone (pour les SMS)',
+          ),
+        ),
+        TextField(
+          controller: adresse,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Quartier'),
+        ),
+      ],
+    ),
+    actions: (ctx, setState) => [
+      TextButton(
+        onPressed: () => Navigator.pop(ctx),
+        child: const Text('Annuler'),
+      ),
+      ElevatedButton(
+        onPressed: () {
+          if (nom.text.trim().isEmpty) return;
+          Navigator.pop(ctx, {
+            'nom': nom.text.trim(),
+            'sexe': sexe,
+            'telephone': telephone.text.trim(),
+            'adresse': adresse.text.trim(),
+            if (naissance != null)
+              'date_naissance':
+                  '${naissance!.year}-${naissance!.month.toString().padLeft(2, '0')}-${naissance!.day.toString().padLeft(2, '0')}'
+            else if (int.tryParse(age.text) != null)
+              'age': int.parse(age.text),
+          });
+        },
+        child: const Text('Enregistrer'),
+      ),
+    ],
+  );
+}
+
+/// La fiche du patient : son identité, ses visites, et ce qu'on fait pour
+/// lui aujourd'hui (l'envoyer en consultation, ouvrir son dossier).
+class PatientScreen extends StatefulWidget {
+  const PatientScreen({required this.patient, super.key});
+
+  final Patient patient;
+
+  @override
+  State<PatientScreen> createState() => _PatientScreenState();
+}
+
+class _PatientScreenState extends State<PatientScreen> {
+  final _service = PatientsService();
+  late Patient _p = widget.patient;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  Future<void> _charger() async {
+    try {
+      final p = await _service.fiche(_p.uuid);
+      if (mounted) setState(() => _p = p);
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  void _dire(String m) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    }
+  }
+
+  Future<void> _modifier() async {
+    final d = await editerPatient(context, _p);
+    if (d == null) return;
+    try {
+      final p = await _service.modifier(_p.uuid, d);
+      if (mounted) setState(() => _p = p);
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  Future<void> _envoyer() async {
+    try {
+      final services = await FileService().services();
+      if (!mounted) return;
+      final ticket = await donnerTicket(
+        context,
+        services,
+        patient: _p,
+        consultation: _p.visiteDuJour == null,
+      );
+      if (ticket != null) await _charger();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  Future<void> _rendezVous() async {
+    try {
+      final agendas = await RdvService().agendas();
+      if (!mounted) return;
+      if (agendas.where((a) => a.actif).isEmpty) {
+        _dire('Aucun agenda : créez-le dans Rendez-vous (icône calendrier).');
+        return;
+      }
+      final ok = await nouveauRdv(
+        context,
+        agendas,
+        DateTime.now(),
+        patient: _p,
+      );
+      if (ok == true) await _charger();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  Future<void> _ouvrir(Widget ecran) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => ecran));
+    await _charger();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthController>();
+    final p = _p;
+    final duJour = p.visiteDuJour;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Patient'),
+        actions: [
+          if (auth.peut('patients.gerer'))
+            IconButton(
+              tooltip: 'Corriger la fiche',
+              icon: const Icon(Icons.edit_rounded),
+              onPressed: _modifier,
+            ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _charger,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            CarteMarque(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.nom,
+                          style: GoogleFonts.poppins(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (p.resume.isNotEmpty)
+                          Text(
+                            p.resume,
+                            style: const TextStyle(
+                              color: Kolors.kJaune,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        if (p.telephone != null)
+                          Text(
+                            p.telephone!,
+                            style: TextStyle(
+                              color: Kolors.kWhite.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        if (p.aUnCompte)
+                          Text(
+                            'A l’app Ngoni Santé',
+                            style: TextStyle(
+                              color: Kolors.kWhite.withValues(alpha: 0.85),
+                              fontSize: 12.5,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const AvatarMarque(Icons.person_rounded),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (duJour != null)
+              Card(
+                color: Kolors.kJauneDoux,
+                child: ListTile(
+                  leading: const Icon(Icons.today_rounded),
+                  title: const Text('Visite en cours aujourd’hui'),
+                  subtitle: Text(
+                    duJour.services.isEmpty
+                        ? 'Ouverte'
+                        : duJour.services.join(' › '),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _ouvrir(VisiteScreen(uuid: duJour.uuid)),
+                ),
+              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (auth.aModule('file') && auth.peut('file.emettre'))
+                  ElevatedButton.icon(
+                    onPressed: _envoyer,
+                    icon: const Icon(Icons.confirmation_number_rounded),
+                    label: Text(
+                      duJour == null
+                          ? 'Envoyer en consultation'
+                          : 'Envoyer vers un service',
+                    ),
+                  ),
+                if (auth.aModule('rdv') && auth.peut('rdv.gerer'))
+                  OutlinedButton.icon(
+                    onPressed: _rendezVous,
+                    icon: const Icon(Icons.event_available_rounded),
+                    label: const Text('Rendez-vous'),
+                  ),
+                if (auth.peut('dossier.lire'))
+                  OutlinedButton.icon(
+                    onPressed: () => _ouvrir(
+                      DossierScreen(
+                        dossier: DossierPatient(
+                          uuid: p.uuid,
+                          nom: p.nom,
+                          aUnCompte: p.aUnCompte,
+                          consultations: const [],
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.folder_shared_rounded),
+                    label: const Text('Dossier médical'),
+                  ),
+              ],
+            ),
+            if (p.rendezVous.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Prochains rendez-vous',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final r in p.rendezVous)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.event_rounded,
+                      color: Kolors.kPrimary,
+                    ),
+                    title: Text(
+                      r.debut == null
+                          ? 'À fixer'
+                          : '${dateCourte(r.debut)} à ${r.debut!.hour.toString().padLeft(2, '0')}:${r.debut!.minute.toString().padLeft(2, '0')}',
+                    ),
+                    subtitle: Text([?r.agenda, ?r.motif].join(' · ')),
+                  ),
+                ),
+            ],
+            const SizedBox(height: 16),
+            Text(
+              'Visites',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (p.visites.isEmpty)
+              const Text(
+                'Pas encore de visite ici.',
+                style: TextStyle(color: Kolors.kTextMuted),
+              ),
+            for (final v in p.visites)
+              Card(
+                child: ListTile(
+                  leading: Icon(
+                    v.ouverte
+                        ? Icons.pending_actions_rounded
+                        : Icons.check_circle_outline_rounded,
+                    color: v.ouverte ? Kolors.kWarning : Kolors.kSuccess,
+                  ),
+                  title: Text(dateCourte(v.date)),
+                  subtitle: Text(
+                    v.services.isEmpty ? '—' : v.services.join(' › '),
+                  ),
+                  trailing: Text(
+                    v.reste > 0
+                        ? 'Reste ${formatMontant(v.reste, v.devise)}'
+                        : formatMontant(v.total, v.devise),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: v.reste > 0 ? Kolors.kRed : null,
+                    ),
+                  ),
+                  onTap: () => _ouvrir(VisiteScreen(uuid: v.uuid)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

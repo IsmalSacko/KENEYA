@@ -1,0 +1,55 @@
+KENEYA+ — la gestion quotidienne de votre cabinet ou de votre pharmacie
+
+KENEYA+ est un outil de travail destiné aux professionnels de santé et à leurs
+équipes. Il réunit sur un téléphone ce qui se tenait jusque-là sur des cahiers
+et des feuilles volantes : les consultations, les médicaments, les ventes et la
+caisse.
+
+Conçu pour les cabinets médicaux, les pharmacies et les officines.
+
+⚠️ À SAVOIR
+KENEYA+ est un outil de gestion, non un service de télémédecine. L'application
+ne délivre aucun diagnostic, aucune prescription et aucun conseil médical, et
+ne remplace pas une consultation. Elle n'est pas destinée aux patients : elle
+s'adresse au personnel de l'établissement.
+
+🩺 CONSULTATIONS
+• Enregistrement des consultations et du dossier des patients reçus
+• Historique consultable par patient
+• Accès réservé au personnel autorisé de l'établissement
+
+💊 PHARMACIE ET STOCK
+• Catalogue des médicaments
+• Mouvements de stock : entrées, sorties, ajustements
+• Ventes en pharmacie et vente d'articles
+• Alertes sur les situations qui demandent votre attention
+
+💰 CAISSE ET PAIEMENTS
+• Encaissements enregistrés au fil de la journée
+• Suivi des paiements
+• Une caisse qui reflète l'activité réelle du comptoir
+
+👥 UNE ÉQUIPE, DES RÔLES
+Chacun voit ce qui le concerne : administrateur, médecin, pharmacien ou
+caissier. Les droits suivent la fonction, et le journal d'audit garde la trace
+de ce qui a été fait.
+
+🏥 PLUSIEURS ÉTABLISSEMENTS
+Gérez plusieurs cabinets ou officines depuis le même compte, chacun avec ses
+propres données.
+
+📊 STATISTIQUES
+• Activité de l'établissement
+• Activité par utilisateur
+• De quoi voir où en est la journée, la semaine, le mois
+
+📶 SANS RÉSEAU
+La connexion n'est pas toujours là où l'on travaille. KENEYA+ continue de
+fonctionner hors ligne et se resynchronise quand le réseau revient.
+
+🔐 DONNÉES DE SANTÉ
+Les informations des patients sont sensibles. L'accès est protégé par un compte
+nominatif, les droits sont attachés au rôle, et chaque action est journalisée.
+Les données de votre établissement restent les vôtres.
+
+Une question ? Le support est joignable depuis l'application.

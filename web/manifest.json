@@ -1,11 +1,11 @@
 {
-    "name": "KENEYA+",
-    "short_name": "KENEYA+",
+    "name": "Ngoni Santé",
+    "short_name": "Ngoni Santé",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
-    "theme_color": "#4F46E5",
-    "description": "Une applicarion pour les cabinet et les pharcies",
+    "theme_color": "#0F2A5C",
+    "description": "La santé simple et fiable : rendez-vous, file d’attente, cabinets, pharmacies et centres de santé.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

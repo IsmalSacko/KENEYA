@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../common/utils/app_style.dart';
 import '../common/utils/kcolors.dart';
 import '../common/utils/kstrings.dart';
-import 'login_screen.dart';
-import 'register_screen.dart';
+import '../common/widgets/carte_marque.dart';
+import 'appareil/appairage_screen.dart';
+import 'compte/connexion_screen.dart';
+import 'compte/inscription_screen.dart';
 
 class AuthGatewayScreen extends StatefulWidget {
   const AuthGatewayScreen({super.key});
@@ -43,15 +45,15 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
   }
 
   void _goLogin() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ConnexionScreen()));
   }
 
   void _goRegister() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const RegisterScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const InscriptionScreen()));
   }
 
   @override
@@ -61,13 +63,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Kolors.kPrimary, Kolors.kBlue, Kolors.kPrimaryDark],
-          ),
-        ),
+        decoration: const BoxDecoration(gradient: Kolors.heroGradient),
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -77,19 +73,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                   const SizedBox(height: 12),
                   Column(
                     children: [
-                      Container(
-                        height: 56,
-                        width: 56,
-                        decoration: BoxDecoration(
-                          color: Kolors.kWhite.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.health_and_safety_rounded,
-                          color: Kolors.kWhite,
-                          size: 32,
-                        ),
-                      ),
+                      const AvatarMarque(Icons.health_and_safety_rounded),
                       const SizedBox(height: 10),
                       Text(
                         AppText.kAppName,
@@ -150,7 +134,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                         width: active ? 26 : 8,
                         decoration: BoxDecoration(
                           color: active
-                              ? Kolors.kWhite
+                              ? Kolors.kJaune
                               : Kolors.kWhite.withValues(alpha: 0.40),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -168,7 +152,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                           child: ElevatedButton(
                             onPressed: _goLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Kolors.kWhite,
+                              backgroundColor: Kolors.kJaune,
                               foregroundColor: Kolors.kPrimaryDark,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
@@ -203,9 +187,28 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                             ),
                             child: Text(
                               AppText.kRegisterButton,
-                              style:
-                                  appStyle(15, Kolors.kWhite, FontWeight.w700),
+                              style: appStyle(
+                                15,
+                                Kolors.kWhite,
+                                FontWeight.w700,
+                              ),
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TextButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const AppairageScreen(),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.tv_rounded,
+                            color: Kolors.kJaune,
+                          ),
+                          label: Text(
+                            'Écran ou borne d’établissement',
+                            style: appStyle(13, Kolors.kWhite, FontWeight.w600),
                           ),
                         ),
                       ],

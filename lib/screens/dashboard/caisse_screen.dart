@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../common/utils/kcolors.dart';
+import '../../common/widgets/carte_marque.dart';
 import '../../services/analytics_service.dart';
 import 'widgets/panel.dart';
 
@@ -51,38 +53,23 @@ class _CaisseScreenState extends State<CaisseScreen> {
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Container(
+                CarteMarque(
                   padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Kolors.kPrimary, Kolors.kBlue],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Kolors.kPrimary.withValues(alpha: 0.28),
-                        blurRadius: 24,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Encaissé aujourd’hui',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Kolors.kWhite.withValues(alpha: 0.85),
                           fontSize: 13,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         _money(total),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: GoogleFonts.poppins(
+                          color: Kolors.kJaune,
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
                         ),
@@ -91,7 +78,7 @@ class _CaisseScreenState extends State<CaisseScreen> {
                       Text(
                         '${data.nbPaiementsJour} paiement(s)',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Kolors.kWhite.withValues(alpha: 0.85),
                           fontSize: 13,
                         ),
                       ),

@@ -1,6 +1,5 @@
 part of 'api_module_screen.dart';
 
-
 extension _ApiModuleScreenView on _ApiModuleScreenState {
   Widget _buildDesktopTable() {
     final columns = _collectColumns();
@@ -18,13 +17,15 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
               dataRowMinHeight: 58,
               dataRowMaxHeight: 66,
               columns: [
-                for (final c in columns) DataColumn(label: Text(_displayLabelForKey(c))),
+                for (final c in columns)
+                  DataColumn(label: Text(_displayLabelForKey(c))),
                 const DataColumn(label: Text('Actions')),
               ],
               rows: _items.map((item) {
                 return DataRow(
                   cells: [
-                    for (final c in columns) DataCell(Text(_cellValueForColumn(c, item[c], item))),
+                    for (final c in columns)
+                      DataCell(Text(_cellValueForColumn(c, item[c], item))),
                     DataCell(
                       PopupMenuButton<String>(
                         tooltip: 'Actions',
@@ -57,10 +58,13 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                             ),
                         ],
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                            border: Border.all(color: Kolors.kBorderStrong),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
@@ -153,16 +157,10 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Kolors.kSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2ECE7)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A0E9F6E),
-            blurRadius: 14,
-            offset: Offset(0, 6),
-          ),
-        ],
+        border: Border.all(color: Kolors.kBorder),
+        boxShadow: Kolors.softShadow(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,7 +190,7 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
-                        color: Color(0xFF0B3D2E),
+                        color: Kolors.kTextHigh,
                       ),
                     ),
                     for (final c in subtitleKeys)
@@ -203,7 +201,7 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFF4B6358),
+                            color: Kolors.kTextMuted,
                             fontSize: 12.5,
                           ),
                         ),
@@ -216,7 +214,7 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                   tooltip: 'Itinéraire',
                   icon: const Icon(
                     Icons.directions_rounded,
-                    color: Color(0xFF2563EB),
+                    color: Kolors.kPrimaryLight,
                   ),
                   onPressed: () => _openItinerary(item),
                 )
@@ -226,7 +224,7 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                   tooltip: 'Définir la position (GPS)',
                   icon: const Icon(
                     Icons.add_location_alt_outlined,
-                    color: Color(0xFF4B6358),
+                    color: Kolors.kTextMuted,
                   ),
                   onPressed: () => _update(item),
                 ),
@@ -251,7 +249,7 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
   Widget _actionsMenu(Map<String, dynamic> item) {
     return PopupMenuButton<String>(
       tooltip: 'Actions',
-      icon: const Icon(Icons.more_vert, color: Color(0xFF4B6358)),
+      icon: const Icon(Icons.more_vert, color: Kolors.kTextMuted),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (value) {
         if (value == 'update') _update(item);
@@ -274,9 +272,9 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
             value: 'delete',
             child: Row(
               children: [
-                Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
+                Icon(Icons.delete_outline, size: 18, color: Kolors.kRed),
                 SizedBox(width: 10),
-                Text('Supprimer', style: TextStyle(color: Color(0xFFDC2626))),
+                Text('Supprimer', style: TextStyle(color: Kolors.kRed)),
               ],
             ),
           ),
@@ -346,8 +344,7 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
     } else {
       positive = true;
     }
-    final color =
-        positive ? const Color(0xFF16A34A) : const Color(0xFFF59E0B);
+    final color = positive ? Kolors.kSuccess : Kolors.kWarning;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
@@ -377,14 +374,19 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
         }[modeRaw] ??
         '-';
     final statutRaw = item['statut_sync']?.toString();
-    final statutLabel = statutRaw == 'en_attente' ? 'En attente' : 'Synchronise';
+    final statutLabel = statutRaw == 'en_attente'
+        ? 'En attente'
+        : 'Synchronise';
     final montant = (item['montant_total'] is num)
         ? (item['montant_total'] as num).toDouble()
         : double.tryParse('${item['montant_total']}');
-    final montantLabel =
-        montant == null ? '-' : '${NumberFormat.decimalPattern('fr_FR').format(montant)} FCFA';
+    final montantLabel = montant == null
+        ? '-'
+        : '${NumberFormat.decimalPattern('fr_FR').format(montant)} FCFA';
     final patientLabel = _extractPatientLabel(item);
-    final articlesCount = item['articles'] is List ? (item['articles'] as List).length : 0;
+    final articlesCount = item['articles'] is List
+        ? (item['articles'] as List).length
+        : 0;
 
     return Card(
       child: Padding(
@@ -397,7 +399,10 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
                 Expanded(
                   child: Text(
                     'Vente #$id',
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 Text(
@@ -416,14 +421,19 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: (statutRaw == 'en_attente' ? Colors.orange : Colors.green)
-                    .withValues(alpha: 0.12),
+                color:
+                    (statutRaw == 'en_attente'
+                            ? Kolors.kWarning
+                            : Kolors.kSuccess)
+                        .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 'Statut: $statutLabel',
                 style: TextStyle(
-                  color: statutRaw == 'en_attente' ? Colors.orange.shade900 : Colors.green.shade900,
+                  color: statutRaw == 'en_attente'
+                      ? Kolors.kGold
+                      : Kolors.kSuccess,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -459,9 +469,9 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
   void _showVenteDetails(Map<String, dynamic> item) {
     final articles = item['articles'] is List
         ? (item['articles'] as List)
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList()
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
         : <Map<String, dynamic>>[];
     final screen = MediaQuery.sizeOf(context);
     final isLarge = screen.width >= 700;
@@ -522,8 +532,12 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
       return;
     }
 
-    final estimatedRows = 5 + limited.length + (articles.length > limited.length ? 1 : 0);
-    final dynamicHeightFactor = (0.28 + (estimatedRows * 0.05)).clamp(0.45, 0.82);
+    final estimatedRows =
+        5 + limited.length + (articles.length > limited.length ? 1 : 0);
+    final dynamicHeightFactor = (0.28 + (estimatedRows * 0.05)).clamp(
+      0.45,
+      0.82,
+    );
 
     showModalBottomSheet<void>(
       context: context,
@@ -536,7 +550,12 @@ extension _ApiModuleScreenView on _ApiModuleScreenState {
           alignment: Alignment.bottomCenter,
           heightFactor: dynamicHeightFactor,
           child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.viewPaddingOf(context).bottom + 12),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              4,
+              16,
+              MediaQuery.viewPaddingOf(context).bottom + 12,
+            ),
             child: SingleChildScrollView(child: detailsBody),
           ),
         ),

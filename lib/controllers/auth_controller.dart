@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 
-import '../core/api/api_client.dart';
 import '../core/offline/local_store.dart';
-import '../core/offline/pin_cache.dart';
-import '../core/offline/uuid.dart';
 import '../core/storage/token_storage.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -16,18 +13,26 @@ class AuthController extends ChangeNotifier {
   bool initializing = true;
   bool loading = false;
   String? error;
-  bool lastRegisterQueued = false;
   bool offlineProvisionalSession = false;
   String? accessToken;
   UserModel? currentUser;
 
-  /// Rempli quand le login renvoie 409 (numéro partagé par plusieurs
-  /// établissements). La couche UI propose alors un choix, puis rappelle
-  /// login(..., etablissementUuid: ...).
-  List<Map<String, dynamic>> loginEtablissements = [];
-  bool requiresEtablissementChoice = false;
+  /// Droits du membre dans son établissement (`patients.voir`,
+  /// `file.appeler`…) et modules actifs de l'établissement.
+  List<String> permissions = [];
+  List<String> modules = [];
+  String? profil;
+  String devise = 'XOF';
 
-  String _offlineLoginKey(String telephone) => 'offline_login_$telephone';
+  bool peut(String droit) => permissions.contains(droit);
+  bool aModule(String module) => modules.contains(module);
+
+  static const String _contexteKey = 'membre_contexte';
+
+  // Ngoni Santé : profil mémorisé de chaque membre (un par espace pro), et
+  // membre à qui appartient le jeton enregistré.
+  String _membreProfilKey(String membreUuid) => 'membre_profil_$membreUuid';
+  static const String _tokenMembreKey = 'token_membre_uuid';
 
   Map<String, dynamic> _profileMap(UserModel u) => {
     'id': u.id,
@@ -58,6 +63,7 @@ class AuthController extends ChangeNotifier {
     initializing = true;
     notifyListeners();
 
+    _lireContexte(LocalStore.read<Map<String, dynamic>>(_contexteKey));
     accessToken = await TokenStorage.getToken();
     if (accessToken == null || accessToken!.isEmpty) {
       final profile = LocalStore.read<Map<String, dynamic>>(_offlineProfileKey);
@@ -78,191 +84,67 @@ class AuthController extends ChangeNotifier {
     if (offlineProvisionalSession) return;
 
     try {
-      final data = await _authService.getCurrentUser();
-      currentUser = UserModel.fromJson(data);
+      final data = await _authService.moi();
+      final user = _parseUser(data['user']);
+      if (user != null) currentUser = user;
+      await _appliquerContexte(data);
       notifyListeners();
     } catch (_) {
       // Keep session even if profile refresh fails.
     }
   }
 
-  Future<bool> login({
-    required String telephone,
-    required String pin,
-    String? etablissementUuid,
-  }) async {
-    loading = true;
-    error = null;
-    requiresEtablissementChoice = false;
-    loginEtablissements = [];
-    notifyListeners();
+  /// Ouvre la session d'un membre (espace pro) avec la réponse de
+  /// /compte/espaces ou /compte/etablissements.
+  Future<void> ouvrirSessionMembre(
+    Map<String, dynamic> data,
+    String membreUuid,
+  ) async {
+    final token = (data['access_token'] ?? '').toString();
+    if (token.isEmpty) throw StateError('Jeton manquant');
 
-    try {
-      final data = await _authService.login(
-        telephone,
-        pin,
-        etablissementUuid: etablissementUuid,
+    accessToken = token;
+    currentUser = _parseUser(data['user']);
+    offlineProvisionalSession = false;
+    await LocalStore.remove(_offlineProfileKey);
+    await TokenStorage.saveToken(token);
+    await LocalStore.write(_tokenMembreKey, membreUuid);
+    await _appliquerContexte(data);
+    await LocalStore.write('${_contexteKey}_$membreUuid', _contexte());
+    if (currentUser != null) {
+      await LocalStore.write(
+        _membreProfilKey(membreUuid),
+        _profileMap(currentUser!),
       );
-      accessToken = (data['access_token'] ?? '').toString();
-      currentUser = _parseUser(data['user']);
-
-      if (accessToken != null && accessToken!.isNotEmpty) {
-        offlineProvisionalSession = false;
-        await LocalStore.remove(_offlineProfileKey);
-        await TokenStorage.saveToken(accessToken!);
-
-        // Mémorise de quoi se reconnecter hors-ligne plus tard.
-        await PinCache.save(telephone, pin);
-        if (currentUser != null) {
-          await LocalStore.write(
-            _offlineLoginKey(telephone),
-            _profileMap(currentUser!),
-          );
-        }
-        return true;
-      }
-
-      error = 'Token invalide.';
-      return false;
-    } on DioException catch (e) {
-      // 409 : le numéro existe dans plusieurs établissements.
-      if (e.response?.statusCode == 409) {
-        final data = e.response?.data;
-        if (data is Map && data['etablissements'] is List) {
-          loginEtablissements = (data['etablissements'] as List)
-              .whereType<Map>()
-              .map((m) => Map<String, dynamic>.from(m))
-              .toList();
-          requiresEtablissementChoice = true;
-        }
-        error =
-            (data is Map ? data['message']?.toString() : null) ??
-            'Précisez l\'établissement.';
-        return false;
-      }
-
-      // Hors-ligne : tenter la connexion via le cache local.
-      if (ApiClient.isNetworkError(e)) {
-        if (await _offlineLogin(telephone, pin)) return true;
-        error =
-            'Hors-ligne : identifiants non mis en cache. Connectez-vous une fois en ligne d\'abord.';
-        return false;
-      }
-
-      error =
-          _extractApiMessage(e) ??
-          'Echec de connexion. Verifie telephone et PIN.';
-      return false;
-    } catch (_) {
-      error = 'Echec de connexion. Verifie telephone et PIN.';
-      return false;
-    } finally {
-      loading = false;
-      notifyListeners();
     }
+    notifyListeners();
   }
 
-  /// Connexion hors-ligne : valide le PIN contre le cache sécurisé et restaure
-  /// le profil mémorisé lors d'une précédente connexion en ligne.
-  Future<bool> _offlineLogin(String telephone, String pin) async {
-    if (!await PinCache.verify(telephone, pin)) return false;
-
+  /// Hors ligne : rouvre un espace déjà ouvert sur ce téléphone, avec son
+  /// profil mémorisé. Le jeton enregistré n'est gardé que s'il est le sien.
+  Future<bool> reprendreSessionMembreHorsLigne(String membreUuid) async {
     final profile = LocalStore.read<Map<String, dynamic>>(
-      _offlineLoginKey(telephone),
+      _membreProfilKey(membreUuid),
     );
     if (profile == null) return false;
 
     currentUser = UserModel.fromJson(profile);
-    accessToken = null;
-    offlineProvisionalSession = true;
-    return true;
-  }
-
-  Future<bool> register({
-    required String nomEtablissement,
-    required String type,
-    required String name,
-    required String telephone,
-    required String pin,
-  }) async {
-    loading = true;
-    error = null;
-    lastRegisterQueued = false;
-    notifyListeners();
-
-    try {
-      // uuid générés par le client → inscription idempotente au rejeu.
-      final etablissementUuid = uuidV4();
-      final userUuid = uuidV4();
-
-      final data = await _authService.register(
-        nomEtablissement: nomEtablissement,
-        type: type,
-        name: name,
-        telephone: telephone,
-        pin: pin,
-        uuid: etablissementUuid,
-        userUuid: userUuid,
-      );
-
-      // Permet de se (re)connecter hors-ligne dès l'inscription.
-      await PinCache.save(telephone, pin);
-
-      if (data['queued'] == true) {
-        accessToken = null;
-        currentUser = UserModel(
-          id: -DateTime.now().millisecondsSinceEpoch,
-          etablissementId: null,
-          name: name,
-          telephone: telephone,
-          // L'inscription crée un admin d'établissement (aligné sur le backend).
-          role: 'admin_etablissement',
-          actif: true,
-        );
-        offlineProvisionalSession = true;
-        final profile = {
-          'id': currentUser!.id,
-          'etablissement_id': null,
-          'uuid': userUuid,
-          'name': currentUser!.name,
-          'telephone': currentUser!.telephone,
-          'role': currentUser!.role,
-          'actif': true,
-        };
-        await LocalStore.write(_offlineProfileKey, profile);
-        await LocalStore.write(_offlineLoginKey(telephone), profile);
-        lastRegisterQueued = true;
-        return true;
-      }
-
-      accessToken = (data['access_token'] ?? '').toString();
-      currentUser = _parseUser(data['user']);
-
-      if (accessToken != null && accessToken!.isNotEmpty) {
-        offlineProvisionalSession = false;
-        await LocalStore.remove(_offlineProfileKey);
-        await TokenStorage.saveToken(accessToken!);
-        if (currentUser != null) {
-          await LocalStore.write(
-            _offlineLoginKey(telephone),
-            _profileMap(currentUser!),
-          );
-        }
-        return true;
-      }
-
-      error = 'Token invalide apres inscription.';
-      return false;
-    } on DioException catch (e) {
-      error = _extractApiMessage(e) ?? 'Echec de l\'inscription.';
-      return false;
-    } catch (_) {
-      error = 'Echec de l\'inscription.';
-      return false;
-    } finally {
-      loading = false;
-      notifyListeners();
+    _lireContexte(
+      LocalStore.read<Map<String, dynamic>>('${_contexteKey}_$membreUuid'),
+    );
+    await LocalStore.write(_contexteKey, _contexte());
+    if (LocalStore.read<String>(_tokenMembreKey) == membreUuid) {
+      accessToken = await TokenStorage.getToken();
+      offlineProvisionalSession = accessToken == null || accessToken!.isEmpty;
+    } else {
+      await TokenStorage.clearToken();
+      await LocalStore.remove(_tokenMembreKey);
+      accessToken = null;
+      offlineProvisionalSession = true;
+      await LocalStore.write(_offlineProfileKey, profile);
     }
+    notifyListeners();
+    return true;
   }
 
   Future<void> logout() async {
@@ -276,6 +158,11 @@ class AuthController extends ChangeNotifier {
     } finally {
       await TokenStorage.clearToken();
       await LocalStore.remove(_offlineProfileKey);
+      await LocalStore.remove(_tokenMembreKey);
+      await LocalStore.remove(_contexteKey);
+      permissions = [];
+      modules = [];
+      profil = null;
       accessToken = null;
       currentUser = null;
       offlineProvisionalSession = false;
@@ -368,6 +255,33 @@ class AuthController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Droits et établissement renvoyés par /me ou à l'ouverture d'un espace.
+  Future<void> _appliquerContexte(Map<String, dynamic> data) async {
+    _lireContexte({
+      'permissions': data['permissions'],
+      'etablissement': data['etablissement'],
+    });
+    await LocalStore.write(_contexteKey, _contexte());
+  }
+
+  void _lireContexte(Map<String, dynamic>? contexte) {
+    if (contexte == null) return;
+    final p = contexte['permissions'];
+    if (p is List) permissions = p.map((e) => e.toString()).toList();
+    final e = contexte['etablissement'];
+    if (e is Map) {
+      final m = e['modules'];
+      if (m is List) modules = m.map((x) => x.toString()).toList();
+      profil = e['profil']?.toString();
+      devise = (e['devise'] ?? devise).toString();
+    }
+  }
+
+  Map<String, dynamic> _contexte() => {
+    'permissions': permissions,
+    'etablissement': {'modules': modules, 'profil': profil, 'devise': devise},
+  };
 
   String? _extractApiMessage(DioException e) {
     final data = e.response?.data;

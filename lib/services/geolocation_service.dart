@@ -18,7 +18,21 @@ class GeolocationService {
       return null;
     }
 
-    return Geolocator.getCurrentPosition();
+    // Sans délai, un GPS lent (intérieur, zone rurale) bloquait l'écran
+    // indéfiniment : 8 s au plus, sinon la dernière position connue.
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (_) {
+      try {
+        return await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        return null;
+      }
+    }
   }
 
   /// URL Google Maps en mode itinéraire vers (lat, lng). Le point de départ
