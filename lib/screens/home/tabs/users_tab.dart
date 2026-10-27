@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:keneya_plus/common/utils/kcolors.dart';
 import 'package:keneya_plus/common/utils/role_ui.dart';
 import 'package:keneya_plus/common/utils/roles.dart';
+import 'package:keneya_plus/common/whatsapp.dart';
+import 'package:keneya_plus/compte/compte_controller.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/controllers/user_controller.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +24,7 @@ class _UsersTabState extends State<UsersTab> {
   final _phoneCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
   String _role = AppRoles.medecin;
+  String? _roleAjoute;
 
   @override
   void dispose() {
@@ -34,6 +37,7 @@ class _UsersTabState extends State<UsersTab> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    _roleAjoute = _role;
     final ok = await widget.userCtrl.createUser(
       name: _nameCtrl.text.trim(),
       telephone: _phoneCtrl.text.trim(),
@@ -44,21 +48,65 @@ class _UsersTabState extends State<UsersTab> {
     if (!mounted) return;
 
     if (ok) {
+      final nom = _nameCtrl.text.trim();
+      final telephone = _phoneCtrl.text.trim();
+      final pin = _pinCtrl.text.trim();
       _nameCtrl.clear();
       _phoneCtrl.clear();
       _pinCtrl.clear();
-      final message = widget.userCtrl.lastActionQueued
-          ? 'Hors connexion: utilisateur en file d\'attente de synchronisation.'
-          : 'Utilisateur ajoute.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      if (widget.userCtrl.lastActionQueued) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hors connexion : le membre sera ajouté au retour du réseau.',
+            ),
+          ),
+        );
+        return;
+      }
+      await _inviter(nom, telephone, pin);
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(widget.userCtrl.error ?? 'Echec creation utilisateur.'),
+      ),
+    );
+  }
+
+  /// Le membre est ajouté : on lui envoie de quoi se connecter.
+  Future<void> _inviter(String nom, String telephone, String pin) async {
+    final etab =
+        context.read<CompteController>().espaceOuvert?.etablissementNom ??
+        'notre établissement';
+    final message =
+        'Bonjour $nom, vous faites partie de l’équipe de $etab sur Ngoni Santé '
+        '(${AppRoles.labelOf(_roleAjoute ?? _role)}).\n'
+        'Installez l’application : https://play.google.com/store/apps/details?id=com.ismaeldev.keneya\n'
+        'Connectez-vous avec votre numéro $telephone et le PIN $pin '
+        '(si vous aviez déjà Ngoni Santé, gardez votre PIN habituel).';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$nom est dans l’équipe'),
+        content: const Text(
+          'Envoyez-lui l’invitation : le lien de l’application, son numéro et son PIN.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Plus tard'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              envoyerWhatsApp(context, telephone, message);
+            },
+            icon: const Icon(Icons.chat_outlined),
+            label: const Text('Inviter par WhatsApp'),
+          ),
+        ],
       ),
     );
   }
@@ -84,7 +132,7 @@ class _UsersTabState extends State<UsersTab> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: 'Nom'),
+                decoration: const InputDecoration(labelText: 'Prénom et nom'),
                 validator: (v) => (v == null || v.trim().isEmpty)
                     ? 'Champ obligatoire'
                     : null,
@@ -92,11 +140,12 @@ class _UsersTabState extends State<UsersTab> {
               const SizedBox(height: 10),
               TextFormField(
                 controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: 'Telephone'),
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Téléphone'),
                 validator: (v) {
                   final t = v?.trim() ?? '';
                   if (t.length < 8 || t.length > 20) {
-                    return 'Telephone invalide (8 a 20 caracteres)';
+                    return 'Numéro invalide';
                   }
                   return null;
                 },
@@ -121,11 +170,14 @@ class _UsersTabState extends State<UsersTab> {
               TextFormField(
                 controller: _pinCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'PIN'),
+                decoration: const InputDecoration(
+                  labelText: 'PIN de départ (4 chiffres)',
+                  helperText: 'S’il a déjà Ngoni Santé, il garde son PIN.',
+                ),
                 validator: (v) {
                   final t = v?.trim() ?? '';
                   if (t.length < 4 || t.length > 6) {
-                    return 'PIN invalide (4 a 6 caracteres)';
+                    return 'De 4 à 6 chiffres';
                   }
                   return null;
                 },
@@ -135,7 +187,7 @@ class _UsersTabState extends State<UsersTab> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: widget.userCtrl.loading ? null : _submit,
-                  child: const Text('Ajouter utilisateur'),
+                  child: const Text('Ajouter à l’équipe'),
                 ),
               ),
               const SizedBox(height: 8),
