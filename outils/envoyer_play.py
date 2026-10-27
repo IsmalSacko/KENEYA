@@ -18,7 +18,9 @@ import re
 import sys
 from pathlib import Path
 
+import httplib2
 from google.oauth2 import service_account
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
@@ -43,15 +45,25 @@ def main():
 
     identite = service_account.Credentials.from_service_account_file(
         str(cle), scopes=['https://www.googleapis.com/auth/androidpublisher'])
-    play = build('androidpublisher', 'v3', credentials=identite, cache_discovery=False)
+    # Un App Bundle pèse ~80 Mo : délai long, envoi par morceaux de 8 Mo.
+    brut = httplib2.Http(timeout=600)
+    # 308 = « morceau reçu, continue » pour un envoi par morceaux, pas une redirection.
+    brut.redirect_codes = set(brut.redirect_codes) - {308}
+    http = AuthorizedHttp(identite, http=brut)
+    play = build('androidpublisher', 'v3', http=http, cache_discovery=False)
     edits = play.edits()
 
     edit = edits.insert(packageName=PAQUET, body={}).execute()['id']
     print(f'Envoi de {AAB.name} ({AAB.stat().st_size // 1_000_000} Mo)…')
-    bundle = edits.bundles().upload(
+    envoi = edits.bundles().upload(
         packageName=PAQUET, editId=edit,
-        media_body=MediaFileUpload(str(AAB), mimetype='application/octet-stream', resumable=True),
-    ).execute()
+        media_body=MediaFileUpload(str(AAB), mimetype='application/octet-stream', resumable=True, chunksize=8 * 1024 * 1024),
+    )
+    bundle = None
+    while bundle is None:
+        etat, bundle = envoi.next_chunk(num_retries=5)
+        if etat:
+            print(f'  {int(etat.progress() * 100)} %')
     code = bundle['versionCode']
     edits.tracks().update(packageName=PAQUET, editId=edit, track=piste, body={
         'track': piste,
