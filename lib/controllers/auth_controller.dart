@@ -22,6 +22,13 @@ class AuthController extends ChangeNotifier {
   List<String> permissions = [];
   List<String> modules = [];
   String? profil;
+
+  /// Officine où le client paie au caissier (le vendeur n'encaisse pas).
+  bool caisseSeparee = false;
+
+  /// Pharmacie ou dépôt : un commerce, où l'on vend plutôt qu'on soigne.
+  bool get estOfficine =>
+      profil == 'pharmacie' || profil == 'depot_medicaments';
   String devise = 'XOF';
 
   bool peut(String droit) => permissions.contains(droit);
@@ -275,12 +282,18 @@ class AuthController extends ChangeNotifier {
       if (m is List) modules = m.map((x) => x.toString()).toList();
       profil = e['profil']?.toString();
       devise = (e['devise'] ?? devise).toString();
+      caisseSeparee = e['caisse_separee'] == true;
     }
   }
 
   Map<String, dynamic> _contexte() => {
     'permissions': permissions,
-    'etablissement': {'modules': modules, 'profil': profil, 'devise': devise},
+    'etablissement': {
+      'modules': modules,
+      'profil': profil,
+      'devise': devise,
+      'caisse_separee': caisseSeparee,
+    },
   };
 
   String? _extractApiMessage(DioException e) {

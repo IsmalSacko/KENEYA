@@ -9,6 +9,14 @@ class ReglagesService {
     );
   }
 
+  /// Un réglage de l'établissement (ex. `caisse_separee`).
+  Future<void> regler(int etablissementId, Map<String, dynamic> valeurs) async {
+    await ApiClient.dio.patch(
+      '/etablissements/$etablissementId',
+      data: valeurs,
+    );
+  }
+
   Future<Map<String, dynamic>> droits() async {
     final res = await ApiClient.dio.get('/droits');
     return Map<String, dynamic>.from(res.data as Map);

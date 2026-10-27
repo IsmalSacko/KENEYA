@@ -16,6 +16,7 @@ import 'package:keneya_plus/screens/presence/entree_tab.dart';
 import 'package:keneya_plus/screens/rdv/rdv_tab.dart';
 import 'package:keneya_plus/screens/caisse/caisse_tab.dart';
 import 'package:keneya_plus/screens/pharmacie/pharmacie_tab.dart';
+import 'package:keneya_plus/screens/pharmacie/vendre_screen.dart';
 import 'package:keneya_plus/screens/home/tabs/users_tab.dart';
 import 'package:provider/provider.dart';
 
@@ -174,6 +175,17 @@ class _HomeScreenState extends State<HomeScreen> {
         (auth.peut('labo.saisir') || auth.peut('labo.valider'));
 
     final navTabs = <_NavTab>[
+      // Une officine est un commerce : on ouvre sur la caisse de vente.
+      if (auth.estOfficine &&
+          auth.aModule('pharmacie') &&
+          auth.peut('pharmacie.delivrer'))
+        const _NavTab(
+          title: 'Vendre',
+          shortLabel: 'Vendre',
+          icon: Icons.point_of_sale_outlined,
+          selectedIcon: Icons.point_of_sale,
+          page: VendreScreen(onglet: true),
+        ),
       _NavTab(
         title: 'Accueil',
         shortLabel: 'Accueil',
@@ -247,8 +259,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       if (voitPharmacie)
         _NavTab(
-          title: 'Pharmacie',
-          shortLabel: 'Pharma.',
+          // Dans une officine, la pharmacie c'est le stock : on vend ailleurs.
+          title: auth.estOfficine ? 'Stock' : 'Pharmacie',
+          shortLabel: auth.estOfficine ? 'Stock' : 'Pharma.',
           icon: Icons.local_pharmacy_outlined,
           selectedIcon: Icons.local_pharmacy,
           page: const PharmacieTab(),

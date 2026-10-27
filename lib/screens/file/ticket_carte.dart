@@ -168,7 +168,15 @@ Future<void> afficherTicket(
 }
 
 /// Imprime, après avoir fait choisir l'imprimante la première fois.
-Future<void> imprimerTicket(BuildContext context, TicketFile ticket) async {
+Future<void> imprimerTicket(BuildContext context, TicketFile ticket) =>
+    imprimerSurThermique(context, () => ImpressionTicket.octetsTicket(ticket));
+
+/// Imprime sur l'imprimante thermique Bluetooth (ticket, reçu…) : demande
+/// l'imprimante la première fois, puis la garde.
+Future<void> imprimerSurThermique(
+  BuildContext context,
+  Future<List<int>> Function() octets,
+) async {
   void dire(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
@@ -200,7 +208,7 @@ Future<void> imprimerTicket(BuildContext context, TicketFile ticket) async {
     if (choix == null) return;
     await ImpressionTicket.choisir(choix);
   }
-  final ok = await ImpressionTicket.imprimer(ticket);
+  final ok = await ImpressionTicket.envoyer(await octets());
   if (context.mounted && !ok) {
     dire('Impression impossible : vérifiez que l’imprimante est allumée.');
   }

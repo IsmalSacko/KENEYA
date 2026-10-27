@@ -91,6 +91,29 @@ class _ReglagesTabState extends State<ReglagesTab> {
               ],
             ),
           ),
+          if (auth.aModule('pharmacie')) ...[
+            const SizedBox(height: 20),
+            _titre('Vente'),
+            Card(
+              child: SwitchListTile(
+                title: const Text('Caisse séparée'),
+                subtitle: const Text(
+                  'Le vendeur prépare le panier, le client paie au caissier puis récupère ses produits. Sinon, le vendeur encaisse lui-même.',
+                ),
+                value: auth.caisseSeparee,
+                onChanged: (v) async {
+                  final id = auth.currentUser?.etablissementId;
+                  if (id == null) return;
+                  try {
+                    await _service.regler(id, {'caisse_separee': v});
+                    await auth.refreshCurrentUser();
+                  } on DioException {
+                    if (mounted) _message('Enregistrement impossible.');
+                  }
+                },
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _titre('Droits par rôle'),
           if (_chargement)

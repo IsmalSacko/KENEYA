@@ -63,6 +63,41 @@ class PharmacieService {
     return Map<String, dynamic>.from(res.data as Map);
   }
 
+  /// La vente du comptoir : le panier, l'ordonnance scannée, le client et le
+  /// paiement (null : le client passe à la caisse).
+  Future<Vente> vendre(
+    List<Map<String, dynamic>> lignes, {
+    String? ordonnance,
+    String? client,
+    String? telephone,
+    String? moyen,
+    String? reference,
+  }) async {
+    final res = await ApiClient.dio.post(
+      '/pharmacie/ventes',
+      data: {
+        'ordonnance_uuid': ?ordonnance,
+        'lignes': lignes,
+        'client': {'nom': ?client, 'telephone': ?telephone},
+        if (moyen != null)
+          'paiement': {'moyen': moyen, 'reference': ?reference},
+      },
+    );
+    return Vente.fromJson(
+      Map<String, dynamic>.from((res.data as Map)['vente'] as Map),
+    );
+  }
+
+  Future<VentesDuJour> ventesDuJour() async {
+    final res = await ApiClient.dio.get('/pharmacie/ventes');
+    return VentesDuJour.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  Future<List<ACommander>> aCommander() async {
+    final res = await ApiClient.dio.get('/pharmacie/a-commander');
+    return _liste(res.data).map(ACommander.fromJson).toList();
+  }
+
   /// Qui attend à la pharmacie aujourd'hui, avec ses ordonnances.
   Future<List<PatientAServir>> aServir() async {
     final res = await ApiClient.dio.get('/pharmacie/a-servir');

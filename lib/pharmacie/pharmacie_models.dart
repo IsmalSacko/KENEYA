@@ -1,4 +1,15 @@
-// Pharmacie : produits, lots, ordonnances.
+// Pharmacie : produits, lots, ordonnances, ventes.
+
+/// Les rayons d'une officine : tout ce qu'on y vend n'est pas un médicament.
+const rayons = {
+  'medicaments': 'Médicaments',
+  'contraception': 'Contraception',
+  'bebe': 'Bébé',
+  'hygiene_beaute': 'Hygiène et beauté',
+  'materiel_medical': 'Matériel médical',
+  'complements': 'Compléments',
+  'autres': 'Autres',
+};
 
 class LotProduit {
   const LotProduit({
@@ -40,6 +51,10 @@ class Produit {
     this.forme,
     this.dosage,
     this.prixUnite,
+    this.rayon = 'medicaments',
+    this.prixAchat,
+    this.codeBarres,
+    this.ventes = 0,
   });
 
   final String uuid;
@@ -56,6 +71,17 @@ class Produit {
   final String? forme;
   final String? dosage;
   final double? prixUnite;
+  final String rayon;
+
+  /// Prix d'achat de la boîte (pour la marge).
+  final double? prixAchat;
+  final String? codeBarres;
+
+  /// Nombre de ventes sur 30 jours : les raccourcis de l'écran « Vendre ».
+  final int ventes;
+
+  String get rayonLabel => rayons[rayon] ?? rayon;
+  bool get estMedicament => rayon == 'medicaments';
 
   bool get stockBas => stockUnites <= seuilAlerte;
 
@@ -85,6 +111,10 @@ class Produit {
     forme: j['forme']?.toString(),
     dosage: j['dosage']?.toString(),
     prixUnite: double.tryParse('${j['prix_unite']}'),
+    rayon: (j['rayon'] ?? 'medicaments').toString(),
+    prixAchat: double.tryParse('${j['prix_achat']}'),
+    codeBarres: j['code_barres']?.toString(),
+    ventes: _int(j['ventes']),
   );
 }
 
@@ -187,6 +217,145 @@ class PatientAServir {
       visiteUuid: j['visite_uuid']?.toString(),
       ticketCode: t?['code']?.toString(),
       ticketStatut: t?['statut']?.toString(),
+    );
+  }
+}
+
+/// Une vente du comptoir, telle que le reçu l'imprime.
+class Vente {
+  const Vente({
+    required this.uuid,
+    required this.numero,
+    required this.client,
+    required this.statut,
+    required this.total,
+    required this.reste,
+    required this.devise,
+    required this.lignes,
+    required this.moyens,
+    this.le,
+    this.telephone,
+    this.etablissement,
+    this.etablissementTelephone,
+    this.etablissementAdresse,
+  });
+
+  final String uuid;
+  final String numero;
+  final String client;
+  final String statut;
+  final int total;
+  final int reste;
+  final String devise;
+  final List<({String libelle, int quantite, int montant})> lignes;
+  final List<String> moyens;
+  final DateTime? le;
+  final String? telephone;
+  final String? etablissement;
+  final String? etablissementTelephone;
+  final String? etablissementAdresse;
+
+  bool get payee => statut == 'payee';
+
+  factory Vente.fromJson(Map<String, dynamic> j) => Vente(
+    uuid: (j['uuid'] ?? '').toString(),
+    numero: (j['numero'] ?? '').toString(),
+    client: (j['client'] ?? '').toString(),
+    statut: (j['statut'] ?? '').toString(),
+    total: _int(j['total']),
+    reste: _int(j['reste']),
+    devise: (j['devise'] ?? 'XOF').toString(),
+    lignes: [
+      for (final l in _maps(j['lignes']))
+        (
+          libelle: (l['libelle'] ?? '').toString(),
+          quantite: _int(l['quantite']),
+          montant: _int(l['montant']),
+        ),
+    ],
+    moyens: [
+      if (j['moyens'] is List)
+        for (final m in j['moyens'] as List) m.toString(),
+    ],
+    le: DateTime.tryParse('${j['le']}')?.toLocal(),
+    telephone: j['telephone']?.toString(),
+    etablissement: j['etablissement'] is Map
+        ? (j['etablissement'] as Map)['nom']?.toString()
+        : null,
+    etablissementTelephone: j['etablissement'] is Map
+        ? (j['etablissement'] as Map)['telephone']?.toString()
+        : null,
+    etablissementAdresse: j['etablissement'] is Map
+        ? (j['etablissement'] as Map)['adresse']?.toString()
+        : null,
+  );
+}
+
+/// La journée du comptoir : les ventes et leurs totaux.
+class VentesDuJour {
+  const VentesDuJour({
+    required this.ventes,
+    required this.nombre,
+    required this.chiffre,
+    required this.encaisse,
+    required this.aEncaisser,
+    required this.parMoyen,
+    required this.parRayon,
+  });
+
+  final List<Vente> ventes;
+  final int nombre;
+  final int chiffre;
+  final int encaisse;
+  final int aEncaisser;
+  final Map<String, int> parMoyen;
+  final List<({String label, int montant})> parRayon;
+
+  factory VentesDuJour.fromJson(Map<String, dynamic> j) => VentesDuJour(
+    ventes: _maps(j['ventes']).map(Vente.fromJson).toList(),
+    nombre: _int(j['nombre']),
+    chiffre: _int(j['chiffre']),
+    encaisse: _int(j['encaisse']),
+    aEncaisser: _int(j['a_encaisser']),
+    parMoyen: {
+      if (j['par_moyen'] is Map)
+        for (final e in (j['par_moyen'] as Map).entries)
+          e.key.toString(): _int(e.value),
+    },
+    parRayon: [
+      for (final r in _maps(j['par_rayon']))
+        (label: (r['label'] ?? '').toString(), montant: _int(r['montant'])),
+    ],
+  );
+}
+
+/// Un produit à recommander au grossiste.
+class ACommander {
+  const ACommander({
+    required this.uuid,
+    required this.nom,
+    required this.stockUnites,
+    required this.boites,
+    this.fournisseur,
+    this.telephoneFournisseur,
+  });
+
+  final String uuid;
+  final String nom;
+  final int stockUnites;
+  final int boites;
+  final String? fournisseur;
+  final String? telephoneFournisseur;
+
+  factory ACommander.fromJson(Map<String, dynamic> j) {
+    final f = j['fournisseur'] is Map ? j['fournisseur'] as Map : null;
+    return ACommander(
+      uuid: (j['uuid'] ?? '').toString(),
+      nom: (j['nom'] ?? '').toString(),
+      stockUnites: _int(j['stock_unites']),
+      boites: _int(j['boites']),
+      fournisseur: f?['nom']?.toString(),
+      telephoneFournisseur: f?['telephone']?.toString(),
     );
   }
 }

@@ -12,7 +12,9 @@ import '../../pharmacie/pharmacie_models.dart';
 import '../../pharmacie/pharmacie_service.dart';
 import '../../pharmacie/verification_ordonnance.dart';
 import '../commun/scanner_qr_screen.dart';
+import 'a_commander_screen.dart';
 import 'delivrance_screen.dart';
+import 'vendre_screen.dart';
 import '../../common/widgets/feuille.dart';
 import '../../common/widgets/formulaire.dart';
 
@@ -178,7 +180,8 @@ class _PharmacieTabState extends State<PharmacieTab> {
             _AServir(patients: _aServir, onServir: _servir),
             const SizedBox(height: 16),
           ],
-          if (delivre) ...[
+          // Dans une officine, on vend et on scanne depuis l'onglet « Vendre ».
+          if (delivre && !auth.estOfficine) ...[
             SizedBox(
               height: 56,
               child: ElevatedButton.icon(
@@ -197,9 +200,9 @@ class _PharmacieTabState extends State<PharmacieTab> {
                 minimumSize: const Size.fromHeight(50),
               ),
               onPressed: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DelivranceScreen()),
-                );
+                await Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const VendreScreen()));
                 _charger();
               },
               icon: const Icon(Icons.shopping_basket_outlined),
@@ -221,6 +224,13 @@ class _PharmacieTabState extends State<PharmacieTab> {
                 ),
               ),
               if (gereStock) ...[
+                IconButton(
+                  tooltip: 'À commander',
+                  icon: const Icon(Icons.assignment_outlined),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ACommanderScreen()),
+                  ),
+                ),
                 IconButton(
                   tooltip: 'Réception d’une livraison',
                   icon: const Icon(Icons.local_shipping_outlined),
@@ -494,6 +504,15 @@ class _Alertes extends StatelessWidget {
 /// Crée ou modifie un produit ; renvoie le produit enregistré. [avecStock] :
 /// propose de saisir le stock déjà en rayon (pas depuis une réception, qui
 /// le saisit elle-même).
+/// « Marge : 450 F (30 %) » quand les deux prix sont saisis.
+String? _marge(String achat, String vente) {
+  final a = double.tryParse(achat.replaceAll(',', '.'));
+  final v = double.tryParse(vente.replaceAll(',', '.'));
+  if (a == null || v == null || a <= 0 || v <= 0) return null;
+  final m = v - a;
+  return 'Marge : ${m.toStringAsFixed(0)} F (${(m / v * 100).toStringAsFixed(0)} %)';
+}
+
 Future<Produit?> editerProduit(
   BuildContext context, [
   Produit? p,
@@ -511,6 +530,11 @@ Future<Produit?> editerProduit(
     text: p?.prixUnite?.toStringAsFixed(0) ?? '',
   );
   final seuil = TextEditingController(text: '${p?.seuilAlerte ?? 5}');
+  final codeBarres = TextEditingController(text: p?.codeBarres);
+  final prixAchat = TextEditingController(
+    text: p?.prixAchat?.toStringAsFixed(0) ?? '',
+  );
+  var rayon = p?.rayon ?? 'medicaments';
   var venteUnite = p?.venteUnite ?? false;
   var ordonnance = p?.ordonnanceRequise ?? false;
   // Le stock déjà en rayon, à la création : une première réception.
@@ -528,13 +552,42 @@ Future<Produit?> editerProduit(
         TextField(
           controller: nom,
           decoration: const InputDecoration(
-            labelText: 'Nom (ex. Doliprane 500 mg)',
+            labelText: 'Nom (ex. Doliprane 500 mg, Lait Guigoz 1er âge)',
           ),
         ),
-        TextField(
-          controller: dci,
-          decoration: const InputDecoration(labelText: 'Molécule (DCI)'),
+        DropdownButtonFormField<String>(
+          initialValue: rayon,
+          decoration: const InputDecoration(labelText: 'Rayon'),
+          items: [
+            for (final r in rayons.entries)
+              DropdownMenuItem(value: r.key, child: Text(r.value)),
+          ],
+          onChanged: (v) => setD(() => rayon = v ?? rayon),
         ),
+        TextField(
+          controller: codeBarres,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'Code-barres (facultatif)',
+            suffixIcon: IconButton(
+              tooltip: 'Scanner le code-barres',
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              onPressed: () async {
+                final lu = await scannerQr(
+                  ctx,
+                  titre: 'Code-barres',
+                  consigne: 'Visez le code-barres de la boîte',
+                );
+                if (lu != null) setD(() => codeBarres.text = lu);
+              },
+            ),
+          ),
+        ),
+        if (rayon == 'medicaments')
+          TextField(
+            controller: dci,
+            decoration: const InputDecoration(labelText: 'Molécule (DCI)'),
+          ),
         Row(
           children: [
             Expanded(
@@ -557,11 +610,42 @@ Future<Produit?> editerProduit(
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(labelText: 'Unités par boîte'),
         ),
-        TextField(
-          controller: prixBoite,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Prix de la boîte'),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: prixAchat,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setD(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Prix d’achat (boîte)',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: prixBoite,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setD(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Prix de vente (boîte)',
+                ),
+              ),
+            ),
+          ],
         ),
+        if (_marge(prixAchat.text, prixBoite.text) case final m?)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              m,
+              style: const TextStyle(
+                color: Kolors.kSuccess,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Vendu aussi à l’unité'),
@@ -574,12 +658,14 @@ Future<Produit?> editerProduit(
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Prix à l’unité'),
           ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Sur ordonnance seulement'),
-          value: ordonnance,
-          onChanged: (v) => setD(() => ordonnance = v),
-        ),
+        // « Sur ordonnance » ne concerne que les médicaments.
+        if (rayon == 'medicaments')
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Sur ordonnance seulement'),
+            value: ordonnance,
+            onChanged: (v) => setD(() => ordonnance = v),
+          ),
         TextField(
           controller: seuil,
           keyboardType: TextInputType.number,
@@ -679,8 +765,13 @@ Future<Produit?> editerProduit(
               'prix_unite': double.tryParse(
                 prixUnite.text.replaceAll(',', '.'),
               ),
-            'ordonnance_requise': ordonnance,
+            'ordonnance_requise': rayon == 'medicaments' && ordonnance,
             'seuil_alerte': int.tryParse(seuil.text) ?? 5,
+            'rayon': rayon,
+            'code_barres': codeBarres.text.trim().isEmpty
+                ? null
+                : codeBarres.text.trim(),
+            'prix_achat': double.tryParse(prixAchat.text.replaceAll(',', '.')),
           });
         },
         child: const Text('Enregistrer'),

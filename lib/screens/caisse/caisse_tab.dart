@@ -10,7 +10,10 @@ import '../../common/utils/kcolors.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
-import '../pharmacie/delivrance_screen.dart';
+import '../../pharmacie/pharmacie_models.dart';
+import '../../pharmacie/pharmacie_service.dart';
+import '../pharmacie/vendre_screen.dart';
+import 'ventes_du_jour.dart';
 import 'assureurs_screen.dart';
 import 'tarifs_screen.dart';
 import 'visite_screen.dart';
@@ -29,6 +32,9 @@ class _CaisseTabState extends State<CaisseTab> {
   final _recherche = TextEditingController();
   Map<String, dynamic>? _session;
   List<Visite> _visites = [];
+
+  /// Officine : les ventes du jour remplacent la liste des visites.
+  VentesDuJour? _ventes;
   String _devise = 'XOF';
   bool _chargement = true;
 
@@ -54,7 +60,11 @@ class _CaisseTabState extends State<CaisseTab> {
             : null;
         _devise = (s['devise'] ?? 'XOF').toString();
       }
-      _visites = await _service.visites(recherche: _recherche.text.trim());
+      if (auth.estOfficine && auth.aModule('pharmacie')) {
+        _ventes = await PharmacieService().ventesDuJour();
+      } else {
+        _visites = await _service.visites(recherche: _recherche.text.trim());
+      }
     } on DioException catch (e) {
       _dire(messageErreur(e));
     } finally {
@@ -313,9 +323,7 @@ class _CaisseTabState extends State<CaisseTab> {
                   ),
                   onPressed: () async {
                     await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const DelivranceScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const VendreScreen()),
                     );
                     _charger();
                   },
@@ -334,95 +342,128 @@ class _CaisseTabState extends State<CaisseTab> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _recherche,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => _charger(),
-                  decoration: const InputDecoration(
-                    hintText: 'Nom, téléphone ou ticket (A012)',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                ),
-              ),
-              if (auth.peut('caisse.rapports') ||
-                  auth.peut('etablissement.regler'))
-                IconButton(
-                  tooltip: 'Tarifs et rapport',
-                  icon: const Icon(Icons.price_change_outlined),
-                  onPressed: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const TarifsScreen()),
-                    );
-                    _charger();
-                  },
-                ),
-              if (auth.aModule('assurances') &&
-                  (auth.peut('assurances.gerer') ||
-                      auth.peut('etablissement.regler') ||
-                      auth.peut('caisse.rapports')))
-                IconButton(
-                  tooltip: 'Assureurs',
-                  icon: const Icon(Icons.health_and_safety_outlined),
+          if (_ventes != null) ...[
+            if (auth.peut('caisse.rapports') ||
+                auth.peut('etablissement.regler'))
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AssureursScreen()),
+                    MaterialPageRoute(builder: (_) => const TarifsScreen()),
+                  ),
+                  icon: const Icon(Icons.price_change_outlined),
+                  label: const Text('Tarifs des prestations'),
+                ),
+              ),
+            VentesDuJourVue(
+              jour: _ventes!,
+              devise: _devise,
+              onVente: (v) async {
+                if (v.payee) {
+                  await afficherRecu(context, v);
+                } else {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => VisiteScreen(uuid: v.uuid),
+                    ),
+                  );
+                  _charger();
+                }
+              },
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _recherche,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => _charger(),
+                    decoration: const InputDecoration(
+                      hintText: 'Nom, téléphone ou ticket (A012)',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (_chargement)
-            const Center(child: CircularProgressIndicator())
-          else if (_visites.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                encaisse
-                    ? 'Aucune visite ouverte. Un client sans ticket : le bouton ci-dessus.'
-                    : 'Aucune visite ouverte.',
-                style: const TextStyle(color: Kolors.kTextMuted),
-              ),
-            )
-          else
-            Card(
-              child: Column(
-                children: [
-                  for (final v in _visites)
-                    ListTile(
-                      title: Text(v.titre),
-                      subtitle: Text(
-                        [
-                          if (v.tickets.isNotEmpty) v.tickets.join(' → '),
-                          if (v.telephone != null) v.telephone!,
-                        ].join(' · '),
+                if (auth.peut('caisse.rapports') ||
+                    auth.peut('etablissement.regler'))
+                  IconButton(
+                    tooltip: 'Tarifs et rapport',
+                    icon: const Icon(Icons.price_change_outlined),
+                    onPressed: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TarifsScreen()),
+                      );
+                      _charger();
+                    },
+                  ),
+                if (auth.aModule('assurances') &&
+                    (auth.peut('assurances.gerer') ||
+                        auth.peut('etablissement.regler') ||
+                        auth.peut('caisse.rapports')))
+                  IconButton(
+                    tooltip: 'Assureurs',
+                    icon: const Icon(Icons.health_and_safety_outlined),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AssureursScreen(),
                       ),
-                      trailing: Text(
-                        v.reste > 0
-                            ? formatMontant(v.reste, v.devise)
-                            : (v.total > 0 ? 'Payé' : 'Pas encore facturé'),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: v.reste > 0
-                              ? Kolors.kGold
-                              : v.total > 0
-                              ? Kolors.kSuccess
-                              : Kolors.kTextMuted,
-                        ),
-                      ),
-                      onTap: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => VisiteScreen(uuid: v.uuid),
-                          ),
-                        );
-                        _charger();
-                      },
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
+            const SizedBox(height: 12),
+            if (_chargement)
+              const Center(child: CircularProgressIndicator())
+            else if (_visites.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  encaisse
+                      ? 'Aucune visite ouverte. Un client sans ticket : le bouton ci-dessus.'
+                      : 'Aucune visite ouverte.',
+                  style: const TextStyle(color: Kolors.kTextMuted),
+                ),
+              )
+            else
+              Card(
+                child: Column(
+                  children: [
+                    for (final v in _visites)
+                      ListTile(
+                        title: Text(v.titre),
+                        subtitle: Text(
+                          [
+                            if (v.tickets.isNotEmpty) v.tickets.join(' → '),
+                            if (v.telephone != null) v.telephone!,
+                          ].join(' · '),
+                        ),
+                        trailing: Text(
+                          v.reste > 0
+                              ? formatMontant(v.reste, v.devise)
+                              : (v.total > 0 ? 'Payé' : 'Pas encore facturé'),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: v.reste > 0
+                                ? Kolors.kGold
+                                : v.total > 0
+                                ? Kolors.kSuccess
+                                : Kolors.kTextMuted,
+                          ),
+                        ),
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => VisiteScreen(uuid: v.uuid),
+                            ),
+                          );
+                          _charger();
+                        },
+                      ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );

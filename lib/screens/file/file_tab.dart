@@ -137,6 +137,18 @@ class _FileTabState extends State<FileTab> {
     }
   }
 
+  /// Le patient se présente avec son ticket : on termine le ticket en cours
+  /// et on le prend, sans attendre son tour.
+  Future<void> _prendre(TicketFile t) => _faire(() async {
+    final courant = _ticketCourant;
+    if (courant != null && courant.uuid != t.uuid) {
+      await _service.action(courant.uuid, 'terminer');
+    }
+    await _service.action(t.uuid, 'servir', salleUuid: _maSalle);
+    _courant = t.uuid;
+    await LocalStore.write(_cleCourant, _courant);
+  });
+
   /// « Suivant » : termine le ticket en cours, puis appelle le prochain.
   Future<void> _suivant() => _faire(() async {
     final courant = _ticketCourant;
@@ -192,12 +204,45 @@ class _FileTabState extends State<FileTab> {
   Future<void> _scanner() async {
     final qr = await scannerQr(
       context,
-      consigne: 'QR du rendez-vous ou de la carte santé du patient',
+      consigne: 'QR du rendez-vous, de la carte santé ou du ticket du patient',
     );
     if (qr == null || !mounted) return;
     final rdv = RdvService();
     try {
       var reponse = await rdv.scanner(qr);
+      // Le ticket du patient : on le prend tout de suite, même hors de son tour.
+      if (reponse['type'] == 'ticket' && reponse['ticket'] is Map && mounted) {
+        final t = TicketFile.fromJson(
+          Map<String, dynamic>.from(reponse['ticket'] as Map),
+        );
+        final prendre = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Ticket ${t.code}'),
+            content: Text(
+              [
+                if (t.nom != null && t.nom!.isNotEmpty) t.nom!,
+                t.serviceNom,
+                t.statutLabel,
+              ].join(' · '),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Fermer'),
+              ),
+              if ((t.statut == 'emis' || t.statut == 'appele') &&
+                  context.read<AuthController>().peut('file.appeler'))
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Le prendre maintenant'),
+                ),
+            ],
+          ),
+        );
+        if (prendre == true) await _prendre(t);
+        return;
+      }
       if (reponse['type'] == 'carte' && mounted) {
         final personne = Map<String, dynamic>.from(reponse['personne'] as Map);
         final service = await showDialog<ServiceFile>(
@@ -332,7 +377,7 @@ class _FileTabState extends State<FileTab> {
               ),
               onPressed: _scanner,
               icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Scanner un rendez-vous ou une carte santé'),
+              label: const Text('Scanner le QR du patient'),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
