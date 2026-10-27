@@ -608,7 +608,11 @@ Future<Produit?> editerProduit(
         TextField(
           controller: cond,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Unités par boîte'),
+          decoration: const InputDecoration(
+            labelText: 'Combien dans une boîte (comprimés, sachets…) ?',
+            helperText:
+                '1 si le produit se vend tel quel (savon, thermomètre).',
+          ),
         ),
         Row(
           children: [
