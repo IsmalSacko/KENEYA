@@ -225,9 +225,15 @@ class _VendreScreenState extends State<VendreScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _Paiement(total: _total, moyens: _moyens, format: _f),
+      // Le crédit en dernier : on encaisse d'abord.
+      builder: (_) =>
+          _Paiement(total: _total, moyens: [..._moyens, 'credit'], format: _f),
     );
     if (paiement == null) return;
+    if (paiement.$1 == 'credit' && _client.text.trim().isEmpty) {
+      _dire('À crédit : écrivez le nom du client (et son téléphone).');
+      return;
+    }
     await _vendre(moyen: paiement.$1, reference: paiement.$2);
   }
 
@@ -883,9 +889,12 @@ class _PaiementState extends State<_Paiement> {
     );
     final rendu = recu == null ? null : recu - widget.total;
     final especes = _moyen == 'especes';
-    final pret = especes
-        ? (rendu == null || rendu >= 0)
-        : _reference.text.trim().isNotEmpty;
+    final credit = _moyen == 'credit';
+    final pret =
+        credit ||
+        (especes
+            ? (rendu == null || rendu >= 0)
+            : _reference.text.trim().isNotEmpty);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -942,7 +951,11 @@ class _PaiementState extends State<_Paiement> {
                   ),
                 ),
               ),
-          ] else
+          ] else if (credit)
+            const Text(
+              'Le client emporte et paiera plus tard. Son nom reste dans « Crédits en cours » à la caisse.',
+            )
+          else
             TextField(
               controller: _reference,
               autofocus: true,
@@ -958,7 +971,7 @@ class _PaiementState extends State<_Paiement> {
               onPressed: pret
                   ? () => Navigator.pop(context, (
                       _moyen,
-                      especes ? null : _reference.text.trim(),
+                      especes || credit ? null : _reference.text.trim(),
                     ))
                   : null,
               child: const Text('Valider la vente'),
@@ -1006,7 +1019,12 @@ class _Vide extends StatelessWidget {
 
 /// Le reçu après la vente : imprimer, envoyer par WhatsApp, ou passer au
 /// client suivant.
-Future<void> afficherRecu(BuildContext context, Vente v) {
+/// [annuler] : la vente du jour peut être annulée (stock et argent rendus).
+Future<void> afficherRecu(
+  BuildContext context,
+  Vente v, {
+  Future<void> Function()? annuler,
+}) {
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -1015,7 +1033,15 @@ Future<void> afficherRecu(BuildContext context, Vente v) {
         color: v.payee ? Kolors.kSuccess : Kolors.kGold,
         size: 48,
       ),
-      title: Text(v.payee ? 'Vente encaissée' : 'Le client paie à la caisse'),
+      title: Text(
+        v.annulee
+            ? 'Vente annulée'
+            : v.aCredit
+            ? 'Vendu à crédit'
+            : v.payee
+            ? 'Vente encaissée'
+            : 'Le client paie à la caisse',
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1041,6 +1067,35 @@ Future<void> afficherRecu(BuildContext context, Vente v) {
         ],
       ),
       actions: [
+        if (annuler != null && !v.annulee)
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Kolors.kRed),
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: ctx,
+                builder: (c2) => AlertDialog(
+                  title: const Text('Annuler cette vente ?'),
+                  content: const Text(
+                    'Les produits rentrent en stock et l’argent est rendu au client.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(c2, false),
+                      child: const Text('Non'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(c2, true),
+                      child: const Text('Annuler la vente'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok != true || !ctx.mounted) return;
+              Navigator.pop(ctx);
+              await annuler();
+            },
+            child: const Text('Annuler la vente'),
+          ),
         if (v.telephone != null && v.telephone!.isNotEmpty)
           TextButton.icon(
             onPressed: () => envoyerWhatsApp(ctx, v.telephone!, Recu.texte(v)),

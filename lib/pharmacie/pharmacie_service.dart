@@ -88,6 +88,14 @@ class PharmacieService {
     );
   }
 
+  /// Annuler une vente du jour : stock rendu, argent rendu.
+  Future<Vente> annulerVente(String uuid) async {
+    final res = await ApiClient.dio.post('/pharmacie/ventes/$uuid/annuler');
+    return Vente.fromJson(
+      Map<String, dynamic>.from((res.data as Map)['vente'] as Map),
+    );
+  }
+
   Future<VentesDuJour> ventesDuJour() async {
     final res = await ApiClient.dio.get('/pharmacie/ventes');
     return VentesDuJour.fromJson(Map<String, dynamic>.from(res.data as Map));

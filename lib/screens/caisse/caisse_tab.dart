@@ -359,8 +359,24 @@ class _CaisseTabState extends State<CaisseTab> {
               jour: _ventes!,
               devise: _devise,
               onVente: (v) async {
-                if (v.payee) {
-                  await afficherRecu(context, v);
+                if (v.payee || v.annulee) {
+                  final duJour =
+                      v.le != null && DateUtils.isSameDay(v.le, DateTime.now());
+                  await afficherRecu(
+                    context,
+                    v,
+                    annuler: v.payee && duJour
+                        ? () async {
+                            try {
+                              await PharmacieService().annulerVente(v.uuid);
+                              _dire('Vente annulée : stock et argent rendus.');
+                            } on DioException catch (e) {
+                              _dire(messageErreur(e));
+                            }
+                            _charger();
+                          }
+                        : null,
+                  );
                 } else {
                   await Navigator.of(context).push(
                     MaterialPageRoute(

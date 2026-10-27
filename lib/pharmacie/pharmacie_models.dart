@@ -256,6 +256,8 @@ class Vente {
   final String? etablissementAdresse;
 
   bool get payee => statut == 'payee';
+  bool get annulee => statut == 'annulee';
+  bool get aCredit => statut == 'a_credit';
 
   factory Vente.fromJson(Map<String, dynamic> j) => Vente(
     uuid: (j['uuid'] ?? '').toString(),
@@ -301,6 +303,7 @@ class VentesDuJour {
     required this.aEncaisser,
     required this.parMoyen,
     required this.parRayon,
+    this.credits = const [],
   });
 
   final List<Vente> ventes;
@@ -310,6 +313,9 @@ class VentesDuJour {
   final int aEncaisser;
   final Map<String, int> parMoyen;
   final List<({String label, int montant})> parRayon;
+
+  /// Les ventes à crédit pas encore payées, de tous les jours.
+  final List<Vente> credits;
 
   factory VentesDuJour.fromJson(Map<String, dynamic> j) => VentesDuJour(
     ventes: _maps(j['ventes']).map(Vente.fromJson).toList(),
@@ -326,6 +332,7 @@ class VentesDuJour {
       for (final r in _maps(j['par_rayon']))
         (label: (r['label'] ?? '').toString(), montant: _int(r['montant'])),
     ],
+    credits: _maps(j['credits']).map(Vente.fromJson).toList(),
   );
 }
 

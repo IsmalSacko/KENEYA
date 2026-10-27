@@ -25,8 +25,10 @@ class VentesDuJourVue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     String f(int m) => formatMontant(m, devise);
-    final attente = jour.ventes.where((v) => !v.payee).toList();
-    final payees = jour.ventes.where((v) => v.payee).toList();
+    final attente = jour.ventes
+        .where((v) => !v.payee && !v.annulee && !v.aCredit)
+        .toList();
+    final payees = jour.ventes.where((v) => v.payee || v.annulee).toList();
     final maxRayon = jour.parRayon.fold(
       1,
       (m, r) => r.montant > m ? r.montant : m,
@@ -53,6 +55,17 @@ class VentesDuJourVue extends StatelessWidget {
           Card(
             color: Kolors.kJauneDoux,
             child: Column(children: [for (final v in attente) _ligne(v, f)]),
+          ),
+        ],
+        if (jour.credits.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _titre('Crédits en cours'),
+          Card(
+            child: Column(
+              children: [
+                for (final v in jour.credits) _ligne(v, f, credit: true),
+              ],
+            ),
           ),
         ],
         if (jour.parRayon.isNotEmpty) ...[
@@ -120,13 +133,31 @@ class VentesDuJourVue extends StatelessWidget {
     ),
   );
 
-  Widget _ligne(Vente v, String Function(int) f) => ListTile(
+  Widget _ligne(
+    Vente v,
+    String Function(int) f, {
+    bool credit = false,
+  }) => ListTile(
     leading: Icon(
-      v.payee ? Icons.receipt_rounded : Icons.hourglass_top_rounded,
-      color: v.payee ? Kolors.kSuccess : Kolors.kGold,
+      v.annulee
+          ? Icons.block_rounded
+          : v.payee
+          ? Icons.receipt_rounded
+          : credit
+          ? Icons.handshake_outlined
+          : Icons.hourglass_top_rounded,
+      color: v.annulee
+          ? Kolors.kTextMuted
+          : (v.payee ? Kolors.kSuccess : Kolors.kGold),
     ),
     title: Text(
-      '${v.le == null ? '' : '${DateFormat('HH:mm').format(v.le!)} · '}${v.client}',
+      '${v.le == null ? '' : '${DateFormat(credit ? 'dd/MM' : 'HH:mm').format(v.le!)} · '}${v.client}${v.annulee ? ' · annulée' : ''}',
+      style: v.annulee
+          ? const TextStyle(
+              color: Kolors.kTextMuted,
+              decoration: TextDecoration.lineThrough,
+            )
+          : null,
     ),
     subtitle: Text(
       v.lignes.map((l) => l.libelle).join(', '),
@@ -134,7 +165,7 @@ class VentesDuJourVue extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
     ),
     trailing: Text(
-      f(v.total),
+      f(credit ? v.reste : v.total),
       style: const TextStyle(fontWeight: FontWeight.w800),
     ),
     onTap: () => onVente(v),

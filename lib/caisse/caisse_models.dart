@@ -31,6 +31,7 @@ const Map<String, String> libellesMoyens = {
   'mtn_momo': 'MTN MoMo',
   'free_money': 'Free Money',
   'mpesa': 'M-Pesa',
+  'credit': 'À crédit',
 };
 
 class Tarif {

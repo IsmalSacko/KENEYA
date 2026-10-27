@@ -14,6 +14,7 @@ import '../../pharmacie/verification_ordonnance.dart';
 import '../commun/scanner_qr_screen.dart';
 import 'a_commander_screen.dart';
 import 'delivrance_screen.dart';
+import 'inventaire_screen.dart';
 import 'vendre_screen.dart';
 import '../../common/widgets/feuille.dart';
 import '../../common/widgets/formulaire.dart';
@@ -224,6 +225,18 @@ class _PharmacieTabState extends State<PharmacieTab> {
                 ),
               ),
               if (gereStock) ...[
+                IconButton(
+                  tooltip: 'Inventaire',
+                  icon: const Icon(Icons.fact_check_outlined),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const InventaireScreen(),
+                      ),
+                    );
+                    _charger();
+                  },
+                ),
                 IconButton(
                   tooltip: 'À commander',
                   icon: const Icon(Icons.assignment_outlined),
