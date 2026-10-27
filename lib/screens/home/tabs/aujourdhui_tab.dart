@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../../rapports/rapport_mensuel_screen.dart';
 import '../../../caisse/caisse_models.dart';
 import '../../../caisse/caisse_service.dart';
 import '../../../common/utils/kcolors.dart';
@@ -239,6 +240,21 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
                   onPressed: _ticket,
                   icon: const Icon(Icons.confirmation_number_outlined),
                   label: const Text('Donner un ticket'),
+                ),
+              if (auth.peut('stats.voir') ||
+                  auth.peut('caisse.rapports') ||
+                  auth.peut('etablissement.regler'))
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const RapportMensuelScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.summarize_outlined),
+                  label: const Text('Rapport du mois'),
                 ),
             ],
           ),
