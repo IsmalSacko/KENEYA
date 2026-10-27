@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,17 +22,46 @@ import '../file/donner_ticket_sheet.dart';
 import '../rdv/nouveau_rdv_sheet.dart';
 import '../../common/widgets/formulaire.dart';
 
+/// Nouveau patient à l'accueil. Pendant qu'on tape, ceux déjà enregistrés
+/// s'affichent : un toucher ouvre leur fiche, sans rien retaper. Renvoie le
+/// patient (nouveau ou retrouvé), ou null.
+Future<Patient?> nouveauPatient(
+  BuildContext context, {
+  String recherche = '',
+}) async {
+  final identite = await editerPatient(context, null, recherche);
+  if (identite == null) return null;
+  if (identite['existant'] case final Patient p) return p;
+  final (p, existant) = await PatientsService().creer(identite);
+  if (existant && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ce patient est déjà enregistré : voici sa fiche.'),
+      ),
+    );
+  }
+  return p;
+}
+
 /// Créer ou corriger la fiche : nom, sexe, âge (ou date de naissance),
-/// téléphone, quartier. Renvoie les champs, ou null.
+/// téléphone, quartier. Renvoie les champs, ou null ; à la création,
+/// `{'existant': Patient}` si l'accueil a reconnu un patient déjà venu.
 Future<Map<String, dynamic>?> editerPatient(
   BuildContext context, [
   Patient? p,
+  String recherche = '',
 ]) {
-  final nom = TextEditingController(text: p?.nom);
+  // Ce qu'on avait cherché remplit déjà le nom, ou le téléphone.
+  final chiffres = RegExp(r'^[\d\s+]+$').hasMatch(recherche.trim());
+  final nom = TextEditingController(
+    text: p?.nom ?? (chiffres ? null : recherche.trim()),
+  );
   final age = TextEditingController(
     text: p?.age == null || p!.naissanceEstimee == false ? '' : '${p.age}',
   );
-  final telephone = TextEditingController(text: p?.telephone);
+  final telephone = TextEditingController(
+    text: p?.telephone ?? (chiffres ? recherche.trim() : null),
+  );
   final adresse = TextEditingController(text: p?.adresse);
   String? sexe = p?.sexe;
   DateTime? naissance = p != null && !p.naissanceEstimee
@@ -51,6 +82,12 @@ Future<Map<String, dynamic>?> editerPatient(
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(labelText: 'Prénom et nom'),
         ),
+        if (p == null)
+          DejaEnregistres(
+            nom: nom,
+            telephone: telephone,
+            onChoisir: (x) => Navigator.pop(ctx, {'existant': x}),
+          ),
         const SizedBox(height: 12),
         SegmentedButton<String>(
           segments: const [
@@ -130,6 +167,101 @@ Future<Map<String, dynamic>?> editerPatient(
       ),
     ],
   );
+}
+
+/// « Déjà venu ? » : les patients qui ressemblent à ce qu'on tape (nom, ou
+/// numéro dès 6 chiffres).
+class DejaEnregistres extends StatefulWidget {
+  const DejaEnregistres({
+    required this.nom,
+    required this.telephone,
+    required this.onChoisir,
+    super.key,
+  });
+
+  final TextEditingController nom;
+  final TextEditingController telephone;
+  final ValueChanged<Patient> onChoisir;
+
+  @override
+  State<DejaEnregistres> createState() => _DejaEnregistresState();
+}
+
+class _DejaEnregistresState extends State<DejaEnregistres> {
+  Timer? _attente;
+  String _cherche = '';
+  List<Patient> _trouves = [];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.nom.addListener(_changer);
+    widget.telephone.addListener(_changer);
+    _changer();
+  }
+
+  @override
+  void dispose() {
+    _attente?.cancel();
+    widget.nom.removeListener(_changer);
+    widget.telephone.removeListener(_changer);
+    super.dispose();
+  }
+
+  void _changer() {
+    final numero = widget.telephone.text.replaceAll(RegExp(r'\D'), '');
+    final nom = widget.nom.text.trim();
+    final q = numero.length >= 6 ? numero : (nom.length >= 3 ? nom : '');
+    if (q == _cherche) return;
+    _cherche = q;
+    _attente?.cancel();
+    if (q.isEmpty) {
+      setState(() => _trouves = []);
+      return;
+    }
+    _attente = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final l = await PatientsService().rechercher(q);
+        // Une réponse arrivée après une autre frappe ne compte plus.
+        if (mounted && q == _cherche) {
+          setState(() => _trouves = l.take(5).toList());
+        }
+      } on DioException {
+        // Pas de réseau : on enregistre sans suggestion.
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_trouves.isEmpty) return const SizedBox.shrink();
+    return Card(
+      color: Kolors.kJauneDoux,
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Text(
+              'Déjà venu ? Touchez sa fiche plutôt que de la refaire.',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          for (final x in _trouves)
+            ListTile(
+              leading: const Icon(Icons.person_search_rounded),
+              title: Text(x.nom),
+              subtitle: Text(
+                [x.resume, ?x.telephone].where((t) => t.isNotEmpty).join(' · '),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => widget.onChoisir(x),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// La fiche du patient : son identité, ses visites, et ce qu'on fait pour
@@ -449,7 +581,14 @@ class _PatientScreenState extends State<PatientScreen> {
                   ),
                   title: Text(dateCourte(v.date)),
                   subtitle: Text(
-                    v.services.isEmpty ? '—' : v.services.join(' › '),
+                    v.services.isEmpty && v.actes.isEmpty
+                        ? 'Rien de facturé'
+                        : [
+                            if (v.services.isNotEmpty) v.services.join(' › '),
+                            if (v.actes.isNotEmpty) v.actes.join(', '),
+                          ].join('\n'),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   trailing: Text(
                     v.reste > 0

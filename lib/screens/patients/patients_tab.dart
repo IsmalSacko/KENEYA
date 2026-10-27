@@ -69,12 +69,9 @@ class _PatientsTabState extends State<PatientsTab> {
   }
 
   Future<void> _nouveau() async {
-    final identite = await editerPatient(context);
-    if (identite == null) return;
     try {
-      final (p, existant) = await _service.creer(identite);
-      if (existant) _dire('Ce patient est déjà enregistré : voici sa fiche.');
-      await _ouvrir(p);
+      final p = await nouveauPatient(context, recherche: _recherche.text);
+      if (p != null && mounted) await _ouvrir(p);
     } on DioException catch (e) {
       _dire(messageErreur(e));
     }

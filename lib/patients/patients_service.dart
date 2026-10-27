@@ -6,6 +6,7 @@ class VisitePatient {
     required this.uuid,
     required this.statut,
     required this.services,
+    required this.actes,
     required this.total,
     required this.reste,
     required this.devise,
@@ -15,6 +16,9 @@ class VisitePatient {
   final String uuid;
   final String statut;
   final List<String> services;
+
+  /// Ce qui a été facturé : « Consultation », « Paracétamol 500 mg · 2 unité(s) ».
+  final List<String> actes;
   final int total;
   final int reste;
   final String devise;
@@ -27,6 +31,9 @@ class VisitePatient {
     statut: (j['statut'] ?? '').toString(),
     services: j['services'] is List
         ? [for (final s in j['services'] as List) s.toString()]
+        : const [],
+    actes: j['actes'] is List
+        ? [for (final a in j['actes'] as List) a.toString()]
         : const [],
     total: int.tryParse('${j['total']}') ?? 0,
     reste: int.tryParse('${j['reste']}') ?? 0,

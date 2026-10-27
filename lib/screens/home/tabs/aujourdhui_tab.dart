@@ -13,7 +13,6 @@ import '../../../file/file_service.dart';
 import '../../../hospitalisation/hospit_service.dart';
 import '../../../labo/labo_service.dart';
 import '../../../maternite/maternite_service.dart';
-import '../../../patients/patients_service.dart';
 import '../../file/donner_ticket_sheet.dart';
 import '../../patients/patient_screen.dart';
 
@@ -149,11 +148,9 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
   }
 
   Future<void> _nouveauPatient() async {
-    final identite = await editerPatient(context);
-    if (identite == null || !mounted) return;
     try {
-      final (p, _) = await PatientsService().creer(identite);
-      if (!mounted) return;
+      final p = await nouveauPatient(context);
+      if (p == null || !mounted) return;
       await Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => PatientScreen(patient: p)));
