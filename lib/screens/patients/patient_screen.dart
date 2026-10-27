@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../caisse/caisse_models.dart';
 import '../../common/utils/kcolors.dart';
+import '../../common/whatsapp.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
@@ -17,6 +18,11 @@ import '../../patients/patients_service.dart';
 import '../caisse/visite_screen.dart';
 import '../dossier/dossier_screen.dart';
 import '../dossier/dossier_widgets.dart';
+import '../hospitalisation/sejour_screen.dart';
+import '../labo/demander_analyses_screen.dart';
+import '../maternite/carnet_screen.dart';
+import '../maternite/grossesse_screen.dart';
+import '../pharmacie/ordonnance_screens.dart';
 import '../../rdv/rdv_service.dart';
 import '../file/donner_ticket_sheet.dart';
 import '../rdv/nouveau_rdv_sheet.dart';
@@ -167,6 +173,41 @@ Future<Map<String, dynamic>?> editerPatient(
       ),
     ],
   );
+}
+
+/// Une action de la fiche : icône et mot, un toucher.
+class _Action extends StatelessWidget {
+  const _Action(this.icone, this.libelle, this.onTap);
+
+  final IconData icone;
+  final String libelle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          child: Row(
+            children: [
+              Icon(icone, color: Kolors.kPrimary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  libelle,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// « Déjà venu ? » : les patients qui ressemblent à ce qu'on tape (nom, ou
@@ -404,6 +445,115 @@ class _PatientScreenState extends State<PatientScreen> {
     await _charger();
   }
 
+  /// Ce qu'on fait pour ce patient, selon qui on est et s'il est là
+  /// aujourd'hui : l'accueil l'envoie, le soignant le soigne, et tout le
+  /// monde suit (rendez-vous, carnet, message).
+  List<Widget> _actions(AuthController auth, Patient p, VisitePatient? duJour) {
+    final envoyer = auth.aModule('file') && auth.peut('file.emettre');
+    final soigne = duJour != null && auth.peut('consultation.faire');
+    final visite = duJour?.uuid;
+    final dossier = DossierPatient(
+      uuid: p.uuid,
+      nom: p.nom,
+      aUnCompte: p.aUnCompte,
+      consultations: const [],
+    );
+    DossierScreen ecranDossier() =>
+        DossierScreen(visiteUuid: visite, dossier: dossier);
+
+    final tuiles = <_Action>[
+      if (envoyer && duJour != null)
+        _Action(
+          Icons.confirmation_number_outlined,
+          'Autre service',
+          _envoyer,
+        ),
+      if (visite != null && auth.peut('ordonnance.prescrire'))
+        _Action(
+          Icons.receipt_long_outlined,
+          'Ordonnance',
+          () => _ouvrir(PrescrireScreen(visiteUuid: visite, patient: p.nom)),
+        ),
+      if (soigne && auth.aModule('labo'))
+        _Action(
+          Icons.science_outlined,
+          'Analyses',
+          () => _ouvrir(
+            DemanderAnalysesScreen(visiteUuid: visite!, patient: p.nom),
+          ),
+        ),
+      if (visite != null &&
+          p.sexe != 'M' &&
+          auth.aModule('maternite') &&
+          auth.peut('maternite.suivre'))
+        _Action(
+          Icons.pregnant_woman_rounded,
+          'Grossesse · CPN',
+          () => ouvrirGrossesse(context, visite),
+        ),
+      if ((p.age ?? 99) < 6 &&
+          (auth.peut('maternite.suivre') || auth.peut('dossier.ecrire')))
+        _Action(
+          Icons.vaccines_outlined,
+          'Carnet de vaccination',
+          () => _ouvrir(CarnetScreen(dossierUuid: p.uuid)),
+        ),
+      if (visite != null &&
+          auth.aModule('hospitalisation') &&
+          auth.peut('hospitalisation.gerer'))
+        _Action(
+          Icons.bed_outlined,
+          'Hospitaliser',
+          () => hospitaliser(context, visite),
+        ),
+      if (auth.aModule('rdv') && auth.peut('rdv.gerer'))
+        _Action(Icons.event_available_outlined, 'Rendez-vous', _rendezVous),
+      if (auth.peut('dossier.lire') && !soigne)
+        _Action(
+          Icons.folder_shared_outlined,
+          'Dossier médical',
+          () => _ouvrir(ecranDossier()),
+        ),
+      if (p.telephone != null)
+        _Action(
+          Icons.chat_outlined,
+          'WhatsApp',
+          () => envoyerWhatsApp(context, p.telephone!, 'Bonjour ${p.nom}, '),
+        ),
+    ];
+
+    return [
+      if (duJour != null) const SizedBox(height: 10),
+      // L'action du moment, en grand.
+      if (soigne)
+        ElevatedButton.icon(
+          onPressed: () => _ouvrir(ecranDossier()),
+          icon: const Icon(Icons.medical_services_rounded),
+          label: const Text('Consulter'),
+        )
+      else if (envoyer && duJour == null)
+        ElevatedButton.icon(
+          onPressed: _envoyer,
+          icon: const Icon(Icons.confirmation_number_rounded),
+          label: const Text('Envoyer en consultation'),
+        ),
+      const SizedBox(height: 10),
+      LayoutBuilder(
+        builder: (context, c) {
+          final colonnes = c.maxWidth >= 900 ? 4 : (c.maxWidth >= 560 ? 3 : 2);
+          final largeur = (c.maxWidth - 8 * (colonnes - 1)) / colonnes;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in tuiles) SizedBox(width: largeur, child: t),
+            ],
+          );
+        },
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
@@ -493,43 +643,7 @@ class _PatientScreenState extends State<PatientScreen> {
                   onTap: () => _ouvrir(VisiteScreen(uuid: duJour.uuid)),
                 ),
               ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (auth.aModule('file') && auth.peut('file.emettre'))
-                  ElevatedButton.icon(
-                    onPressed: _envoyer,
-                    icon: const Icon(Icons.confirmation_number_rounded),
-                    label: Text(
-                      duJour == null
-                          ? 'Envoyer en consultation'
-                          : 'Envoyer vers un service',
-                    ),
-                  ),
-                if (auth.aModule('rdv') && auth.peut('rdv.gerer'))
-                  OutlinedButton.icon(
-                    onPressed: _rendezVous,
-                    icon: const Icon(Icons.event_available_rounded),
-                    label: const Text('Rendez-vous'),
-                  ),
-                if (auth.peut('dossier.lire'))
-                  OutlinedButton.icon(
-                    onPressed: () => _ouvrir(
-                      DossierScreen(
-                        dossier: DossierPatient(
-                          uuid: p.uuid,
-                          nom: p.nom,
-                          aUnCompte: p.aUnCompte,
-                          consultations: const [],
-                        ),
-                      ),
-                    ),
-                    icon: const Icon(Icons.folder_shared_rounded),
-                    label: const Text('Dossier médical'),
-                  ),
-              ],
-            ),
+            ..._actions(auth, p, duJour),
             if (p.rendezVous.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
