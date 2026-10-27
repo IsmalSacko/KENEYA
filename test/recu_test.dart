@@ -12,7 +12,7 @@ void main() {
     'reste': 0,
     'nom': 'Awa Traoré',
     'telephone': '+22376123456',
-    'numero_facture': 'F26-00042',
+    'numero_facture': 'F26-4821',
     'recu': {'etablissement': 'CSCom Ngoni', 'numero_dossier': '26-4821'},
     'lignes': [
       {
@@ -44,9 +44,9 @@ void main() {
     'le reçu d’une visite : numéro de facture, patient, lignes, paiement',
     () {
       final recu = Recu.deVisite(visite);
-      expect(recu.numero, 'F26-00042');
+      expect(recu.numero, 'F26-4821');
       final texte = recu.texte();
-      expect(texte, contains('Reçu N° F26-00042'));
+      expect(texte, contains('Reçu N° F26-4821'));
       expect(texte, contains('Patient : Awa Traoré (dossier 26-4821)'));
       expect(texte, contains('Goutte épaisse'));
       expect(texte, contains('Payé (Espèces)'));
