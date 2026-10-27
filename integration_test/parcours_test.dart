@@ -556,7 +556,8 @@ void main() {
       'Paracétamol 500 mg',
     );
     await saisir(t, find.widgetWithText(TextField, 'Prix de la boîte'), '1500');
-    await toucher(t, find.text('Enregistrer'));
+    // Vérifie le formulaire sans créer de produit (pas de doublons en démo).
+    await toucher(t, find.text('Annuler'));
     await t.pump(const Duration(seconds: 2));
     await toucher(t, find.text('Vente au comptoir'));
     await t.pump(const Duration(seconds: 2));

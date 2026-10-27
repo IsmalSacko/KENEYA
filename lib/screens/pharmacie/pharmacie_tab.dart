@@ -312,9 +312,33 @@ class _Alertes extends StatelessWidget {
 
   final Map<String, dynamic> alertes;
 
+  /// Au-delà, « et N autres » : la liste ne doit pas cacher les produits.
+  static const _visibles = 5;
+
   @override
   Widget build(BuildContext context) {
     List<Map> liste(String cle) => (alertes[cle] as List).cast<Map>();
+    // Le plus grave d'abord : périmés, puis péremption proche, puis stock bas.
+    final lignes = <(IconData, String, Color)>[
+      for (final p in liste('perimes'))
+        (
+          Icons.block_rounded,
+          '${p['medicament']} · lot ${p['lot'] ?? '—'} périmé (${p['quantite']})',
+          Kolors.kRed,
+        ),
+      for (final p in liste('peremption_proche'))
+        (
+          Icons.hourglass_bottom_rounded,
+          '${p['medicament']} · lot ${p['lot'] ?? '—'} périme le ${p['peremption']}',
+          Kolors.kGold,
+        ),
+      for (final p in liste('stock_bas'))
+        (
+          Icons.trending_down_rounded,
+          '${p['medicament']} : ${p['stock']} en stock (alerte sous ${p['seuil']})',
+          Kolors.kTextHigh,
+        ),
+    ];
     return Card(
       color: Kolors.kJauneDoux,
       child: Padding(
@@ -329,18 +353,29 @@ class _Alertes extends StatelessWidget {
                 fontSize: 16,
               ),
             ),
-            for (final p in liste('perimes'))
-              Text(
-                '⛔ ${p['medicament']} · lot ${p['lot'] ?? '—'} périmé (${p['quantite']})',
-                style: const TextStyle(color: Kolors.kRed),
+            for (final l in lignes.take(_visibles))
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    Icon(l.$1, size: 18, color: l.$3),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(l.$2, style: TextStyle(color: l.$3)),
+                    ),
+                  ],
+                ),
               ),
-            for (final p in liste('peremption_proche'))
-              Text(
-                '⏳ ${p['medicament']} · lot ${p['lot'] ?? '—'} périme le ${p['peremption']}',
-              ),
-            for (final p in liste('stock_bas'))
-              Text(
-                '📉 ${p['medicament']} : ${p['stock']} (seuil ${p['seuil']})',
+            if (lignes.length > _visibles)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'et ${lignes.length - _visibles} autre${lignes.length - _visibles > 1 ? 's' : ''}',
+                  style: const TextStyle(
+                    color: Kolors.kTextMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
           ],
         ),
@@ -350,7 +385,14 @@ class _Alertes extends StatelessWidget {
 }
 
 /// Créer ou modifier un produit.
-Future<void> editerProduit(BuildContext context, [Produit? p]) async {
+/// Crée ou modifie un produit ; renvoie le produit enregistré. [avecStock] :
+/// propose de saisir le stock déjà en rayon (pas depuis une réception, qui
+/// le saisit elle-même).
+Future<Produit?> editerProduit(
+  BuildContext context, [
+  Produit? p,
+  bool avecStock = true,
+]) async {
   final nom = TextEditingController(text: p?.nom);
   final dci = TextEditingController(text: p?.dci);
   final forme = TextEditingController(text: p?.forme);
@@ -451,7 +493,7 @@ Future<void> editerProduit(BuildContext context, [Produit? p]) async {
               'Pour ajouter : « Réception ». Pour corriger : « Inventaire » sur le lot.',
             ),
           )
-        else ...[
+        else if (avecStock) ...[
           const Text(
             'Stock actuel (facultatif)',
             style: TextStyle(fontWeight: FontWeight.w800),
@@ -539,15 +581,15 @@ Future<void> editerProduit(BuildContext context, [Produit? p]) async {
       ),
     ],
   );
-  if (donnees == null || !context.mounted) return;
+  if (donnees == null || !context.mounted) return null;
   try {
     final service = PharmacieService();
-    final uuid = await service.enregistrerProduit(donnees, uuid: p?.uuid);
+    final produit = await service.enregistrerProduit(donnees, uuid: p?.uuid);
     final enStock = int.tryParse(boites.text) ?? 0;
-    if (p == null && enStock > 0 && uuid.isNotEmpty) {
+    if (p == null && avecStock && enStock > 0 && produit != null) {
       await service.recevoir([
         {
-          'medicament_uuid': uuid,
+          'medicament_uuid': produit.uuid,
           'boites': enStock,
           if (lot.text.trim().isNotEmpty) 'numero': lot.text.trim(),
           if (peremption != null)
@@ -556,12 +598,14 @@ Future<void> editerProduit(BuildContext context, [Produit? p]) async {
         },
       ]);
     }
+    return produit;
   } on DioException catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
     }
+    return null;
   }
 }
 
@@ -578,12 +622,20 @@ class ReceptionScreen extends StatefulWidget {
 class _ReceptionScreenState extends State<ReceptionScreen> {
   final List<Map<String, dynamic>> _lignes = [];
   List<Map<String, dynamic>> _fournisseurs = [];
+  // Tous les produits, pas seulement ceux affichés dans l'onglet (filtrés).
+  late List<Produit> _produits = [...widget.produits];
   String? _fournisseur;
   bool _envoi = false;
 
   @override
   void initState() {
     super.initState();
+    PharmacieService()
+        .produits()
+        .then((p) {
+          if (mounted) setState(() => _produits = p);
+        })
+        .catchError((_) {});
     PharmacieService()
         .fournisseurs()
         .then((f) {
@@ -593,7 +645,7 @@ class _ReceptionScreenState extends State<ReceptionScreen> {
   }
 
   Future<void> _ajouterLigne() async {
-    Produit? produit = widget.produits.firstOrNull;
+    Produit? produit = _produits.firstOrNull;
     final numero = TextEditingController();
     final boites = TextEditingController(text: '1');
     DateTime? peremption;
@@ -604,14 +656,33 @@ class _ReceptionScreenState extends State<ReceptionScreen> {
         spacing: 12,
         mainAxisSize: MainAxisSize.min,
         children: [
-          DropdownButtonFormField<Produit>(
-            initialValue: produit,
-            isExpanded: true,
-            items: [
-              for (final p in widget.produits)
-                DropdownMenuItem(value: p, child: Text(p.nom)),
-            ],
-            onChanged: (v) => setD(() => produit = v),
+          if (_produits.isNotEmpty)
+            DropdownButtonFormField<Produit>(
+              // La clé change avec le produit choisi : un produit créé à
+              // l'instant s'affiche tout de suite.
+              key: ValueKey(produit?.uuid),
+              initialValue: produit,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Produit'),
+              items: [
+                for (final p in _produits)
+                  DropdownMenuItem(value: p, child: Text(p.nom)),
+              ],
+              onChanged: (v) => setD(() => produit = v),
+            ),
+          TextButton.icon(
+            onPressed: () async {
+              final nouveau = await editerProduit(ctx, null, false);
+              if (nouveau == null) return;
+              setState(() => _produits = [..._produits, nouveau]);
+              setD(() => produit = nouveau);
+            },
+            icon: const Icon(Icons.add),
+            label: Text(
+              _produits.isEmpty
+                  ? 'Créer le produit reçu'
+                  : 'Produit absent de la liste ? Le créer',
+            ),
           ),
           TextField(
             controller: numero,
@@ -694,7 +765,7 @@ class _ReceptionScreenState extends State<ReceptionScreen> {
         children: [
           DropdownButtonFormField<String?>(
             initialValue: _fournisseur,
-            decoration: const InputDecoration(labelText: 'Grossiste'),
+            decoration: const InputDecoration(labelText: 'Fournisseur'),
             items: [
               const DropdownMenuItem(value: null, child: Text('—')),
               for (final f in _fournisseurs)
@@ -711,8 +782,15 @@ class _ReceptionScreenState extends State<ReceptionScreen> {
               final n = await showDialog<String>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Nouveau grossiste'),
-                  content: TextField(controller: nom, autofocus: true),
+                  title: const Text('Nouveau fournisseur'),
+                  content: TextField(
+                    controller: nom,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Nom (ex. Laborex, Copharma)',
+                    ),
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, nom.text.trim()),
@@ -727,7 +805,7 @@ class _ReceptionScreenState extends State<ReceptionScreen> {
               if (mounted) setState(() => _fournisseurs = f);
             },
             icon: const Icon(Icons.add),
-            label: const Text('Nouveau grossiste'),
+            label: const Text('Nouveau fournisseur'),
           ),
           const SizedBox(height: 8),
           for (final l in _lignes)
@@ -744,7 +822,7 @@ class _ReceptionScreenState extends State<ReceptionScreen> {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(50),
             ),
-            onPressed: widget.produits.isEmpty ? null : _ajouterLigne,
+            onPressed: _ajouterLigne,
             icon: const Icon(Icons.add),
             label: const Text('Ajouter une ligne'),
           ),

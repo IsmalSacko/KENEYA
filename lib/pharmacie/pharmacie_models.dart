@@ -61,8 +61,8 @@ class Produit {
 
   /// « 3 boîtes (90 cp) » ou « 12 ».
   String get stockLabel => conditionnement > 1
-      ? '$stockBoites boîte(s) · $stockUnites unités'
-      : '$stockUnites';
+      ? 'En stock : $stockBoites boîte(s) · $stockUnites unités'
+      : 'En stock : $stockUnites';
 
   String get description => [
     dci,

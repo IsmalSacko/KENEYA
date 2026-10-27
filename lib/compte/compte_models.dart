@@ -148,7 +148,7 @@ class ProfilEtablissement {
     ProfilEtablissement(
       code: 'pharmacie',
       label: 'Pharmacie',
-      description: 'Ordonnances, lots et péremption, grossistes.',
+      description: 'Ordonnances, lots et péremption, fournisseurs.',
       modules: ['file', 'caisse', 'pharmacie'],
     ),
     ProfilEtablissement(
