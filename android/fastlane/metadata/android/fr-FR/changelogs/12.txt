@@ -1,1 +1,0 @@
-Application plus légère et plus stable : compatible avec les nouveaux téléphones (mémoire 16 Ko), affichage bord à bord sur toutes les versions d'Android. Rapport du mois en tableau de bord, pharmacie (crédit, annulation, inventaire), invitation de l'équipe, fusion des fiches patient.

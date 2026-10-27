@@ -1,0 +1,1 @@
+À l'inscription, choisissez Patient ou Professionnel : un seul compte, « Ma santé » pour tous. Les nouveaux établissements sont vérifiés avant d'être visibles des patients. À l'accueil, la fiche d'un patient se relie à son compte en scannant sa carte santé : il retrouve tout dans l'app.

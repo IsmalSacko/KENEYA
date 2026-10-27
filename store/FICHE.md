@@ -89,7 +89,7 @@ Une question : keneya.ismaeldev.fr
 ## Notes de version (500 caractères)
 
 ```
-Application plus légère et plus stable : compatible avec les nouveaux téléphones (mémoire 16 Ko), affichage bord à bord sur toutes les versions d'Android. Rapport du mois en tableau de bord, pharmacie (crédit, annulation, inventaire), invitation de l'équipe, fusion des fiches patient.
+À l'inscription, choisissez Patient ou Professionnel : un seul compte, « Ma santé » pour tous. Les nouveaux établissements sont vérifiés avant d'être visibles des patients. À l'accueil, la fiche d'un patient se relie à son compte en scannant sa carte santé : il retrouve tout dans l'app.
 ```
 
 ## Catégorie et classement
