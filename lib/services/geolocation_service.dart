@@ -18,20 +18,24 @@ class GeolocationService {
       return null;
     }
 
-    // Sans délai, un GPS lent (intérieur, zone rurale) bloquait l'écran
-    // indéfiniment : 8 s au plus, sinon la dernière position connue.
+    // La dernière position connue répond tout de suite ; pour trouver un
+    // centre proche, le quartier suffit : précision réduite, 5 s au plus
+    // (un GPS lent, en intérieur ou en brousse, ne bloque plus rien).
+    try {
+      final connue = await Geolocator.getLastKnownPosition();
+      if (connue != null) return connue;
+    } catch (_) {
+      // Pas de dernière position : on la demande.
+    }
     try {
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          timeLimit: Duration(seconds: 8),
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 5),
         ),
       );
     } catch (_) {
-      try {
-        return await Geolocator.getLastKnownPosition();
-      } catch (_) {
-        return null;
-      }
+      return null;
     }
   }
 

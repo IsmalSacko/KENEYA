@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -38,16 +40,27 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  /// La liste d'abord, sans attendre le GPS ; elle se reclasse par distance
+  /// dès que la position arrive.
   Future<void> _init() async {
+    unawaited(_load());
     try {
-      _pos = await GeolocationService.currentPosition();
+      final pos = await GeolocationService.currentPosition();
+      if (pos != null && mounted) {
+        _pos = pos;
+        await _load();
+      }
     } catch (_) {
-      _pos = null;
+      // Sans position : la liste reste sans distances.
     }
-    await _load();
   }
 
+  /// Numéro de la dernière recherche : une réponse plus ancienne, arrivée
+  /// en retard, n'écrase pas la plus récente.
+  int _requete = 0;
+
   Future<void> _load() async {
+    final n = ++_requete;
     setState(() {
       _loading = true;
       _error = null;
@@ -59,7 +72,7 @@ class _SearchScreenState extends State<SearchScreen> {
         profil: _typeFilter,
         query: _searchCtrl.text.trim(),
       );
-      if (!mounted) return;
+      if (!mounted || n != _requete) return;
       setState(() => _items = items);
     } catch (_) {
       if (!mounted) return;
