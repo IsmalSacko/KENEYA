@@ -124,7 +124,13 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
                 'Sur l’écran ou la borne, ouvrez Ngoni Santé, touchez « Écran ou borne d’établissement », puis scannez ce QR ou tapez le code. Valable 10 minutes.',
               ),
               const SizedBox(height: 14),
-              QrImageView(data: data['qr'].toString(), size: 180),
+              // Taille fixe : la fenêtre mesure son contenu à l'avance, et le
+              // QR seul ne sait pas le faire (sinon la fenêtre reste vide).
+              SizedBox(
+                width: 180,
+                height: 180,
+                child: QrImageView(data: data['qr'].toString(), size: 180),
+              ),
               SelectableText(
                 code,
                 style: GoogleFonts.poppins(
@@ -163,7 +169,12 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                QrImageView(data: data['qr'].toString(), size: 240),
+                // Taille fixe : voir le QR d'appairage ci-dessus.
+                SizedBox(
+                  width: 240,
+                  height: 240,
+                  child: QrImageView(data: data['qr'].toString(), size: 240),
+                ),
                 const SizedBox(height: 10),
                 const Text(
                   'Vous avez rendez-vous ? Scannez ce QR avec Ngoni Santé.',
