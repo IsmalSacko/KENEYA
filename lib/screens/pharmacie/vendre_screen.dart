@@ -7,15 +7,14 @@ import 'package:provider/provider.dart';
 import '../../caisse/caisse_models.dart';
 import '../../caisse/caisse_service.dart';
 import '../../common/utils/kcolors.dart';
-import '../../common/whatsapp.dart';
 import '../../common/widgets/feuille.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
 import '../../pharmacie/pharmacie_models.dart';
 import '../../pharmacie/pharmacie_service.dart';
-import '../../pharmacie/recu.dart';
+import '../../caisse/recu.dart';
+import '../caisse/recu_screen.dart';
 import '../commun/scanner_qr_screen.dart';
-import '../file/ticket_carte.dart';
 import 'pharmacie_tab.dart';
 
 /// Vendre, comme à la caisse d'une boutique : on tape un nom ou on scanne
@@ -1017,101 +1016,16 @@ class _Vide extends StatelessWidget {
   }
 }
 
-/// Le reçu après la vente : imprimer, envoyer par WhatsApp, ou passer au
-/// client suivant.
-/// [annuler] : la vente du jour peut être annulée (stock et argent rendus).
+/// Le reçu après la vente : le même que celui de la caisse (imprimer,
+/// partager en PDF, WhatsApp) ; [annuler] pour une vente du jour.
 Future<void> afficherRecu(
   BuildContext context,
   Vente v, {
   Future<void> Function()? annuler,
 }) {
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      icon: Icon(
-        v.payee ? Icons.check_circle_rounded : Icons.point_of_sale_rounded,
-        color: v.payee ? Kolors.kSuccess : Kolors.kGold,
-        size: 48,
-      ),
-      title: Text(
-        v.annulee
-            ? 'Vente annulée'
-            : v.aCredit
-            ? 'Vendu à crédit'
-            : v.payee
-            ? 'Vente encaissée'
-            : 'Le client paie à la caisse',
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            formatMontant(v.total, v.devise),
-            style: GoogleFonts.poppins(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          Text(
-            'Reçu N° ${v.numero}${v.client.isEmpty ? '' : ' · ${v.client}'}',
-            style: const TextStyle(color: Kolors.kTextMuted),
-          ),
-          if (!v.payee)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'Remettez les produits une fois la vente payée.',
-                textAlign: TextAlign.center,
-              ),
-            ),
-        ],
-      ),
-      actions: [
-        if (annuler != null && !v.annulee)
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Kolors.kRed),
-            onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: ctx,
-                builder: (c2) => AlertDialog(
-                  title: const Text('Annuler cette vente ?'),
-                  content: const Text(
-                    'Les produits rentrent en stock et l’argent est rendu au client.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(c2, false),
-                      child: const Text('Non'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(c2, true),
-                      child: const Text('Annuler la vente'),
-                    ),
-                  ],
-                ),
-              );
-              if (ok != true || !ctx.mounted) return;
-              Navigator.pop(ctx);
-              await annuler();
-            },
-            child: const Text('Annuler la vente'),
-          ),
-        if (v.telephone != null && v.telephone!.isNotEmpty)
-          TextButton.icon(
-            onPressed: () => envoyerWhatsApp(ctx, v.telephone!, Recu.texte(v)),
-            icon: const Icon(Icons.chat_outlined),
-            label: const Text('WhatsApp'),
-          ),
-        TextButton.icon(
-          onPressed: () => imprimerSurThermique(ctx, () => Recu.octets(v)),
-          icon: const Icon(Icons.print_outlined),
-          label: const Text('Imprimer'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Client suivant'),
-        ),
-      ],
+  return Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => RecuScreen(recu: Recu.deVente(v), annuler: annuler),
     ),
   );
 }

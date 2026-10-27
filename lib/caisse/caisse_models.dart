@@ -96,12 +96,20 @@ class EncaissementVisite {
     required this.moyen,
     this.reference,
     this.at,
+    this.par,
+    this.rembourse = false,
   });
 
   final int montant;
   final String moyen;
   final String? reference;
   final DateTime? at;
+
+  /// Le caissier qui a encaissé.
+  final String? par;
+
+  /// Rendu au client (vente annulée) : ne compte plus.
+  final bool rembourse;
 
   String get moyenLabel => libellesMoyens[moyen] ?? moyen;
 
@@ -111,6 +119,8 @@ class EncaissementVisite {
         moyen: (j['moyen'] ?? '').toString(),
         reference: j['reference']?.toString(),
         at: DateTime.tryParse((j['at'] ?? '').toString())?.toLocal(),
+        par: j['par']?.toString(),
+        rembourse: j['rembourse'] == true,
       );
 }
 
@@ -135,6 +145,8 @@ class Visite {
     this.tauxAssurance,
     this.numeroAssure,
     this.tri,
+    this.numeroFacture,
+    this.recu = const {},
   });
 
   final String uuid;
@@ -162,6 +174,12 @@ class Visite {
 
   /// Les constantes du tri, telles que l'API les envoie (soignants seuls).
   final Map<String, dynamic>? tri;
+
+  /// « F26-00042 », donné au premier encaissement.
+  final String? numeroFacture;
+
+  /// L'en-tête du reçu : etablissement, adresse, telephone, numero_dossier.
+  final Map<String, String> recu;
 
   bool get ouverte => statut == 'ouverte';
 
@@ -199,6 +217,12 @@ class Visite {
         ? (j['assurance'] as Map)['numero']?.toString()
         : null,
     tri: j['tri'] is Map ? Map<String, dynamic>.from(j['tri'] as Map) : null,
+    numeroFacture: j['numero_facture']?.toString(),
+    recu: {
+      if (j['recu'] is Map)
+        for (final e in (j['recu'] as Map).entries)
+          if (e.value != null) e.key.toString(): e.value.toString(),
+    },
   );
 }
 

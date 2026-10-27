@@ -73,6 +73,8 @@ dependencies:
 
   # Vérifier hors ligne la signature des ordonnances (Ed25519)
   cryptography: ^2.9.0
+  pdf: ^3.13.1
+  share_plus: ^12.0.0
 
 dev_dependencies:
   flutter_test:

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../caisse/caisse_models.dart';
 import '../../caisse/caisse_service.dart';
+import '../../caisse/recu.dart';
 import '../../common/utils/kcolors.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
@@ -15,6 +16,7 @@ import '../../dossier/dossier_service.dart';
 import '../dossier/champs_constantes.dart';
 import '../dossier/dossier_screen.dart';
 import '../pharmacie/delivrance_screen.dart';
+import 'recu_screen.dart';
 import '../pharmacie/ordonnance_screens.dart';
 import '../../common/widgets/formulaire.dart';
 import '../../common/widgets/feuille.dart';
@@ -282,6 +284,15 @@ class _VisiteScreenState extends State<VisiteScreen> {
         reference: paiement.$3,
       ),
     );
+    // Encaissé : le reçu s'ouvre aussitôt, comme le ticket de Ngoni Caisse.
+    final apres = _visite;
+    if (mounted && apres != null && apres.paye > v.paye) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => RecuScreen(recu: Recu.deVisite(apres)),
+        ),
+      );
+    }
   }
 
   @override
@@ -298,7 +309,21 @@ class _VisiteScreenState extends State<VisiteScreen> {
     final peutEncaisser = auth.peut('caisse.encaisser');
 
     return Scaffold(
-      appBar: AppBar(title: Text(v?.titre ?? 'Visite')),
+      appBar: AppBar(
+        title: Text(v?.titre ?? 'Visite'),
+        actions: [
+          if (v != null && v.paye > 0)
+            IconButton(
+              tooltip: 'Reçu',
+              icon: const Icon(Icons.receipt_long_rounded),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => RecuScreen(recu: Recu.deVisite(v)),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: v == null
           ? Center(
               child: _erreur == null
