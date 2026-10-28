@@ -12,6 +12,10 @@ import '../../core/api/api_client.dart';
 import '../../core/api/options_serveur.dart';
 import '../../dossier/dossier_models.dart';
 import '../../dossier/dossier_service.dart';
+import '../../common/widgets/confirmer.dart';
+import '../../patients/patients_service.dart';
+import '../../rdv/rdv_service.dart';
+import '../rdv/nouveau_rdv_sheet.dart';
 import '../commun/scanner_qr_screen.dart';
 import '../labo/demander_analyses_screen.dart';
 import '../maternite/carnet_screen.dart';
@@ -203,13 +207,15 @@ class _DossierScreenState extends State<DossierScreen> {
     if (fait == true) await _charger();
   }
 
-  Future<void> _consulter(DossierPatient d) async {
+  Future<void> _consulter(DossierPatient d, [Consultation? edition]) async {
     final fait = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ConsultationScreen(
-          visiteUuid: widget.visiteUuid!,
+          visiteUuid: widget.visiteUuid,
           patient: d.nom,
+          dossier: d,
           tri: _tri,
+          edition: edition,
         ),
       ),
     );
@@ -383,7 +389,14 @@ class _DossierScreenState extends State<DossierScreen> {
                       'Aucune consultation notée.',
                       style: TextStyle(color: Kolors.kTextMuted),
                     ),
-                  for (final c in d.consultations) CarteConsultation(c),
+                  for (final c in d.consultations)
+                    CarteConsultation(
+                      c,
+                      onModifier:
+                          c.modifiable && auth.peut('consultation.faire')
+                          ? () => _consulter(d, c)
+                          : null,
+                    ),
                   if (d.analyses.isNotEmpty || peutConsulter) ...[
                     const SizedBox(height: 16),
                     Text(
@@ -473,33 +486,58 @@ class _DemandeAcces extends StatelessWidget {
 }
 
 /// La consultation : motif, constantes, examen, diagnostic, conclusion.
+/// Avec [edition], son auteur corrige une consultation du jour.
 class ConsultationScreen extends StatefulWidget {
   const ConsultationScreen({
-    required this.visiteUuid,
     required this.patient,
+    this.visiteUuid,
+    this.dossier,
     this.tri,
+    this.edition,
     super.key,
-  });
+  }) : assert(visiteUuid != null || edition != null);
 
-  final String visiteUuid;
+  final String? visiteUuid;
   final String patient;
+
+  /// Le dossier : pour réserver le rendez-vous « À revoir le… ».
+  final DossierPatient? dossier;
 
   /// Les constantes du tri, reprises dans le formulaire.
   final Tri? tri;
+
+  /// La consultation à corriger.
+  final Consultation? edition;
 
   @override
   State<ConsultationScreen> createState() => _ConsultationScreenState();
 }
 
 class _ConsultationScreenState extends State<ConsultationScreen> {
-  final _motif = TextEditingController();
-  final _examen = TextEditingController();
-  final _diagnostic = TextEditingController();
-  final _cim10 = TextEditingController();
-  final _conclusion = TextEditingController();
-  late final _constantes = controleursConstantes(widget.tri?.constantes);
-  DateTime? _revoir;
+  late final _e = widget.edition;
+  late final _motif = TextEditingController(text: _e?.motif);
+  late final _examen = TextEditingController(text: _e?.examen);
+  late final _diagnostic = TextEditingController(text: _e?.diagnostic);
+  late final _cim10 = TextEditingController(text: _e?.cim10);
+  late final _conclusion = TextEditingController(text: _e?.conclusion);
+  late final _constantes = controleursConstantes(
+    _e?.constantes ?? widget.tri?.constantes,
+  );
+  late DateTime? _revoir = DateTime.tryParse(_e?.prochainRdv ?? '');
   bool _envoi = false;
+
+  /// Ce qui a été saisi, pour ne pas le perdre en quittant par erreur.
+  late final String _depart = _saisie;
+
+  String get _saisie => [
+    _motif.text,
+    _examen.text,
+    _diagnostic.text,
+    _cim10.text,
+    _conclusion.text,
+    lireConstantes(_constantes).toString(),
+    '$_revoir',
+  ].join('|');
 
   Future<void> _valider() async {
     final probleme = _motif.text.trim().isEmpty
@@ -512,18 +550,23 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       return;
     }
     setState(() => _envoi = true);
+    final donnees = {
+      'motif': _motif.text.trim(),
+      'constantes': lireConstantes(_constantes),
+      'examen': _examen.text.trim(),
+      'diagnostic': _diagnostic.text.trim(),
+      'cim10': _cim10.text.trim(),
+      'conclusion': _conclusion.text.trim(),
+      'prochain_rdv': _revoir == null
+          ? null
+          : DateFormat('yyyy-MM-dd').format(_revoir!),
+    };
     try {
-      await DossierService().consulter(widget.visiteUuid, {
-        'motif': _motif.text.trim(),
-        'constantes': lireConstantes(_constantes),
-        'examen': _examen.text.trim(),
-        'diagnostic': _diagnostic.text.trim(),
-        'cim10': _cim10.text.trim(),
-        'conclusion': _conclusion.text.trim(),
-        if (_revoir != null)
-          'prochain_rdv': DateFormat('yyyy-MM-dd').format(_revoir!),
-      });
-      if (mounted) Navigator.pop(context, true);
+      if (_e != null) {
+        await DossierService().corriger(_e.uuid, donnees);
+      } else {
+        await DossierService().consulter(widget.visiteUuid!, donnees);
+      }
     } on DioException catch (e) {
       if (mounted) {
         setState(() => _envoi = false);
@@ -531,94 +574,174 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
       }
+      return;
+    }
+    if (!mounted) return;
+    // « À revoir le… » : le rendez-vous se prend tout de suite, tant que le
+    // patient est là.
+    final revoir = _revoir;
+    final auth = context.read<AuthController>();
+    final nouveau =
+        revoir != null &&
+        revoir.toIso8601String().substring(0, 10) != _e?.prochainRdv;
+    if (nouveau &&
+        widget.dossier != null &&
+        auth.aModule('rdv') &&
+        auth.peut('rdv.gerer')) {
+      await _proposerRdv(revoir);
+    }
+    if (mounted) Navigator.pop(context, true);
+  }
+
+  Future<void> _proposerRdv(DateTime revoir) async {
+    final reserver = await confirmer(
+      context,
+      titre: 'À revoir le ${dateCourte(revoir)}',
+      texte:
+          'Réserver ce rendez-vous maintenant, pendant que le patient est là ?',
+      action: 'Réserver ce rendez-vous',
+    );
+    if (!reserver || !mounted) return;
+    try {
+      final agendas = await RdvService().agendas();
+      if (!mounted) return;
+      final d = widget.dossier!;
+      await nouveauRdv(
+        context,
+        agendas,
+        revoir,
+        patient: Patient(
+          uuid: d.uuid,
+          nom: d.nom,
+          aUnCompte: d.aUnCompte,
+          naissanceEstimee: false,
+          telephone: d.telephone,
+          sexe: d.sexe,
+          age: d.age,
+        ),
+      );
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+      }
     }
   }
 
+  Future<bool> _quitter() async =>
+      _saisie == _depart ||
+      await confirmer(
+        context,
+        titre: 'Quitter sans enregistrer ?',
+        texte: 'Ce que vous avez saisi sera perdu.',
+        action: 'Quitter',
+        danger: true,
+      );
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.patient)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextField(
-            controller: _motif,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Motif (ex. fièvre depuis 3 jours)',
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (fait, _) async {
+        if (fait) return;
+        if (_envoi) return;
+        if (await _quitter() && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            _e == null ? widget.patient : 'Corriger · ${widget.patient}',
+          ),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextField(
+              controller: _motif,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Motif (ex. fièvre depuis 3 jours)',
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Constantes',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
-          ChampsConstantes(champs: _constantes),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _examen,
-            maxLines: null,
-            minLines: 2,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Examen clinique'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _diagnostic,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Diagnostic'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _cim10,
-            textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
-              labelText: 'Code CIM-10 (facultatif, ex. B54)',
+            const SizedBox(height: 16),
+            Text(
+              'Constantes',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _conclusion,
-            maxLines: null,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Conclusion, conseils',
+            const SizedBox(height: 10),
+            ChampsConstantes(champs: _constantes),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _examen,
+              maxLines: null,
+              minLines: 2,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Examen clinique'),
             ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.event_repeat_rounded),
-            title: Text(
-              _revoir == null
-                  ? 'À revoir le… (facultatif)'
-                  : 'À revoir le ${dateCourte(_revoir)}',
+            const SizedBox(height: 12),
+            TextField(
+              controller: _diagnostic,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Diagnostic'),
             ),
-            trailing: _revoir == null
-                ? null
-                : IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => setState(() => _revoir = null),
-                  ),
-            onTap: () async {
-              final choix = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now().add(const Duration(days: 7)),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (choix != null) setState(() => _revoir = choix);
-            },
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _envoi ? null : _valider,
-              child: const Text('Enregistrer la consultation'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _cim10,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Code CIM-10 (facultatif, ex. B54)',
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _conclusion,
+              maxLines: null,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Conclusion, conseils',
+              ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.event_repeat_rounded),
+              title: Text(
+                _revoir == null
+                    ? 'À revoir le… (facultatif)'
+                    : 'À revoir le ${dateCourte(_revoir)}',
+              ),
+              trailing: _revoir == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'Retirer la date',
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => setState(() => _revoir = null),
+                    ),
+              onTap: () async {
+                final choix = await showDatePicker(
+                  context: context,
+                  initialDate:
+                      _revoir ?? DateTime.now().add(const Duration(days: 7)),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (choix != null) setState(() => _revoir = choix);
+              },
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _envoi ? null : _valider,
+                child: Text(
+                  _e == null
+                      ? 'Enregistrer la consultation'
+                      : 'Enregistrer la correction',
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

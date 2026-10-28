@@ -187,9 +187,9 @@ Future<void> afficherRdv(BuildContext context, RendezVousRdv r) {
                       ),
                     ),
                     Text(
-                      r.heure,
+                      r.creneau ? r.heure : 'Heure à fixer',
                       style: GoogleFonts.poppins(
-                        fontSize: 44,
+                        fontSize: r.creneau ? 44 : 26,
                         fontWeight: FontWeight.w800,
                         color: Kolors.kJaune,
                       ),
@@ -347,7 +347,7 @@ class _MesRdvScreenState extends State<MesRdvScreen> {
                       ),
                     ),
                     title: Text(
-                      '${r.date == null ? r.jour : DateFormat('EEE d MMM', 'fr').format(r.date!)} · ${r.heure}',
+                      '${r.date == null ? r.jour : DateFormat('EEE d MMM', 'fr').format(r.date!)} · ${r.creneau ? r.heure : 'heure à fixer'}',
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     subtitle: Text(

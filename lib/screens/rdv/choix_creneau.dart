@@ -4,19 +4,24 @@ import 'package:intl/intl.dart';
 import '../../common/utils/kcolors.dart';
 import '../../rdv/rdv_models.dart';
 
-/// Choisir un jour (les 7 prochains) puis une heure libre. Sert à l'accueil
-/// comme au patient ; [charger] lit les créneaux du jour choisi.
+/// Choisir un jour (les 7 prochains, ou « Autre date… » jusqu'à
+/// [horizonJours]) puis une heure libre. Sert à l'accueil comme au patient ;
+/// [charger] lit les créneaux du jour choisi.
 class ChoixCreneau extends StatefulWidget {
   const ChoixCreneau({
     required this.charger,
     required this.onChoisi,
     this.depart,
+    this.horizonJours = 365,
     super.key,
   });
 
   final Future<List<CreneauRdv>> Function(String jour) charger;
   final ValueChanged<CreneauRdv?> onChoisi;
   final DateTime? depart;
+
+  /// Jusqu'où l'agenda prend des rendez-vous.
+  final int horizonJours;
 
   @override
   State<ChoixCreneau> createState() => _ChoixCreneauState();
@@ -55,6 +60,25 @@ class _ChoixCreneauState extends State<ChoixCreneau> {
     }
   }
 
+  /// Un jour plus loin que la semaine : le calendrier.
+  Future<void> _autreDate() async {
+    final aujourdhui = DateUtils.dateOnly(DateTime.now());
+    final choix = await showDatePicker(
+      context: context,
+      initialDate: _jour.isBefore(aujourdhui)
+          ? aujourdhui
+          : (_jour.isAfter(aujourdhui.add(Duration(days: widget.horizonJours)))
+                ? aujourdhui
+                : _jour),
+      firstDate: aujourdhui,
+      lastDate: aujourdhui.add(Duration(days: widget.horizonJours)),
+      helpText: 'Jour du rendez-vous',
+    );
+    if (choix == null || !mounted) return;
+    setState(() => _jour = choix);
+    _charger();
+  }
+
   @override
   Widget build(BuildContext context) {
     final aujourdhui = DateTime.now();
@@ -62,6 +86,10 @@ class _ChoixCreneauState extends State<ChoixCreneau> {
       7,
       (i) => DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day + i),
     );
+    // Le jour choisi au calendrier, hors de la semaine, garde sa puce.
+    if (!jours.any((j) => DateUtils.isSameDay(j, _jour))) {
+      jours.add(DateUtils.dateOnly(_jour));
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -91,6 +119,11 @@ class _ChoixCreneauState extends State<ChoixCreneau> {
                     },
                   ),
                 ),
+              ActionChip(
+                avatar: const Icon(Icons.calendar_month_rounded, size: 18),
+                label: const Text('Autre date…'),
+                onPressed: _autreDate,
+              ),
             ],
           ),
         ),

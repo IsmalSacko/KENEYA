@@ -31,6 +31,14 @@ class _PatientsTabState extends State<PatientsTab> {
   List<Patient>? _liste;
   String? _erreur;
 
+  /// La dernière page chargée, et s'il y en a d'autres (« Voir plus »).
+  int _page = 1;
+  bool _suite = false;
+  bool _chargeSuite = false;
+
+  /// Seulement ceux qui sont dans le centre aujourd'hui.
+  bool _aujourdhui = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,16 +52,49 @@ class _PatientsTabState extends State<PatientsTab> {
   }
 
   Future<void> _charger() async {
+    final recherche = _recherche.text.trim();
+    final aujourdhui = _aujourdhui;
     try {
-      final l = await _service.rechercher(_recherche.text.trim());
+      final (l, suite) = await _service.page(
+        recherche: recherche,
+        aujourdhui: aujourdhui,
+      );
+      // Une réponse arrivée après une autre frappe ne compte plus.
+      if (!mounted ||
+          recherche != _recherche.text.trim() ||
+          aujourdhui != _aujourdhui) {
+        return;
+      }
+      setState(() {
+        _liste = l;
+        _page = 1;
+        _suite = suite;
+        _erreur = null;
+      });
+    } on DioException catch (e) {
+      if (mounted) setState(() => _erreur = messageErreur(e));
+    }
+  }
+
+  Future<void> _voirPlus() async {
+    setState(() => _chargeSuite = true);
+    try {
+      final (l, suite) = await _service.page(
+        recherche: _recherche.text.trim(),
+        aujourdhui: _aujourdhui,
+        page: _page + 1,
+      );
       if (mounted) {
         setState(() {
-          _liste = l;
-          _erreur = null;
+          _liste = [...?_liste, ...l];
+          _page++;
+          _suite = suite;
         });
       }
     } on DioException catch (e) {
-      if (mounted) setState(() => _erreur = messageErreur(e));
+      _dire(messageErreur(e));
+    } finally {
+      if (mounted) setState(() => _chargeSuite = false);
     }
   }
 
@@ -143,7 +184,23 @@ class _PatientsTabState extends State<PatientsTab> {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilterChip(
+                avatar: const Icon(Icons.today_rounded, size: 18),
+                label: const Text('Dans le centre aujourd’hui'),
+                selected: _aujourdhui,
+                onSelected: (v) {
+                  setState(() {
+                    _aujourdhui = v;
+                    _liste = null;
+                  });
+                  _charger();
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
             if (l == null)
               Padding(
                 padding: const EdgeInsets.only(top: 40),
@@ -157,7 +214,9 @@ class _PatientsTabState extends State<PatientsTab> {
               Padding(
                 padding: const EdgeInsets.only(top: 40),
                 child: Text(
-                  _recherche.text.isEmpty
+                  _aujourdhui && _recherche.text.isEmpty
+                      ? 'Personne n’est dans le centre pour le moment.'
+                      : _recherche.text.isEmpty
                       ? 'Aucun patient pour l’instant. Enregistrez-le à son arrivée : « Nouveau patient ».'
                       : 'Personne à ce nom. Nouveau ? Enregistrez-le.',
                   textAlign: TextAlign.center,
@@ -169,8 +228,8 @@ class _PatientsTabState extends State<PatientsTab> {
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
                 child: Text(
                   _recherche.text.isEmpty
-                      ? 'Dossiers patients · ${l.length}${l.length == 100 ? '+' : ''}'
-                      : '${l.length} dossier${l.length > 1 ? 's' : ''} trouvé${l.length > 1 ? 's' : ''}',
+                      ? '${_aujourdhui ? 'Dans le centre' : 'Dossiers patients'} · ${l.length}${_suite ? '+' : ''}'
+                      : '${l.length}${_suite ? '+' : ''} dossier${l.length > 1 ? 's' : ''} trouvé${l.length > 1 ? 's' : ''}',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -197,6 +256,23 @@ class _PatientsTabState extends State<PatientsTab> {
                   );
                 },
               ),
+              if (_suite)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: _chargeSuite ? null : _voirPlus,
+                      icon: _chargeSuite
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.expand_more_rounded),
+                      label: const Text('Voir plus'),
+                    ),
+                  ),
+                ),
             ],
           ],
         ),

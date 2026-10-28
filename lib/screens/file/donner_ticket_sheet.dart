@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../../common/utils/kcolors.dart';
 import '../../file/file_models.dart';
 import '../../file/file_service.dart';
 import '../../patients/patients_service.dart';
 import '../patients/choix_patient.dart';
+import '../../controllers/auth_controller.dart';
+import 'reglages_file_screen.dart';
 import 'ticket_carte.dart';
 import '../../common/widgets/feuille.dart';
 
@@ -19,6 +22,10 @@ Future<TicketFile?> donnerTicket(
   Patient? patient,
   bool consultation = false,
 }) async {
+  if (!services.any((s) => s.actif)) {
+    await aucunServiceOuvert(context);
+    return null;
+  }
   final ticket = await feuille<TicketFile>(
     context: context,
     isScrollControlled: true,
@@ -33,6 +40,39 @@ Future<TicketFile?> donnerTicket(
     await afficherTicket(context, ticket);
   }
   return ticket;
+}
+
+/// Aucun service ouvert : pas de ticket possible. On le dit, et celui qui
+/// règle la file y va directement.
+Future<void> aucunServiceOuvert(
+  BuildContext context, {
+  String texte =
+      'Aucun service n’est ouvert : ouvrez-en un dans « Régler la file » pour donner des tickets.',
+}) async {
+  final regler = context.read<AuthController>().peut('file.gerer');
+  final ouvrir = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Aucun service ouvert'),
+      content: Text(texte),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Fermer'),
+        ),
+        if (regler)
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Régler la file'),
+          ),
+      ],
+    ),
+  );
+  if (ouvrir == true && context.mounted) {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ReglagesFileScreen()));
+  }
 }
 
 class _FeuilleTicket extends StatefulWidget {

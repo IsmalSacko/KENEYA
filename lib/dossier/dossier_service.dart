@@ -66,6 +66,11 @@ class DossierService {
     await ApiClient.dio.post('/visites/$visite/consultation', data: donnees);
   }
 
+  /// Le médecin corrige sa consultation (le jour même).
+  Future<void> corriger(String uuid, Map<String, dynamic> donnees) async {
+    await ApiClient.dio.patch('/dossiers/consultations/$uuid', data: donnees);
+  }
+
   DossierPatient _dossier(Object? data) => DossierPatient.fromJson(
     Map<String, dynamic>.from((data as Map)['dossier'] as Map),
   );

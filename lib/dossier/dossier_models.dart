@@ -43,9 +43,13 @@ class Consultation {
     this.cim10,
     this.conclusion,
     this.prochainRdv,
+    this.modifiable = false,
   });
 
   final String uuid;
+
+  /// Son auteur peut la corriger (le jour même).
+  final bool modifiable;
   final String etablissement;
   final bool ici;
   final String motif;
@@ -78,6 +82,7 @@ class Consultation {
       cim10: _texte(j['cim10']),
       conclusion: _texte(j['conclusion']),
       prochainRdv: _texte(j['prochain_rdv']),
+      modifiable: j['modifiable'] == true,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 import '../../common/utils/kcolors.dart';
 import '../../core/api/api_client.dart';
@@ -19,6 +20,11 @@ class _StatsFileScreenState extends State<StatsFileScreen> {
   Map<String, dynamic>? _stats;
   String? _erreur;
 
+  /// Le jour regardé : aujourd'hui, ou un jour passé pour comparer.
+  DateTime _jour = DateTime.now();
+
+  bool get _aujourdhui => DateUtils.isSameDay(_jour, DateTime.now());
+
   @override
   void initState() {
     super.initState();
@@ -27,18 +33,50 @@ class _StatsFileScreenState extends State<StatsFileScreen> {
 
   Future<void> _charger() async {
     try {
-      final s = await FileService().statistiques();
+      final s = await FileService().statistiques(
+        jour: DateFormat('yyyy-MM-dd').format(_jour),
+      );
       if (mounted) setState(() => _stats = s);
     } on DioException catch (e) {
       if (mounted) setState(() => _erreur = messageErreur(e));
     }
   }
 
+  Future<void> _choisirJour() async {
+    final choix = await showDatePicker(
+      context: context,
+      initialDate: _jour,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+      helpText: 'Chiffres de quel jour ?',
+    );
+    if (choix == null) return;
+    setState(() {
+      _jour = choix;
+      _stats = null;
+      _erreur = null;
+    });
+    await _charger();
+  }
+
   @override
   Widget build(BuildContext context) {
     final stats = _stats;
     return Scaffold(
-      appBar: AppBar(title: const Text('Chiffres du jour')),
+      appBar: AppBar(
+        title: Text(
+          _aujourdhui
+              ? 'Chiffres du jour'
+              : 'Chiffres du ${DateFormat('d MMMM', 'fr').format(_jour)}',
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Autre jour',
+            icon: const Icon(Icons.calendar_month_rounded),
+            onPressed: _choisirJour,
+          ),
+        ],
+      ),
       body: stats == null
           ? Center(
               child: _erreur == null
@@ -51,7 +89,7 @@ class _StatsFileScreenState extends State<StatsFileScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   Text(
-                    '${stats['total']} tickets aujourd’hui',
+                    '${stats['total']} tickets ${_aujourdhui ? 'aujourd’hui' : 'ce jour-là'}',
                     style: GoogleFonts.poppins(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,

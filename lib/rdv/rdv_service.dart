@@ -24,16 +24,28 @@ class RdvService {
     await ApiClient.dio.delete('/agendas/$uuid');
   }
 
-  Future<void> ajouterAbsence(
+  /// Renvoie les rendez-vous déjà pris pendant l'absence (à déplacer).
+  Future<List<RendezVousRdv>> ajouterAbsence(
     String agendaUuid,
     String du,
     String au,
     String? motif,
   ) async {
-    await ApiClient.dio.post(
+    final res = await ApiClient.dio.post(
       '/agendas/$agendaUuid/absences',
       data: {'du': du, 'au': au, 'motif': ?motif},
     );
+    final l = (res.data as Map)['rendez_vous'];
+    return l is List
+        ? l
+              .whereType<Map>()
+              .map((m) => RendezVousRdv.fromJson(Map<String, dynamic>.from(m)))
+              .toList()
+        : const [];
+  }
+
+  Future<void> supprimerAbsence(int id) async {
+    await ApiClient.dio.delete('/absences/$id');
   }
 
   Future<List<CreneauRdv>> creneaux(
@@ -59,6 +71,30 @@ class RdvService {
     return _liste(res.data).map(RendezVousRdv.fromJson).toList();
   }
 
+  /// Les rendez-vous d'un patient (nom ou numéro), tous jours confondus.
+  Future<List<RendezVousRdv>> rechercher(
+    String recherche, {
+    String? agendaUuid,
+  }) async {
+    final res = await ApiClient.dio.get(
+      '/rdv',
+      queryParameters: {'q': recherche, 'agenda': ?agendaUuid},
+    );
+    return _liste(res.data).map(RendezVousRdv.fromJson).toList();
+  }
+
+  /// Autre heure, autre jour ou autre agenda : le patient est prévenu.
+  Future<void> deplacer(
+    String uuid, {
+    required String debut,
+    String? agendaUuid,
+  }) async {
+    await ApiClient.dio.post(
+      '/rdv/$uuid/deplacer',
+      data: {'debut': debut, 'agenda_uuid': ?agendaUuid},
+    );
+  }
+
   Future<void> reserver({
     required String agendaUuid,
     required String debut,
@@ -81,9 +117,23 @@ class RdvService {
     );
   }
 
-  /// confirmer, refuser, annuler, absent.
-  Future<void> action(String uuid, String action) async {
-    await ApiClient.dio.post('/rdv/$uuid/$action');
+  /// confirmer, refuser, annuler, absent. [raison] est envoyée au patient ;
+  /// [debut] fixe l'heure d'une demande venue sans heure (à la confirmation).
+  Future<void> action(
+    String uuid,
+    String action, {
+    String? raison,
+    String? debut,
+    String? agendaUuid,
+  }) async {
+    await ApiClient.dio.post(
+      '/rdv/$uuid/$action',
+      data: {
+        if (raison != null && raison.isNotEmpty) 'raison': raison,
+        'debut': ?debut,
+        'agenda_uuid': ?agendaUuid,
+      },
+    );
   }
 
   /// Arrivée du patient : il entre dans la file (priorité rendez-vous).

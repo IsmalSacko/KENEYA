@@ -70,9 +70,22 @@ class FileService {
     return _ticket(res.data);
   }
 
-  /// Les chiffres du jour : passages, absents, attentes, affluence par heure.
-  Future<Map<String, dynamic>> statistiques() async {
-    final res = await ApiClient.dio.get('/file/statistiques');
+  /// Urgence, femme enceinte… : la priorité d'un ticket qui attend.
+  Future<TicketFile> priorite(String ticketUuid, String priorite) async {
+    final res = await ApiClient.dio.post(
+      '/file/tickets/$ticketUuid/priorite',
+      data: {'priorite': priorite},
+    );
+    return _ticket(res.data);
+  }
+
+  /// Les chiffres d'un jour (aujourd'hui par défaut) : passages, absents,
+  /// attentes, affluence par heure. [jour] : « 2026-10-28 ».
+  Future<Map<String, dynamic>> statistiques({String? jour}) async {
+    final res = await ApiClient.dio.get(
+      '/file/statistiques',
+      queryParameters: {'jour': ?jour},
+    );
     return Map<String, dynamic>.from(res.data as Map);
   }
 
@@ -98,6 +111,10 @@ class FileService {
       '/file/services/$serviceUuid/points',
       data: {'nom': nom},
     );
+  }
+
+  Future<void> renommerSalle(String uuid, String nom) async {
+    await ApiClient.dio.patch('/file/points/$uuid', data: {'nom': nom});
   }
 
   Future<void> supprimerSalle(String uuid) async {

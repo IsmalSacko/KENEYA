@@ -11,6 +11,8 @@ import '../../controllers/auth_controller.dart';
 import '../abonnement/verrou.dart';
 import 'package:provider/provider.dart';
 import '../../common/widgets/formulaire.dart';
+import '../../common/widgets/confirmer.dart';
+import '../../core/api/api_client.dart';
 import '../../file/file_models.dart';
 import '../../file/file_service.dart';
 import '../../rdv/rdv_service.dart';
@@ -57,12 +59,7 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
       await action();
       await _charger();
     } on DioException catch (e) {
-      final data = e.response?.data;
-      _dire(
-        data is Map && data['message'] != null
-            ? data['message'].toString()
-            : 'Enregistrement impossible.',
-      );
+      _dire(messageErreur(e, defaut: 'Enregistrement impossible.'));
     }
   }
 
@@ -72,19 +69,33 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
     }
   }
 
+  /// Le formulaire enregistre lui-même : il ne se ferme qu'une fois le
+  /// service accepté (lettre déjà prise, etc. : rien n'est perdu).
   Future<void> _editerService([ServiceFile? s]) async {
-    final donnees = await Navigator.of(context).push<Map<String, dynamic>>(
+    final fait = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => _EditionService(service: s),
+        builder: (_) => _EditionService(
+          service: s,
+          enregistrer: (donnees) => s == null
+              ? _service.creerService(donnees)
+              : _service.modifierService(s.uuid, donnees),
+        ),
       ),
     );
-    if (donnees == null) return;
-    await _faire(
-      () => s == null
-          ? _service.creerService(donnees)
-          : _service.modifierService(s.uuid, donnees),
+    if (fait == true) await _charger();
+  }
+
+  Future<void> _supprimerService(ServiceFile s) async {
+    final ok = await confirmer(
+      context,
+      titre: 'Supprimer le service ${s.nom} ?',
+      texte:
+          'Ses salles disparaissent avec lui. Pour l’arrêter un temps, fermez-le plutôt (« Ouvert » dans le service).',
+      action: 'Supprimer',
+      danger: true,
     );
+    if (ok) await _faire(() => _service.supprimerService(s.uuid));
   }
 
   Future<void> _ajouterSalle(ServiceFile s) async {
@@ -94,6 +105,28 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
     );
     if (nom == null) return;
     await _faire(() => _service.creerSalle(s.uuid, nom));
+  }
+
+  Future<void> _renommerSalle(SalleFile p) async {
+    final nom = await _demanderTexte(
+      'Renommer ${p.nom}',
+      'ex. Salle 2',
+      depart: p.nom,
+      action: 'Renommer',
+    );
+    if (nom == null || nom == p.nom) return;
+    await _faire(() => _service.renommerSalle(p.uuid, nom));
+  }
+
+  Future<void> _supprimerSalle(SalleFile p) async {
+    final ok = await confirmer(
+      context,
+      titre: 'Supprimer ${p.nom} ?',
+      texte: 'Les postes réglés sur cette salle devront en choisir une autre.',
+      action: 'Supprimer',
+      danger: true,
+    );
+    if (ok) await _faire(() => _service.supprimerSalle(p.uuid));
   }
 
   Future<void> _ajouterAppareil(String mode) async {
@@ -198,8 +231,13 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
     }
   }
 
-  Future<String?> _demanderTexte(String titre, String exemple) {
-    final ctrl = TextEditingController();
+  Future<String?> _demanderTexte(
+    String titre,
+    String exemple, {
+    String? depart,
+    String action = 'Ajouter',
+  }) {
+    final ctrl = TextEditingController(text: depart);
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -220,7 +258,7 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
               final v = ctrl.text.trim();
               Navigator.pop(ctx, v.isEmpty ? null : v);
             },
-            child: const Text('Ajouter'),
+            child: Text(action),
           ),
         ],
       ),
@@ -289,7 +327,14 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
                                 if (v == 'code') {
                                   final data = await _service.nouveauCode(uuid);
                                   if (mounted) await _montrerCode(data);
-                                } else {
+                                } else if (await confirmer(
+                                  context,
+                                  titre: 'Retirer ${a['nom']} ?',
+                                  texte:
+                                      'L’appareil cesse aussitôt d’afficher la file ou de donner des tickets. Pour le remettre, il faudra l’appairer à nouveau.',
+                                  action: 'Retirer',
+                                  danger: true,
+                                )) {
                                   await _faire(
                                     () => _service.retirerAppareil(uuid),
                                   );
@@ -393,8 +438,14 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Modifier le service',
                   icon: const Icon(Icons.edit_outlined),
                   onPressed: () => _editerService(s),
+                ),
+                IconButton(
+                  tooltip: 'Supprimer le service',
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: () => _supprimerService(s),
                 ),
               ],
             ),
@@ -404,8 +455,10 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
                 for (final p in s.salles)
                   InputChip(
                     label: Text(p.nom),
-                    onDeleted: () =>
-                        _faire(() => _service.supprimerSalle(p.uuid)),
+                    tooltip: 'Toucher pour renommer',
+                    onPressed: () => _renommerSalle(p),
+                    deleteButtonTooltipMessage: 'Supprimer la salle',
+                    onDeleted: () => _supprimerSalle(p),
                   ),
                 ActionChip(
                   avatar: const Icon(Icons.add, size: 18),
@@ -422,9 +475,12 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
 }
 
 class _EditionService extends StatefulWidget {
-  const _EditionService({this.service});
+  const _EditionService({required this.enregistrer, this.service});
 
   final ServiceFile? service;
+
+  /// Envoie le service ; la page se ferme seulement si c'est accepté.
+  final Future<void> Function(Map<String, dynamic> donnees) enregistrer;
 
   @override
   State<_EditionService> createState() => _EditionServiceState();
@@ -440,6 +496,38 @@ class _EditionServiceState extends State<_EditionService> {
   late bool _distance = widget.service?.ticketDistance ?? true;
   late String? _tarif = widget.service?.tarifUuid;
   List<Tarif> _tarifs = [];
+  bool _envoi = false;
+
+  Future<void> _enregistrer() async {
+    final nom = _nom.text.trim();
+    final prefixe = _prefixe.text.trim().toUpperCase();
+    if (nom.isEmpty || prefixe.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Indiquez le nom du service et la lettre des tickets.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _envoi = true);
+    try {
+      await widget.enregistrer({
+        'nom': nom,
+        'prefixe': prefixe,
+        'duree_moyenne_min': int.tryParse(_duree.text) ?? 10,
+        'actif': _actif,
+        'ticket_distance': _distance,
+        if (_tarifs.isNotEmpty) 'tarif_uuid': _tarif,
+      });
+      if (mounted) Navigator.pop(context, true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _envoi = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+    }
+  }
 
   @override
   void initState() {
@@ -536,14 +624,7 @@ class _EditionServiceState extends State<_EditionService> {
           child: const Text('Annuler'),
         ),
         TextButton(
-          onPressed: () => Navigator.pop(context, {
-            'nom': _nom.text.trim(),
-            'prefixe': _prefixe.text.trim().toUpperCase(),
-            'duree_moyenne_min': int.tryParse(_duree.text) ?? 10,
-            'actif': _actif,
-            'ticket_distance': _distance,
-            if (_tarifs.isNotEmpty) 'tarif_uuid': _tarif,
-          }),
+          onPressed: _envoi ? null : _enregistrer,
           child: const Text('Enregistrer'),
         ),
       ],

@@ -18,17 +18,152 @@ Future<bool?> nouveauRdv(
   List<AgendaRdv> agendas,
   DateTime jour, {
   Patient? patient,
-}) {
+}) async {
+  final ouverts = agendas.where((a) => a.actif).toList();
+  if (ouverts.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          agendas.isEmpty
+              ? 'Aucun agenda : créez-le dans Rendez-vous (icône calendrier).'
+              : 'Tous les agendas sont en pause : rouvrez-en un dans Rendez-vous › Agendas.',
+        ),
+      ),
+    );
+    return null;
+  }
   return feuille<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => _NouveauRdv(
-      agendas: agendas.where((a) => a.actif).toList(),
-      jour: jour,
-      patient: patient,
+    builder: (_) => _NouveauRdv(agendas: ouverts, jour: jour, patient: patient),
+  );
+}
+
+/// Un autre créneau : déplacer un rendez-vous, ou fixer l'heure d'une
+/// demande venue sans heure. Renvoie l'agenda et le créneau choisis.
+Future<(String, CreneauRdv)?> choisirCreneau(
+  BuildContext context,
+  List<AgendaRdv> agendas, {
+  required String titre,
+  required String action,
+  String? agendaUuid,
+  DateTime? depart,
+}) async {
+  final ouverts = agendas
+      .where((a) => a.actif || a.uuid == agendaUuid)
+      .toList();
+  if (ouverts.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Aucun agenda ouvert : rouvrez-en un dans Agendas.'),
+      ),
+    );
+    return null;
+  }
+  return feuille<(String, CreneauRdv)>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _AutreCreneau(
+      agendas: ouverts,
+      agenda: ouverts.any((a) => a.uuid == agendaUuid)
+          ? agendaUuid!
+          : ouverts.first.uuid,
+      depart: depart,
+      titre: titre,
+      action: action,
     ),
   );
+}
+
+class _AutreCreneau extends StatefulWidget {
+  const _AutreCreneau({
+    required this.agendas,
+    required this.agenda,
+    required this.titre,
+    required this.action,
+    this.depart,
+  });
+
+  final List<AgendaRdv> agendas;
+  final String agenda;
+  final String titre;
+  final String action;
+  final DateTime? depart;
+
+  @override
+  State<_AutreCreneau> createState() => _AutreCreneauState();
+}
+
+class _AutreCreneauState extends State<_AutreCreneau> {
+  late String _agenda = widget.agenda;
+  CreneauRdv? _creneau;
+
+  @override
+  Widget build(BuildContext context) {
+    final agenda = widget.agendas.firstWhere((a) => a.uuid == _agenda);
+    final aujourdhui = DateUtils.dateOnly(DateTime.now());
+    final depart = widget.depart == null || widget.depart!.isBefore(aujourdhui)
+        ? aujourdhui
+        : widget.depart;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        16 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.titre,
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Kolors.kTextHigh,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (widget.agendas.length > 1) ...[
+              DropdownButtonFormField<String>(
+                initialValue: _agenda,
+                decoration: const InputDecoration(labelText: 'Agenda'),
+                items: [
+                  for (final a in widget.agendas)
+                    DropdownMenuItem(value: a.uuid, child: Text(a.nom)),
+                ],
+                onChanged: (v) => setState(() {
+                  _agenda = v ?? _agenda;
+                  _creneau = null;
+                }),
+              ),
+              const SizedBox(height: 10),
+            ],
+            ChoixCreneau(
+              key: ValueKey(_agenda),
+              depart: depart,
+              horizonJours: agenda.horizonJours,
+              charger: (jour) => RdvService().creneaux(_agenda, jour, jour),
+              onChoisi: (c) => setState(() => _creneau = c),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _creneau == null
+                    ? null
+                    : () => Navigator.pop(context, (_agenda, _creneau!)),
+                child: Text(widget.action),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _NouveauRdv extends StatefulWidget {
@@ -124,6 +259,9 @@ class _NouveauRdvState extends State<_NouveauRdv> {
             ChoixCreneau(
               key: ValueKey(_agenda),
               depart: widget.jour,
+              horizonJours: widget.agendas
+                  .firstWhere((a) => a.uuid == _agenda)
+                  .horizonJours,
               charger: (jour) => _service.creneaux(_agenda, jour, jour),
               onChoisi: (c) => _creneau = c,
             ),

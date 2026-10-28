@@ -181,6 +181,48 @@ class PatientsService {
     ];
   }
 
+  /// Une page de la liste (50 par page) : les patients, et s'il y en a
+  /// d'autres. [aujourdhui] : ceux qui sont dans le centre en ce moment.
+  Future<(List<Patient>, bool)> page({
+    String recherche = '',
+    int page = 1,
+    bool aujourdhui = false,
+  }) async {
+    final res = await ApiClient.dio.get(
+      '/patients',
+      queryParameters: {
+        if (recherche.isNotEmpty) 'q': recherche,
+        if (page > 1) 'page': page,
+        if (aujourdhui) 'aujourdhui': 1,
+      },
+    );
+    final data = res.data as Map;
+    final d = data['data'];
+    return (
+      [
+        if (d is List)
+          for (final m in d.whereType<Map>())
+            Patient.fromJson(Map<String, dynamic>.from(m)),
+      ],
+      data['page_suivante'] == true,
+    );
+  }
+
+  /// Le médecin reçoit le patient sans ticket : sa visite du jour s'ouvre
+  /// (ou reprend). Renvoie l'uuid de la visite.
+  Future<String> ouvrirVisite(String uuid) async {
+    final res = await ApiClient.dio.post(
+      '/visites',
+      data: {'dossier_uuid': uuid},
+    );
+    return '${((res.data as Map)['visite'] as Map)['uuid']}';
+  }
+
+  /// Une fiche créée par erreur, sur laquelle rien n'est rattaché.
+  Future<void> supprimer(String uuid) async {
+    await ApiClient.dio.delete('/patients/$uuid');
+  }
+
   Future<Patient> fiche(String uuid) async =>
       _p((await ApiClient.dio.get('/patients/$uuid')).data);
 

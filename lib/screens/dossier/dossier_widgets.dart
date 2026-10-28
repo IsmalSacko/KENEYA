@@ -115,10 +115,18 @@ class _Ligne extends StatelessWidget {
 
 /// Une consultation du dossier.
 class CarteConsultation extends StatelessWidget {
-  const CarteConsultation(this.c, {this.montrerLieu = true, super.key});
+  const CarteConsultation(
+    this.c, {
+    this.montrerLieu = true,
+    this.onModifier,
+    super.key,
+  });
 
   final Consultation c;
   final bool montrerLieu;
+
+  /// Corriger la consultation (son auteur, le jour même).
+  final VoidCallback? onModifier;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +196,16 @@ class CarteConsultation extends StatelessWidget {
                 ),
               ),
             ],
+            if (onModifier != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(minimumSize: const Size(0, 40)),
+                  onPressed: onModifier,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Modifier'),
+                ),
+              ),
           ],
         ),
       ),

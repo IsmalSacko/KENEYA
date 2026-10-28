@@ -29,6 +29,7 @@ import '../file/donner_ticket_sheet.dart';
 import '../rdv/nouveau_rdv_sheet.dart';
 import '../../common/widgets/feuille.dart';
 import '../../common/widgets/formulaire.dart';
+import '../../common/widgets/confirmer.dart';
 
 /// Nouveau patient à l'accueil. Pendant qu'on tape, ceux déjà enregistrés
 /// s'affichent : un toucher ouvre leur fiche, sans rien retaper. Renvoie le
@@ -37,10 +38,16 @@ Future<Patient?> nouveauPatient(
   BuildContext context, {
   String recherche = '',
 }) async {
-  final identite = await editerPatient(context, null, recherche);
+  var existant = false;
+  final identite = await editerPatient(context, null, recherche, (
+    donnees,
+  ) async {
+    final (p, deja) = await PatientsService().creer(donnees);
+    existant = deja;
+    return p;
+  });
   if (identite == null) return null;
-  if (identite['existant'] case final Patient p) return p;
-  final (p, existant) = await PatientsService().creer(identite);
+  final p = identite['existant'] ?? identite['enregistre'];
   if (existant && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -48,17 +55,21 @@ Future<Patient?> nouveauPatient(
       ),
     );
   }
-  return p;
+  return p is Patient ? p : null;
 }
 
 /// Créer ou corriger la fiche : nom, sexe, âge (ou date de naissance),
-/// téléphone, quartier. Renvoie les champs, ou null ; à la création,
-/// `{'existant': Patient}` si l'accueil a reconnu un patient déjà venu.
+/// téléphone, quartier. [enregistrer] envoie les champs : la page ne se
+/// ferme qu'une fois la fiche enregistrée (sinon l'erreur s'affiche et rien
+/// n'est perdu). Renvoie `{'enregistre': Patient}`, ou `{'existant': Patient}`
+/// si l'accueil a reconnu un patient déjà venu, ou null.
 Future<Map<String, dynamic>?> editerPatient(
-  BuildContext context, [
+  BuildContext context,
   Patient? p,
-  String recherche = '',
-]) {
+  String recherche,
+  Future<Patient> Function(Map<String, dynamic> donnees) enregistrer,
+) {
+  var envoi = false;
   // Ce qu'on avait cherché remplit déjà le nom, ou le téléphone.
   final chiffres = RegExp(r'^[\d\s+]+$').hasMatch(recherche.trim());
   final nom = TextEditingController(
@@ -157,20 +168,40 @@ Future<Map<String, dynamic>?> editerPatient(
         child: const Text('Annuler'),
       ),
       ElevatedButton(
-        onPressed: () {
-          if (nom.text.trim().isEmpty) return;
-          Navigator.pop(ctx, {
-            'nom': nom.text.trim(),
-            'sexe': sexe,
-            'telephone': telephone.text.trim(),
-            'adresse': adresse.text.trim(),
-            if (naissance != null)
-              'date_naissance':
-                  '${naissance!.year}-${naissance!.month.toString().padLeft(2, '0')}-${naissance!.day.toString().padLeft(2, '0')}'
-            else if (int.tryParse(age.text) != null)
-              'age': int.parse(age.text),
-          });
-        },
+        onPressed: envoi
+            ? null
+            : () async {
+                if (nom.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Indiquez son nom.')),
+                  );
+                  return;
+                }
+                setState(() => envoi = true);
+                try {
+                  final enregistre = await enregistrer({
+                    'nom': nom.text.trim(),
+                    'sexe': sexe,
+                    'telephone': telephone.text.trim(),
+                    'adresse': adresse.text.trim(),
+                    if (naissance != null)
+                      'date_naissance':
+                          '${naissance!.year}-${naissance!.month.toString().padLeft(2, '0')}-${naissance!.day.toString().padLeft(2, '0')}'
+                    else if (int.tryParse(age.text) != null)
+                      'age': int.parse(age.text),
+                  });
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx, {'enregistre': enregistre});
+                  }
+                } on DioException catch (e) {
+                  if (ctx.mounted) {
+                    setState(() => envoi = false);
+                    ScaffoldMessenger.of(
+                      ctx,
+                    ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+                  }
+                }
+              },
         child: const Text('Enregistrer'),
       ),
     ],
@@ -422,11 +453,55 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _modifier() async {
-    final d = await editerPatient(context, _p);
-    if (d == null) return;
+    final d = await editerPatient(
+      context,
+      _p,
+      '',
+      (donnees) => _service.modifier(_p.uuid, donnees),
+    );
+    if (d?['enregistre'] case final Patient p when mounted) {
+      setState(() => _p = p);
+    }
+  }
+
+  /// Le médecin reçoit le patient sans ticket : la visite du jour s'ouvre,
+  /// puis son dossier, prêt pour la consultation.
+  Future<void> _consulter() async {
     try {
-      final p = await _service.modifier(_p.uuid, d);
-      if (mounted) setState(() => _p = p);
+      final visite = await _service.ouvrirVisite(_p.uuid);
+      if (!mounted) return;
+      await _ouvrir(
+        DossierScreen(
+          visiteUuid: visite,
+          dossier: DossierPatient(
+            uuid: _p.uuid,
+            nom: _p.nom,
+            aUnCompte: _p.aUnCompte,
+            consultations: const [],
+          ),
+        ),
+      );
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  /// Une fiche créée par erreur : rien n'y est rattaché, elle disparaît.
+  Future<void> _supprimer() async {
+    final ok = await confirmer(
+      context,
+      titre: 'Supprimer cette fiche ?',
+      texte:
+          'La fiche « ${_p.nom} » n’a ni visite ni rendez-vous : elle disparaît de la liste des patients.',
+      action: 'Supprimer la fiche',
+      danger: true,
+    );
+    if (!ok) return;
+    try {
+      await _service.supprimer(_p.uuid);
+      if (!mounted) return;
+      _dire('Fiche supprimée.');
+      Navigator.pop(context, true);
     } on DioException catch (e) {
       _dire(messageErreur(e));
     }
@@ -589,7 +664,8 @@ class _PatientScreenState extends State<PatientScreen> {
   /// monde suit (rendez-vous, carnet, message).
   List<Widget> _actions(AuthController auth, Patient p, VisitePatient? duJour) {
     final envoyer = auth.aModule('file') && auth.peut('file.emettre');
-    final soigne = duJour != null && auth.peut('consultation.faire');
+    final consulte = auth.peut('consultation.faire');
+    final soigne = duJour != null && consulte;
     final visite = duJour?.uuid;
     final dossier = DossierPatient(
       uuid: p.uuid,
@@ -603,6 +679,13 @@ class _PatientScreenState extends State<PatientScreen> {
     final tuiles = <_Action>[
       if (envoyer && duJour != null)
         _Action(Icons.confirmation_number_outlined, 'Autre service', _envoyer),
+      // Le médecin consulte lui-même ; l'envoyer dans la file reste possible.
+      if (envoyer && duJour == null && consulte)
+        _Action(
+          Icons.confirmation_number_outlined,
+          'Envoyer en consultation',
+          _envoyer,
+        ),
       if (visite != null && auth.peut('ordonnance.prescrire'))
         _Action(
           Icons.receipt_long_outlined,
@@ -669,6 +752,13 @@ class _PatientScreenState extends State<PatientScreen> {
           icon: const Icon(Icons.medical_services_rounded),
           label: const Text('Consulter'),
         )
+      // Sans ticket ni visite (patient reçu directement) : la visite s'ouvre.
+      else if (consulte && duJour == null)
+        ElevatedButton.icon(
+          onPressed: _consulter,
+          icon: const Icon(Icons.medical_services_rounded),
+          label: const Text('Consulter'),
+        )
       else if (envoyer && duJour == null)
         ElevatedButton.icon(
           onPressed: _envoyer,
@@ -719,6 +809,16 @@ class _PatientScreenState extends State<PatientScreen> {
               tooltip: 'PIN oublié',
               icon: const Icon(Icons.password_rounded),
               onPressed: _nouveauPin,
+            ),
+          // Créée par erreur : rien n'y est rattaché, on peut la retirer.
+          if (auth.peut('patients.gerer') &&
+              !_p.aUnCompte &&
+              _p.visites.isEmpty &&
+              _p.rendezVous.isEmpty)
+            IconButton(
+              tooltip: 'Supprimer la fiche',
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: _supprimer,
             ),
         ],
       ),
