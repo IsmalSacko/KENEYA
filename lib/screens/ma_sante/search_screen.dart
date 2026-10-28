@@ -89,7 +89,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Services de santé'),
+        title: const Text('Trouver un établissement'),
         actions: [
           IconButton(
             tooltip: _mapView ? 'Vue liste' : 'Vue carte',
@@ -157,6 +157,8 @@ class _SearchScreenState extends State<SearchScreen> {
           chip('Cliniques', 'clinique'),
           chip('Laboratoires', 'laboratoire'),
           chip('Maternités', 'maternite'),
+          chip('Cabinets dentaires', 'cabinet_dentaire'),
+          chip('Dépôts de médicaments', 'depot_medicaments'),
         ],
       ),
     );

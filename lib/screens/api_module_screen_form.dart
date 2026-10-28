@@ -99,8 +99,12 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
                           relationOptions: relationOptions,
                           setModalState: setModalState,
                           refreshRelationOptions: (field) async {
-                            final refreshed = await _fetchRelationOptions(field);
-                            setModalState(() => relationOptions[field.key] = refreshed);
+                            final refreshed = await _fetchRelationOptions(
+                              field,
+                            );
+                            setModalState(
+                              () => relationOptions[field.key] = refreshed,
+                            );
                           },
                         ),
                       if (_isVisible(f, values)) const SizedBox(height: 10),
@@ -220,7 +224,12 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
           if (id == null) return null;
           final label = _relationOptionLabel(field: field, item: item, id: id);
           final subtitle = _relationOptionSubtitle(field: field, item: item);
-          return _RelationOption(id: id, label: label, subtitle: subtitle, raw: item);
+          return _RelationOption(
+            id: id,
+            label: label,
+            subtitle: subtitle,
+            raw: item,
+          );
         })
         .whereType<_RelationOption>()
         .toList();
@@ -231,7 +240,8 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
     required Map<String, dynamic> item,
     required int id,
   }) {
-    if (field.key == 'consultation_id' && field.relationEndpoint == '/consultations') {
+    if (field.key == 'consultation_id' &&
+        field.relationEndpoint == '/consultations') {
       final motif = item['motif']?.toString().trim();
       if (motif != null && motif.isNotEmpty) {
         return 'Consultation #$id - $motif';
@@ -259,7 +269,8 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
     required ModuleField field,
     required Map<String, dynamic> item,
   }) {
-    if (field.key == 'consultation_id' && field.relationEndpoint == '/consultations') {
+    if (field.key == 'consultation_id' &&
+        field.relationEndpoint == '/consultations') {
       final montant = item['montant']?.toString();
       return montant == null ? null : '$montant FCFA';
     }
@@ -293,7 +304,8 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
     required Map<String, TextEditingController> textControllers,
   }) {
     if (widget.endpoint != '/paiements') return;
-    if (sourceFieldKey != 'consultation_id' && sourceFieldKey != 'vente_pharmacie_id') {
+    if (sourceFieldKey != 'consultation_id' &&
+        sourceFieldKey != 'vente_pharmacie_id') {
       return;
     }
     if (selectedId == null || selectedId == -1) return;
@@ -307,8 +319,9 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
         .firstWhere((o) => o != null, orElse: () => null);
     if (selected == null) return;
 
-    final sourceAmount =
-        sourceFieldKey == 'consultation_id' ? selected.raw['montant'] : selected.raw['montant_total'];
+    final sourceAmount = sourceFieldKey == 'consultation_id'
+        ? selected.raw['montant']
+        : selected.raw['montant_total'];
     if (sourceAmount == null) return;
 
     final amountText = sourceAmount.toString().trim();
@@ -408,8 +421,9 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
         );
       case ModuleFieldType.relation:
         final opts = relationOptions[field.key] ?? const <_RelationOption>[];
-        final current =
-            values[field.key] is int ? values[field.key] as int : int.tryParse('${values[field.key]}');
+        final current = values[field.key] is int
+            ? values[field.key] as int
+            : int.tryParse('${values[field.key]}');
         final entries = <DropdownMenuItem<int>>[
           if (!field.required)
             const DropdownMenuItem<int>(
@@ -419,7 +433,9 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
           ...opts.map(
             (o) => DropdownMenuItem<int>(
               value: o.id,
-              child: Text(o.subtitle == null ? o.label : '${o.label} (${o.subtitle})'),
+              child: Text(
+                o.subtitle == null ? o.label : '${o.label} (${o.subtitle})',
+              ),
             ),
           ),
         ];
@@ -441,7 +457,8 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
                             title: field.label,
                             options: opts,
                             allowEmpty: !field.required,
-                            currentValue: current ?? (field.required ? null : -1),
+                            currentValue:
+                                current ?? (field.required ? null : -1),
                           );
                           if (picked != null) {
                             setModalState(() {
@@ -493,7 +510,8 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
                       field.relationEndpoint == '/medicaments')
                     TextButton.icon(
                       onPressed: () async {
-                        final created = await _showQuickCreateMedicamentDialog();
+                        final created =
+                            await _showQuickCreateMedicamentDialog();
                         if (created) {
                           await refreshRelationOptions(field);
                         }
@@ -571,7 +589,9 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
                             contentPadding: EdgeInsets.zero,
                             onTap: () => Navigator.of(context).pop(option.id),
                             title: Text(option.label),
-                            subtitle: option.subtitle == null ? null : Text(option.subtitle!),
+                            subtitle: option.subtitle == null
+                                ? null
+                                : Text(option.subtitle!),
                             trailing: selected
                                 ? const Icon(Icons.check_circle, size: 20)
                                 : const Icon(Icons.circle_outlined, size: 20),
@@ -616,12 +636,16 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
                 TextFormField(
                   controller: nomCtrl,
                   decoration: const InputDecoration(labelText: 'Nom'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Champ obligatoire' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Champ obligatoire'
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: prixCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(labelText: 'Prix unitaire'),
                   validator: (v) {
                     final parsed = double.tryParse(v?.trim() ?? '');
@@ -684,8 +708,9 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
     try {
       await ApiClient.dio.post('/medicaments', data: payload);
       if (!mounted) return false;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Medicament cree avec succes.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Medicament cree avec succes.')),
+      );
       return true;
     } on DioException catch (e) {
       if (ApiClient.isNetworkError(e)) {
@@ -707,14 +732,16 @@ extension _ApiModuleScreenForm on _ApiModuleScreenState {
         return true;
       }
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_extractMessage(e))));
       return false;
     } catch (_) {
       if (!mounted) return false;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Erreur de creation.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Erreur de creation.')));
       return false;
     }
   }
 }
-

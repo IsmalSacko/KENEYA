@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../common/utils/kcolors.dart';
 import '../../compte/compte_controller.dart';
 import '../../compte/compte_models.dart';
+import '../../controllers/auth_controller.dart';
 import 'cadre_acces.dart';
 import 'inscription_screen.dart';
 import 'pin_oublie_screen.dart';
@@ -40,7 +41,9 @@ class _ConnexionScreenState extends State<ConnexionScreen> {
     );
     if (!mounted) return;
     if (ok) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      final navigator = Navigator.of(context);
+      await compte.ouvrirEspaceDArrivee(context.read<AuthController>());
+      navigator.popUntil((route) => route.isFirst);
     } else {
       afficherMessage(context, compte.erreur ?? 'Connexion impossible.');
     }
@@ -101,7 +104,7 @@ class _ConnexionScreenState extends State<ConnexionScreen> {
                         builder: (_) => const InscriptionScreen(),
                       ),
                     ),
-                    child: const Text('Créer un compte'),
+                    child: const Text('Créer mon compte'),
                   ),
                 ],
               ),

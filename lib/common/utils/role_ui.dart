@@ -21,7 +21,7 @@ class RoleUi {
         );
       case AppRoles.adminEtablissement:
         return const RoleUi(
-          "Admin d'établissement",
+          'Admin d’établissement',
           Icons.manage_accounts_rounded,
           Kolors.kPrimary,
         );
@@ -56,11 +56,7 @@ class RoleUi {
           Kolors.kViolet,
         );
       case AppRoles.accueil:
-        return const RoleUi(
-          'Accueil',
-          Icons.waving_hand_rounded,
-          Kolors.kTeal,
-        );
+        return const RoleUi('Accueil', Icons.waving_hand_rounded, Kolors.kTeal);
       case AppRoles.caissier:
         return const RoleUi(
           'Caissier',

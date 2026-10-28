@@ -319,9 +319,7 @@ class _MesRdvScreenState extends State<MesRdvScreen> {
               ),
               onPressed: () => jeSuisArrive(context),
               icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text(
-                'Je suis arrivé : scanner l’affiche de l’accueil',
-              ),
+              label: const Text('J’ai rendez-vous : je suis arrivé'),
             ),
             const SizedBox(height: 16),
             if (_erreur != null)

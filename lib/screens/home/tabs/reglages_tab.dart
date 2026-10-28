@@ -4,12 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/utils/kcolors.dart';
+import '../../../compte/compte_controller.dart';
 import '../../../compte/compte_models.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../services/reglages_service.dart';
+import '../etablissement_infos_screen.dart';
 
-/// Réglages de l'établissement : ses modules, et ce que chaque rôle peut y
-/// faire. Réservé au droit `etablissement.regler`.
+/// Réglages de l'établissement : son nom et ses coordonnées, ses modules, et
+/// ce que chaque rôle peut y faire. Réservé au droit `etablissement.regler`.
 class ReglagesTab extends StatefulWidget {
   const ReglagesTab({super.key});
 
@@ -61,6 +63,12 @@ class _ReglagesTabState extends State<ReglagesTab> {
     }
   }
 
+  /// La formule ne l'ouvre pas : l'allumer ne changerait rien.
+  bool _horsFormule(AuthController auth, String module) {
+    final inclus = auth.abonnement?['modules'];
+    return inclus is List && !inclus.contains(module);
+  }
+
   void _message(String texte) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(texte)));
@@ -73,6 +81,27 @@ class _ReglagesTabState extends State<ReglagesTab> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _titre('L’établissement'),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.storefront_outlined),
+              title: Text(
+                context
+                        .watch<CompteController>()
+                        .espaceOuvert
+                        ?.etablissementNom ??
+                    'Mon établissement',
+              ),
+              subtitle: const Text('Nom, téléphone, adresse, responsable'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EtablissementInfosScreen(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
           _titre('Modules de l’établissement'),
           const Text(
             'Un module coupé disparaît des écrans et ses droits ne s’appliquent plus.',
@@ -83,11 +112,19 @@ class _ReglagesTabState extends State<ReglagesTab> {
             child: Column(
               children: [
                 for (final entree in libellesModules.entries)
-                  SwitchListTile(
-                    title: Text(entree.value),
-                    value: auth.aModule(entree.key),
-                    onChanged: (v) => _basculerModule(entree.key, v),
-                  ),
+                  if (_horsFormule(auth, entree.key))
+                    SwitchListTile(
+                      title: Text(entree.value),
+                      subtitle: const Text('Pas dans votre formule'),
+                      value: false,
+                      onChanged: null,
+                    )
+                  else
+                    SwitchListTile(
+                      title: Text(entree.value),
+                      value: auth.aModule(entree.key),
+                      onChanged: (v) => _basculerModule(entree.key, v),
+                    ),
               ],
             ),
           ),

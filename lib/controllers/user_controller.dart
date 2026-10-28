@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../core/api/api_client.dart';
 import '../models/user_model.dart';
 import '../services/user_service.dart';
 
@@ -83,7 +85,7 @@ class UserController extends ChangeNotifier {
       }
       return true;
     } catch (_) {
-      error = 'Echec de creation utilisateur.';
+      error = 'Impossible d’ajouter ce membre.';
       loading = false;
       notifyListeners();
       return false;
@@ -99,8 +101,8 @@ class UserController extends ChangeNotifier {
       await _service.updateUser(id, payload);
       await fetchUsers();
       return true;
-    } catch (_) {
-      error = 'Echec de mise a jour utilisateur.';
+    } catch (e) {
+      error = e is DioException ? messageErreur(e) : 'Modification impossible.';
       loading = false;
       notifyListeners();
       return false;
@@ -118,8 +120,10 @@ class UserController extends ChangeNotifier {
       loading = false;
       notifyListeners();
       return true;
-    } catch (_) {
-      error = 'Echec de suppression utilisateur.';
+    } catch (e) {
+      error = e is DioException
+          ? messageErreur(e)
+          : 'Impossible de retirer ce membre.';
       loading = false;
       notifyListeners();
       return false;

@@ -47,7 +47,10 @@ class _StatsScreenState extends State<StatsScreen> {
               children: [
                 Panel(
                   title: 'Activité (7 derniers jours)',
-                  child: SizedBox(height: 200, child: _ActivityChart(data.activite)),
+                  child: SizedBox(
+                    height: 200,
+                    child: _ActivityChart(data.activite),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Panel(

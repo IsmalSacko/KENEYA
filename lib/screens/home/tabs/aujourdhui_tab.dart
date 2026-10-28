@@ -7,6 +7,7 @@ import '../../../caisse/caisse_models.dart';
 import '../../../caisse/caisse_service.dart';
 import '../../../common/utils/kcolors.dart';
 import '../../../common/widgets/carte_marque.dart';
+import '../../../compte/compte_controller.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../core/api/api_client.dart';
 import '../../../file/file_service.dart';
@@ -114,7 +115,7 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
             _AFaire(
               Icons.point_of_sale_rounded,
               '${formatMontant(impaye, devise)} restent à encaisser aujourd’hui.',
-              'Ouvrir la caisse',
+              'Voir la caisse',
               'Caisse',
             ),
           );
@@ -258,7 +259,12 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
     final chiffres = _chiffres;
-    final prenom = _appel(auth.currentUser?.name ?? '');
+    // Le nom du compte (le même que dans « Ma santé »), sinon celui du membre.
+    final prenom = _appel(
+      context.watch<CompteController>().personne?.nom ??
+          auth.currentUser?.name ??
+          '',
+    );
 
     return RefreshIndicator(
       onRefresh: _charger,

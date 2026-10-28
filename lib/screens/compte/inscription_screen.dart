@@ -125,7 +125,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
-                  labelText: 'Nom et prénom',
+                  labelText: 'Prénom et nom',
                   prefixIcon: Icon(Icons.person_outline_rounded),
                 ),
                 validator: (v) =>

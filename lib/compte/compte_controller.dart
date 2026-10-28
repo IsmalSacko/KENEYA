@@ -28,6 +28,13 @@ class CompteController extends ChangeNotifier {
   static const _clePersonne = 'compte_personne';
   static const _cleEspaces = 'compte_espaces';
   static const _cleEspaceActif = 'compte_espace_actif';
+  static const _cleLimite = 'compte_limite_etablissements';
+
+  /// Dernier espace ouvert par cette personne sur ce téléphone, gardé après
+  /// la déconnexion : on y revient à la connexion suivante.
+  String _cleDernierEspace(String personneUuid) =>
+      'compte_dernier_espace_$personneUuid';
+  static const _maSante = 'ma_sante';
   static const _clePays = 'referentiel_pays';
   static const _cleProfils = 'referentiel_profils';
 
@@ -37,6 +44,10 @@ class CompteController extends ChangeNotifier {
 
   Personne? personne;
   List<Espace> espaces = [];
+
+  /// Combien d'établissements la personne peut encore créer ; null tant que
+  /// le serveur ne l'a pas dit.
+  LimiteEtablissements? limite;
 
   /// Membre dont l'espace pro est ouvert ; null = « Ma santé ».
   String? espaceActif;
@@ -61,6 +72,9 @@ class CompteController extends ChangeNotifier {
     final p = LocalStore.read<Map<String, dynamic>>(_clePersonne);
     if (p != null) personne = Personne.fromJson(p);
     espaces = _lireEspacesEnCache();
+    limite = LimiteEtablissements.fromJson(
+      LocalStore.read<dynamic>(_cleLimite),
+    );
     espaceActif = LocalStore.read<String>(_cleEspaceActif);
 
     initialisation = false;
@@ -297,6 +311,44 @@ class CompteController extends ChangeNotifier {
     return true;
   });
 
+  /// Après la connexion : le dernier espace ouvert sur ce téléphone. La
+  /// première fois, l'établissement d'un pro qui n'en a qu'un ; sinon
+  /// « Ma santé ».
+  Future<void> ouvrirEspaceDArrivee(AuthController auth) async {
+    final p = personne;
+    if (p == null) return;
+    final dernier = LocalStore.read<String>(_cleDernierEspace(p.uuid));
+    if (dernier == _maSante) return;
+    final ouvrables = espaces.where((e) => e.actif).toList();
+    final espace = dernier != null
+        ? ouvrables.where((e) => e.membreUuid == dernier).firstOrNull
+        : (p.pro && ouvrables.length == 1 ? ouvrables.first : null);
+    if (espace != null) await ouvrirEspace(espace, auth);
+  }
+
+  /// Supprime l'établissement (et tout ce qu'il contient). S'il était
+  /// ouvert, on revient sur « Ma santé ».
+  Future<bool> supprimerEtablissement(
+    Espace espace,
+    String nom,
+    AuthController auth,
+  ) => _action(() async {
+    if (espace.membreUuid == espaceActif) {
+      if (!await _envoyerEnAttente()) return false;
+    }
+    final data = await _api.supprimerEtablissement(
+      espace.etablissementUuid,
+      nom,
+    );
+    if (espace.membreUuid == espaceActif) {
+      await auth.logout();
+      await _changerDEspace(null);
+    }
+    _appliquer(data);
+    await _memoriser();
+    return true;
+  });
+
   Future<void> deconnexion(AuthController auth) async {
     await SyncManager.instance.syncNow();
     try {
@@ -307,8 +359,10 @@ class CompteController extends ChangeNotifier {
     await LocalStore.remove(_clePersonne);
     await LocalStore.remove(_cleEspaces);
     await LocalStore.remove(_cleEspaceActif);
+    await LocalStore.remove(_cleLimite);
     personne = null;
     espaces = [];
+    limite = null;
     espaceActif = null;
     notifyListeners();
   }
@@ -331,6 +385,10 @@ class CompteController extends ChangeNotifier {
   Future<void> _changerDEspace(String? membreUuid) async {
     if (membreUuid != espaceActif) await OfflineMirror.viderTout();
     espaceActif = membreUuid;
+    final p = personne;
+    if (p != null) {
+      await LocalStore.write(_cleDernierEspace(p.uuid), membreUuid ?? _maSante);
+    }
     if (membreUuid == null) {
       await LocalStore.remove(_cleEspaceActif);
     } else {
@@ -388,12 +446,14 @@ class CompteController extends ChangeNotifier {
           .map((m) => Espace.fromJson(Map<String, dynamic>.from(m)))
           .toList();
     }
+    limite = LimiteEtablissements.fromJson(data['etablissements']) ?? limite;
   }
 
   Future<void> _memoriser() async {
     if (personne != null) {
       await LocalStore.write(_clePersonne, personne!.toJson());
     }
+    if (limite != null) await LocalStore.write(_cleLimite, limite!.toJson());
     await LocalStore.write(
       _cleEspaces,
       espaces.map((e) => e.toJson()).toList(),

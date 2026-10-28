@@ -21,19 +21,20 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
 
   static const List<_Slide> _slides = [
     _Slide(
-      icon: Icons.local_hospital_rounded,
-      title: 'Gérez votre établissement',
-      description: 'Cabinets et pharmacies, tout au même endroit.',
+      icon: Icons.favorite_rounded,
+      title: 'Ma santé',
+      description:
+          'Rendez-vous, tickets de file, ordonnances et dossier : gratuit pour les patients.',
     ),
     _Slide(
-      icon: Icons.groups_rounded,
-      title: 'Patients & consultations',
+      icon: Icons.local_hospital_rounded,
+      title: 'Gérez votre établissement',
       description:
-          'Suivez vos patients et leurs consultations en un clin d’œil.',
+          'Cabinet, centre de santé, clinique, pharmacie : patients et consultations au même endroit.',
     ),
     _Slide(
       icon: Icons.inventory_2_rounded,
-      title: 'Stock & paiements',
+      title: 'Stock et paiements',
       description: 'Médicaments, ventes et encaissements toujours maîtrisés.',
     ),
   ];

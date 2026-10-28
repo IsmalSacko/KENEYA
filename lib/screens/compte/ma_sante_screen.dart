@@ -79,7 +79,7 @@ class MaSanteScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Bonjour${personne.prenom.isEmpty ? '' : ', ${personne.prenom}'} !',
+                          'Bonjour${personne.prenom.isEmpty ? '' : ', ${personne.prenom}'}',
                           style: GoogleFonts.poppins(
                             color: Kolors.kWhite,
                             fontSize: 20,
@@ -192,7 +192,7 @@ class MaSanteScreen extends StatelessWidget {
                 _Tuile(
                   icone: Icons.add_business_rounded,
                   titre: 'Créer mon établissement',
-                  texte: 'Cabinet, pharmacie, centre de santé, clinique…',
+                  texte: sousTitreCreer(compte.limite),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const CreerEtablissementScreen(),

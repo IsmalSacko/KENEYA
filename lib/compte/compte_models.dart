@@ -234,6 +234,7 @@ class Espace {
     required this.modules,
     required this.devise,
     this.valide = true,
+    this.proprietaire = false,
   });
 
   final String membreUuid;
@@ -249,6 +250,9 @@ class Espace {
   /// Créé depuis l'app : invisible des patients tant que Ngoni Santé ne l'a
   /// pas vérifié.
   final bool valide;
+
+  /// La personne l'a créé : elle seule peut le supprimer.
+  final bool proprietaire;
 
   String get profilLabel => ProfilEtablissement.labelDe(profil);
 
@@ -267,6 +271,7 @@ class Espace {
       modules: _strings(e['modules']),
       devise: (e['devise'] ?? '').toString(),
       valide: e['valide'] != false,
+      proprietaire: j['proprietaire'] == true,
     );
   }
 
@@ -275,6 +280,7 @@ class Espace {
     'role': role,
     'role_label': roleLabel,
     'actif': actif,
+    'proprietaire': proprietaire,
     'etablissement': {
       'uuid': etablissementUuid,
       'nom': etablissementNom,
@@ -283,6 +289,35 @@ class Espace {
       'devise': devise,
       'valide': valide,
     },
+  };
+}
+
+/// Les établissements que la personne a créés, et combien il lui en reste.
+class LimiteEtablissements {
+  const LimiteEtablissements({
+    required this.crees,
+    required this.max,
+    required this.restants,
+  });
+
+  final int crees;
+  final int max;
+  final int restants;
+
+  static LimiteEtablissements? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    int n(dynamic v) => int.tryParse('$v') ?? 0;
+    return LimiteEtablissements(
+      crees: n(j['crees']),
+      max: n(j['max']),
+      restants: n(j['restants']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'crees': crees,
+    'max': max,
+    'restants': restants,
   };
 }
 
@@ -312,7 +347,7 @@ List<String> _strings(dynamic v) =>
 
 /// Libellés des modules (mêmes codes que l'API).
 const Map<String, String> libellesModules = {
-  'file': "File d'attente",
+  'file': 'File d’attente',
   'rdv': 'Rendez-vous',
   'consultation': 'Consultation',
   'caisse': 'Caisse',

@@ -689,7 +689,7 @@ class _ChoixActeState extends State<_ChoixActe> {
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  'Pas encore de tarifs : réglez-les dans Caisse › Tarifs.',
+                  'Pas encore de tarifs : l’administrateur les règle dans Caisse › Tarifs et rapport.',
                   style: TextStyle(color: Kolors.kTextMuted),
                 ),
               ),

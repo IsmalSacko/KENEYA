@@ -111,7 +111,10 @@ class _FeuilleEspaces extends StatelessWidget {
                 _Ligne(
                   icone: Icons.local_hospital_rounded,
                   titre: espace.etablissementNom,
-                  sousTitre: '${espace.roleLabel} · ${espace.profilLabel}',
+                  sousTitre: [
+                    '${espace.roleLabel} · ${espace.profilLabel}',
+                    if (!espace.valide) 'en attente de vérification',
+                  ].join(' · '),
                   actif: compte.espaceActif == espace.membreUuid,
                   desactive: !espace.actif,
                   onTap: () =>
@@ -121,7 +124,7 @@ class _FeuilleEspaces extends StatelessWidget {
                 _Ligne(
                   icone: Icons.add_business_rounded,
                   titre: 'Créer mon établissement',
-                  sousTitre: 'Cabinet, pharmacie, centre de santé…',
+                  sousTitre: sousTitreCreer(compte.limite),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const CreerEtablissementScreen(),
@@ -234,6 +237,14 @@ class _Ligne extends StatelessWidget {
     );
   }
 }
+
+/// Sous « Créer mon établissement » : combien il en reste.
+String sousTitreCreer(LimiteEtablissements? limite) => switch (limite) {
+  null => 'Cabinet, pharmacie, centre de santé, clinique…',
+  final l when l.restants <= 0 => 'Maximum atteint : ${l.crees} sur ${l.max}',
+  final l =>
+    'Cabinet, pharmacie, clinique… Il vous en reste ${l.restants} sur ${l.max}',
+};
 
 /// Utilisé par les écrans qui listent les espaces sans passer par la feuille.
 Future<void> ouvrirEspace(BuildContext context, Espace espace) async {

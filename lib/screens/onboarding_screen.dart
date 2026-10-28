@@ -26,13 +26,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       colors: [Kolors.kPrimaryLight, Kolors.kPrimaryDark],
     ),
     _OnboardingPageData(
-      title: 'Patients centralisés',
-      description: 'Retrouvez en un instant les informations essentielles.',
-      icon: Icons.groups_rounded,
+      title: 'Ma santé',
+      description:
+          'Rendez-vous, tickets de file, ordonnances et dossier : gratuit pour les patients.',
+      icon: Icons.favorite_rounded,
       colors: [Kolors.kBlue, Kolors.kPrimaryDark],
     ),
     _OnboardingPageData(
-      title: 'Médicaments & stock',
+      title: 'Médicaments et stock',
       description: 'Suivez vos stocks et évitez les ruptures.',
       icon: Icons.medication_rounded,
       colors: [Kolors.kPrimaryLight, Kolors.kPrimary],

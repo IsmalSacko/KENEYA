@@ -31,23 +31,20 @@ class AlertesScreen extends StatelessWidget {
     final now = DateTime.now();
 
     final ruptures = meds.where((m) => m.stock <= 0).toList();
-    final stockBas = meds
-        .where((m) => m.stock > 0 && m.stock <= m.seuilAlerte)
-        .toList()
-      ..sort((a, b) => a.stock.compareTo(b.stock));
-    final peremptions = meds
-        .where((m) {
+    final stockBas =
+        meds.where((m) => m.stock > 0 && m.stock <= m.seuilAlerte).toList()
+          ..sort((a, b) => a.stock.compareTo(b.stock));
+    final peremptions =
+        meds.where((m) {
           final d = _expDate(m.dateExpiration);
           if (d == null) return false;
           final diff = d.difference(now).inDays;
           return diff <= 30;
-        })
-        .toList()
-      ..sort((a, b) {
-        final da = _expDate(a.dateExpiration) ?? now;
-        final db = _expDate(b.dateExpiration) ?? now;
-        return da.compareTo(db);
-      });
+        }).toList()..sort((a, b) {
+          final da = _expDate(a.dateExpiration) ?? now;
+          final db = _expDate(b.dateExpiration) ?? now;
+          return da.compareTo(db);
+        });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Alertes & stock')),
@@ -210,8 +207,8 @@ class _ExpRow extends StatelessWidget {
     final label = expired
         ? 'Périmé'
         : days == 0
-            ? "Aujourd'hui"
-            : 'J-$days';
+        ? "Aujourd'hui"
+        : 'J-$days';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(

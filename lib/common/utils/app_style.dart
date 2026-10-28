@@ -11,5 +11,9 @@ TextStyle appStyle(double size, Color color, FontWeight fw) {
   final isTitle = size >= 18 || fw.value >= FontWeight.w700.value;
   return isTitle
       ? GoogleFonts.poppins(fontSize: fontSize, color: color, fontWeight: fw)
-      : GoogleFonts.nunitoSans(fontSize: fontSize, color: color, fontWeight: fw);
+      : GoogleFonts.nunitoSans(
+          fontSize: fontSize,
+          color: color,
+          fontWeight: fw,
+        );
 }

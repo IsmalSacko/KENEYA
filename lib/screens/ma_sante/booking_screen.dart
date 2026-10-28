@@ -107,9 +107,9 @@ class _BookingScreenState extends State<BookingScreen> {
       if (!mounted) return;
       await _showSuccess();
     } on DioException catch (e) {
-      _snack(_apiMessage(e) ?? 'Échec de l\'envoi. Réessayez.');
+      _snack(_apiMessage(e) ?? 'Échec de l’envoi. Réessayez.');
     } catch (_) {
-      _snack('Échec de l\'envoi. Réessayez.');
+      _snack('Échec de l’envoi. Réessayez.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -126,8 +126,8 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
         title: const Text('Demande envoyée'),
         content: const Text(
-          'Votre demande de rendez-vous a été transmise à l\'établissement. '
-          'Vous la retrouverez dans « Mes demandes ». L\'établissement la confirmera.',
+          'Votre demande de rendez-vous a été transmise à l’établissement. '
+          'Vous la retrouverez dans « Mes rendez-vous ». L’établissement la confirmera.',
         ),
         actions: [
           FilledButton(
@@ -176,7 +176,7 @@ class _BookingScreenState extends State<BookingScreen> {
             TextFormField(
               controller: _nomCtrl,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Votre nom complet'),
+              decoration: const InputDecoration(labelText: 'Prénom et nom'),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Nom requis' : null,
             ),

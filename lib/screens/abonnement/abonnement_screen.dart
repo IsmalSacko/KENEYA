@@ -155,12 +155,13 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
           TextField(
             controller: note,
             maxLines: 3,
+            maxLength: 255,
             decoration: const InputDecoration(
               labelText: 'Référence ou SMS de confirmation (collez-le)',
             ),
           ),
           const Text(
-            'Ngoni Santé vérifie le paiement et active la formule. Vous êtes prévenu dans l’app.',
+            'Ngoni Santé vérifie le paiement et active la formule : revenez sur cet écran pour voir où en est votre demande.',
             style: TextStyle(color: Kolors.kTextMuted),
           ),
         ],
@@ -247,6 +248,12 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
                 children: [
                   _Etat(etat: _etat, date: _date),
                   const SizedBox(height: 12),
+                  _Places(
+                    membres: int.tryParse('${_etat['membres']}'),
+                    maxMembres: int.tryParse('${_etat['max_membres']}'),
+                    limite: context.watch<CompteController>().limite,
+                  ),
+                  const SizedBox(height: 12),
                   if (_etat['demande_en_attente'] is Map)
                     _EnAttente(
                       demande: Map<String, dynamic>.from(
@@ -280,6 +287,14 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
                     onSelectionChanged: (s) => setState(() => _mois = s.first),
                   ),
                   const SizedBox(height: 12),
+                  if (_liste('formules').isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'Aucune formule proposée pour le moment : écrivez-nous.',
+                        style: TextStyle(color: Kolors.kTextMuted),
+                      ),
+                    ),
                   for (final f in _liste('formules'))
                     _CarteFormule(
                       formule: f,
@@ -390,6 +405,53 @@ class _Etat extends StatelessWidget {
           AvatarMarque(
             enCours ? Icons.verified_rounded : Icons.lock_clock_rounded,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ce qui est utilisé et ce qui reste : l'équipe de cet établissement (selon
+/// sa formule) et les établissements que la personne peut encore créer.
+class _Places extends StatelessWidget {
+  const _Places({
+    required this.membres,
+    required this.maxMembres,
+    required this.limite,
+  });
+
+  final int? membres;
+  final int? maxMembres;
+  final LimiteEtablissements? limite;
+
+  static String _reste(int n) => n <= 0 ? 'plus de place' : 'il en reste $n';
+
+  @override
+  Widget build(BuildContext context) {
+    final l = limite;
+    return Card(
+      child: Column(
+        children: [
+          if (membres != null)
+            ListTile(
+              leading: const Icon(Icons.groups_outlined),
+              title: Text(
+                maxMembres == null
+                    ? 'Équipe : $membres personne${membres! > 1 ? 's' : ''}, sans limite'
+                    : 'Équipe : $membres sur $maxMembres personnes',
+              ),
+              subtitle: maxMembres == null
+                  ? null
+                  : Text(_reste(maxMembres! - membres!)),
+            ),
+          if (l != null)
+            ListTile(
+              leading: const Icon(Icons.storefront_outlined),
+              title: Text('Vos établissements : ${l.crees} sur ${l.max}'),
+              subtitle: Text(
+                '${_reste(l.restants)}. Chaque établissement a son propre abonnement.',
+              ),
+            ),
         ],
       ),
     );
@@ -515,7 +577,11 @@ class _CarteFormule extends StatelessWidget {
               ),
               onPressed: peutChoisir && tarif != null ? onChoisir : null,
               child: Text(
-                actuelle ? 'Renouveler' : 'Choisir ${formule['nom']}',
+                tarif == null
+                    ? 'Pas proposé sur cette durée'
+                    : actuelle
+                    ? 'Renouveler'
+                    : 'Choisir ${formule['nom']}',
               ),
             ),
           ],

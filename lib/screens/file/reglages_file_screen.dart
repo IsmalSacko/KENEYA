@@ -312,21 +312,27 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _ajouterAppareil('ecran'),
-                        icon: const Icon(Icons.tv_rounded),
-                        label: const Text('Ajouter un écran'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => _ajouterAppareil('borne'),
-                        icon: const Icon(Icons.confirmation_number_rounded),
-                        label: const Text('Ajouter une borne'),
-                      ),
-                    ],
-                  ),
+                  if (!context.watch<AuthController>().aFonction('ecrans'))
+                    const Text(
+                      'Écrans et bornes ne sont pas dans votre formule : voyez Abonnement pour les ajouter.',
+                      style: TextStyle(color: Kolors.kTextMuted),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _ajouterAppareil('ecran'),
+                          icon: const Icon(Icons.tv_rounded),
+                          label: const Text('Ajouter un écran'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _ajouterAppareil('borne'),
+                          icon: const Icon(Icons.confirmation_number_rounded),
+                          label: const Text('Ajouter une borne'),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

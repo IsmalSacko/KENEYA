@@ -27,7 +27,7 @@ class EtablissementDetailScreen extends StatelessWidget {
     final e = etablissement;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Détail')),
+      appBar: AppBar(title: Text(e.nom, overflow: TextOverflow.ellipsis)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

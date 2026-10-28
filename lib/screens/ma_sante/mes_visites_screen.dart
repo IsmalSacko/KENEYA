@@ -54,7 +54,7 @@ class _MesVisitesScreenState extends State<MesVisitesScreen> {
           : v.isEmpty
           ? const Center(
               child: Text(
-                'Aucune visite ces 3 derniers mois.',
+                'Aucun paiement ces 3 derniers mois.',
                 style: TextStyle(color: Kolors.kTextMuted),
               ),
             )

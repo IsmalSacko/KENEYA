@@ -452,7 +452,7 @@ String prixProduit(Produit p, String devise) {
     p.conditionnement > 1
         ? '${m(p.prixBoite)} la boîte de ${p.conditionnement}'
         : m(p.prixBoite),
-    if (p.venteUnite && p.prixUnite != null) "${m(p.prixUnite!)} l'unité",
+    if (p.venteUnite && p.prixUnite != null) '${m(p.prixUnite!)} l’unité',
   ].join(' · ');
 }
 

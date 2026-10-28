@@ -49,7 +49,8 @@ class AppRoles {
 
   static const Map<String, String> labels = {
     admin: 'Administrateur',
-    adminEtablissement: "Admin d'établissement",
+    adminEtablissement: 'Admin d’établissement',
+    accueil: 'Accueil',
     medecin: 'Médecin',
     infirmier: 'Infirmier',
     sageFemme: 'Sage-femme',

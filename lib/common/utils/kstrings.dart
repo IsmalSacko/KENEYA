@@ -43,7 +43,7 @@ class AppText {
 
   static const kFullName = "Nom complet";
   static const kConfirmPassword = "Confirmer le mot de passe";
-  static const kRegisterButton = "S'inscrire";
+  static const kRegisterButton = 'Créer mon compte';
   static const kAlreadyAccount = "Vous avez déjà un compte ? ";
   static const kEnterFullName = "Entrez votre nom complet";
   static const kEnterPassword = "Entrez votre mot de passe";

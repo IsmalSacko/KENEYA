@@ -147,7 +147,9 @@ String _resumeAbonnement(AuthController auth) {
   final nom = '${a['formule_nom'] ?? 'Formule'}';
   if (auth.abonnementEchu) return '$nom · échu';
   final jours = auth.joursRestants;
-  return jours == null ? nom : '$nom · $jours j restants';
+  return jours == null
+      ? nom
+      : '$nom · $jours jour${jours > 1 ? 's' : ''} restant${jours > 1 ? 's' : ''}';
 }
 
 class _MenuEtablissement extends StatelessWidget {
@@ -195,7 +197,9 @@ class _MenuEtablissement extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.groups_rounded),
                 title: const Text('Équipe'),
-                subtitle: const Text('Ajouter ou retirer un membre'),
+                subtitle: const Text(
+                  'Ajouter, changer de rôle ou retirer un membre',
+                ),
                 onTap: () => _page(
                   context,
                   'Équipe',
@@ -206,7 +210,9 @@ class _MenuEtablissement extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.tune_rounded),
                 title: const Text('Réglages'),
-                subtitle: const Text('Services, tarifs, droits de chacun'),
+                subtitle: const Text(
+                  'Établissement, modules, vente, droits de chacun',
+                ),
                 onTap: () => _page(context, 'Réglages', const ReglagesTab()),
               ),
             if (acces.abonnement)
@@ -239,13 +245,13 @@ class _MenuEtablissement extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.account_circle_outlined),
               title: const Text('Mon profil'),
-              subtitle: const Text('Mon nom, mon PIN, me déconnecter'),
+              subtitle: const Text('Mes infos, me déconnecter'),
               onTap: () => _page(context, 'Mon profil', const ProfileTab()),
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.swap_horiz_rounded),
-              title: const Text('Changer d’établissement'),
+              title: const Text('Changer d’espace'),
               subtitle: const Text('Ou revenir à « Ma santé »'),
               onTap: () {
                 Navigator.pop(context);

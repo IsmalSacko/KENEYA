@@ -240,6 +240,18 @@ class CompteApi {
     await _dio.delete('/compte/dossier/acces/$id');
   }
 
+  /// Le propriétaire supprime son établissement ; [nom] retapé pour confirmer.
+  Future<Map<String, dynamic>> supprimerEtablissement(
+    String uuid,
+    String nom,
+  ) async {
+    final res = await _dio.delete(
+      '/compte/etablissements/$uuid',
+      data: {'nom': nom},
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
   Future<void> deconnexion() async {
     await _dio.post('/compte/deconnexion');
   }

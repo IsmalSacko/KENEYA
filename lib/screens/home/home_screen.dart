@@ -318,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(10),
             color: Kolors.kJauneDoux,
             child: const Text(
-              'Mode hors connexion actif. Les modifications seront synchronisees automatiquement.',
+              'Mode hors connexion actif. Les modifications seront synchronisées automatiquement.',
             ),
           ),
         ValueListenableBuilder<int>(
@@ -333,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      '$pending operation(s) en attente de synchronisation.',
+                      '$pending opération(s) en attente de synchronisation.',
                     ),
                   ),
                   TextButton.icon(

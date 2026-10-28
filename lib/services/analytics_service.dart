@@ -60,17 +60,17 @@ class AnalyticsService {
         for (final a in articles) {
           if (a is Map) {
             final med = a['medicament'];
-            final nom = (med is Map ? med['nom'] : null)?.toString() ??
+            final nom =
+                (med is Map ? med['nom'] : null)?.toString() ??
                 'Médicament #${a['medicament_id']}';
             medMap[nom] = (medMap[nom] ?? 0) + _toInt(a['quantite']);
           }
         }
       }
     }
-    final topMedicaments = medMap.entries
-        .map((e) => TopMed(e.key, e.value))
-        .toList()
-      ..sort((a, b) => b.quantite.compareTo(a.quantite));
+    final topMedicaments =
+        medMap.entries.map((e) => TopMed(e.key, e.value)).toList()
+          ..sort((a, b) => b.quantite.compareTo(a.quantite));
 
     // Activité 7 derniers jours
     final now = DateTime.now();

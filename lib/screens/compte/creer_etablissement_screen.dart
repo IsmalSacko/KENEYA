@@ -44,6 +44,14 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
   }
 
   Future<void> _valider() async {
+    final limite = context.read<CompteController>().limite;
+    if (limite != null && limite.restants <= 0) {
+      afficherMessage(
+        context,
+        'Vous avez déjà ${limite.max} établissements, le maximum. Supprimez-en un ou écrivez-nous pour en ouvrir plus.',
+      );
+      return;
+    }
     if (_profil == null) {
       afficherMessage(context, 'Choisissez le type d’établissement.');
       return;
@@ -89,9 +97,21 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Ngoni Santé s’adapte à votre métier. Vous pourrez changer plus tard.',
+              'Ngoni Santé s’adapte à votre métier : ses modules se règlent ensuite dans Réglages.',
               style: TextStyle(color: Kolors.kTextMuted),
             ),
+            if (compte.limite case final l?) ...[
+              const SizedBox(height: 6),
+              Text(
+                l.restants <= 0
+                    ? 'Maximum atteint : vous avez déjà ${l.crees} établissements sur ${l.max}.'
+                    : 'Établissements : ${l.crees} sur ${l.max}, il vous en reste ${l.restants}. Chacun a son propre abonnement, avec son essai gratuit.',
+                style: TextStyle(
+                  color: l.restants <= 0 ? Kolors.kRed : Kolors.kTextMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             for (final profil in compte.profils) ...[
               _CarteProfil(

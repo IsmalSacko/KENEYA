@@ -47,11 +47,13 @@ class UserStats {
     if (rawMois is List) {
       for (final m in rawMois) {
         if (m is Map) {
-          mois.add(MonthPoint(
-            (m['mois'] ?? '').toString(),
-            (m['label'] ?? '').toString(),
-            _toInt(m['total']),
-          ));
+          mois.add(
+            MonthPoint(
+              (m['mois'] ?? '').toString(),
+              (m['label'] ?? '').toString(),
+              _toInt(m['total']),
+            ),
+          );
         }
       }
     }

@@ -7,6 +7,7 @@ import 'package:keneya_plus/common/whatsapp.dart';
 import 'package:keneya_plus/compte/compte_controller.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/controllers/user_controller.dart';
+import 'package:keneya_plus/models/user_model.dart';
 import 'package:provider/provider.dart';
 
 class UsersTab extends StatefulWidget {
@@ -70,7 +71,9 @@ class _UsersTabState extends State<UsersTab> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(widget.userCtrl.error ?? 'Echec creation utilisateur.'),
+        content: Text(
+          widget.userCtrl.error ?? 'Impossible d’ajouter ce membre.',
+        ),
       ),
     );
   }
@@ -111,13 +114,127 @@ class _UsersTabState extends State<UsersTab> {
     );
   }
 
+  /// Un membre touché : changer son rôle, couper son accès, le retirer.
+  Future<void> _gerer(UserModel u, List<String> roles) async {
+    final ctrl = widget.userCtrl;
+    final messenger = ScaffoldMessenger.of(context);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                u.name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(AppRoles.labelOf(u.role)),
+            ),
+            if (roles.contains(u.role))
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('Changer son rôle'),
+                onTap: () => Navigator.pop(ctx, 'role'),
+              ),
+            ListTile(
+              leading: Icon(
+                u.actif ? Icons.block_rounded : Icons.check_circle_outline,
+              ),
+              title: Text(u.actif ? 'Couper son accès' : 'Rendre son accès'),
+              subtitle: u.actif
+                  ? const Text('Il reste dans la liste, sans pouvoir entrer.')
+                  : null,
+              onTap: () => Navigator.pop(ctx, 'actif'),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.person_remove_outlined,
+                color: Kolors.kRed,
+              ),
+              title: const Text(
+                'Retirer de l’équipe',
+                style: TextStyle(color: Kolors.kRed),
+              ),
+              onTap: () => Navigator.pop(ctx, 'retirer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+
+    bool ok;
+    switch (action) {
+      case 'role':
+        final role = await showDialog<String>(
+          context: context,
+          builder: (ctx) => SimpleDialog(
+            title: Text('Rôle de ${u.name}'),
+            children: [
+              for (final r in roles)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, r),
+                  child: Text(
+                    AppRoles.labelOf(r),
+                    style: TextStyle(
+                      fontWeight: r == u.role ? FontWeight.w800 : null,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+        if (role == null || role == u.role) return;
+        ok = await ctrl.updateUser(u.id, {'role': role});
+      case 'actif':
+        ok = await ctrl.updateUser(u.id, {'actif': !u.actif});
+      default:
+        final oui = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Retirer ${u.name} ?'),
+            content: const Text(
+              'Il n’aura plus accès à cet établissement. Ce qu’il y a fait (consultations, ventes…) reste.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Retirer'),
+              ),
+            ],
+          ),
+        );
+        if (oui != true) return;
+        ok = await ctrl.deleteUser(u.id);
+    }
+    if (!ok) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(ctrl.error ?? 'Action impossible.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.userCtrl,
+      builder: (context, _) => _contenu(context),
+    );
+  }
+
+  Widget _contenu(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 1000;
 
     // Rôles que l'utilisateur courant a le droit d'attribuer (un admin
     // d'établissement ne peut pas créer d'admin d'instance).
-    final currentRole = context.read<AuthController>().currentUser?.role;
+    final moi = context.read<AuthController>().currentUser;
+    final currentRole = moi?.role;
     final assignableRoles = AppRoles.assignableBy(currentRole);
     if (!assignableRoles.contains(_role) && assignableRoles.isNotEmpty) {
       _role = assignableRoles.first;
@@ -171,7 +288,7 @@ class _UsersTabState extends State<UsersTab> {
                 controller: _pinCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'PIN de départ (4 chiffres)',
+                  labelText: 'PIN de départ (4 à 6 chiffres)',
                   helperText: 'S’il a déjà Ngoni Santé, il garde son PIN.',
                 ),
                 validator: (v) {
@@ -198,7 +315,7 @@ class _UsersTabState extends State<UsersTab> {
                       ? null
                       : () => widget.userCtrl.fetchUsers(),
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Rafraichir la liste'),
+                  label: const Text('Rafraîchir la liste'),
                 ),
               ),
             ],
@@ -213,7 +330,7 @@ class _UsersTabState extends State<UsersTab> {
         child: widget.userCtrl.loading && widget.userCtrl.users.isEmpty
             ? const Center(child: CircularProgressIndicator())
             : widget.userCtrl.users.isEmpty
-            ? const Text('Aucun utilisateur.')
+            ? Text(widget.userCtrl.error ?? 'Aucun membre.')
             : Column(
                 children: [
                   for (final u in widget.userCtrl.users)
@@ -224,6 +341,9 @@ class _UsersTabState extends State<UsersTab> {
                         telephone: u.telephone,
                         role: u.role,
                         actif: u.actif,
+                        onTap: u.id == moi?.id
+                            ? null
+                            : () => _gerer(u, assignableRoles),
                       ),
                     ),
                 ],
@@ -264,75 +384,81 @@ class _UserCard extends StatelessWidget {
     required this.telephone,
     required this.role,
     required this.actif,
+    this.onTap,
   });
 
   final String name;
   final String telephone;
   final String role;
   final bool actif;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final r = RoleUi.of(role);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Kolors.kWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Kolors.kBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            height: 44,
-            width: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: r.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Kolors.kWhite,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Kolors.kBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              height: 44,
+              width: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: r.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(r.icon, color: r.color, size: 22),
             ),
-            child: Icon(r.icon, color: r.color, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.5,
+                      color: Kolors.kTextHigh,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    telephone,
+                    style: const TextStyle(
+                      color: Kolors.kTextMuted,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5,
-                    color: Kolors.kTextHigh,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  telephone,
-                  style: const TextStyle(
-                    color: Kolors.kTextMuted,
-                    fontSize: 12.5,
-                  ),
+                _MiniChip(text: r.label, color: r.color),
+                const SizedBox(height: 6),
+                _MiniChip(
+                  text: actif ? 'Actif' : 'Inactif',
+                  color: actif ? Kolors.kSuccess : Kolors.kRed,
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _MiniChip(text: r.label, color: r.color),
-              const SizedBox(height: 6),
-              _MiniChip(
-                text: actif ? 'Actif' : 'Inactif',
-                color: actif ? Kolors.kSuccess : Kolors.kRed,
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

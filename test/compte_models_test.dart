@@ -30,4 +30,24 @@ void main() {
     expect(espace.modules, ['file', 'pharmacie']);
     expect(Espace.fromJson(espace.toJson()).membreUuid, 'm-1');
   });
+
+  test('le propriétaire et la limite d’établissements se lisent et se gardent', () {
+    final espace = Espace.fromJson({
+      'membre_uuid': 'm-2',
+      'proprietaire': true,
+      'etablissement': {'uuid': 'e-2', 'nom': 'Cabinet'},
+    });
+    expect(espace.proprietaire, isTrue);
+    expect(Espace.fromJson(espace.toJson()).proprietaire, isTrue);
+    expect(Espace.fromJson({'membre_uuid': 'm-3'}).proprietaire, isFalse);
+
+    final limite = LimiteEtablissements.fromJson({
+      'crees': 2,
+      'max': 3,
+      'restants': 1,
+    })!;
+    expect(limite.restants, 1);
+    expect(LimiteEtablissements.fromJson(limite.toJson())!.max, 3);
+    expect(LimiteEtablissements.fromJson(null), isNull);
+  });
 }

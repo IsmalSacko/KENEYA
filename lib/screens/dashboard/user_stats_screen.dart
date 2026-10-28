@@ -69,7 +69,10 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Row(
                     children: [
-                      _LegendDot(color: Kolors.kPrimary, label: 'Hausse / stable'),
+                      _LegendDot(
+                        color: Kolors.kPrimary,
+                        label: 'Hausse / stable',
+                      ),
                       SizedBox(width: 16),
                       _LegendDot(color: Kolors.kRed, label: 'Baisse'),
                     ],
@@ -119,15 +122,11 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
     return LayoutBuilder(
       builder: (context, c) {
         final twoCols = c.maxWidth < 520;
-        final width = twoCols
-            ? (c.maxWidth - 12) / 2
-            : (c.maxWidth - 36) / 4;
+        final width = twoCols ? (c.maxWidth - 12) / 2 : (c.maxWidth - 36) / 4;
         return Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: [
-            for (final t in tiles) SizedBox(width: width, child: t),
-          ],
+          children: [for (final t in tiles) SizedBox(width: width, child: t)],
         );
       },
     );
@@ -169,7 +168,11 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   '${up ? '+' : ''}${s.variationPct.toStringAsFixed(1)}% vs mois précédent (${s.nouveauxMoisPrecedent})',
-                  style: TextStyle(fontSize: 12.5, color: color, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -270,7 +273,10 @@ class _InscriptionsChart extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     mm,
-                    style: const TextStyle(fontSize: 9, color: Kolors.kTextMuted),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Kolors.kTextMuted,
+                    ),
                   ),
                 );
               },

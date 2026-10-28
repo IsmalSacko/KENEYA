@@ -352,7 +352,7 @@ class _CaisseTabState extends State<CaisseTab> {
                     MaterialPageRoute(builder: (_) => const TarifsScreen()),
                   ),
                   icon: const Icon(Icons.price_change_outlined),
-                  label: const Text('Tarifs des prestations'),
+                  label: const Text('Tarifs et rapport'),
                 ),
               ),
             VentesDuJourVue(

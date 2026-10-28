@@ -37,10 +37,7 @@ class EtablissementController extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateEtablissement(
-    int id,
-    Map<String, dynamic> payload,
-  ) async {
+  Future<bool> updateEtablissement(int id, Map<String, dynamic> payload) async {
     loading = true;
     error = null;
     notifyListeners();

@@ -22,7 +22,7 @@ class LocalNotificationService {
     const androidDetails = AndroidNotificationDetails(
       'keneya_activity',
       'Activité Ngoni Santé',
-      channelDescription: 'Notifications des actions metier',
+      channelDescription: 'Notifications des actions métier',
       importance: Importance.high,
       priority: Priority.high,
     );

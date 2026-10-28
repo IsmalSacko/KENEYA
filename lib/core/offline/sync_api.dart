@@ -12,10 +12,7 @@ class SyncApi {
   }) async {
     final response = await ApiClient.dio.post(
       '/sync/pull',
-      data: {
-        'last_pulled_rev': lastPulledRev,
-        'tables': ?tables,
-      },
+      data: {'last_pulled_rev': lastPulledRev, 'tables': ?tables},
     );
     return Map<String, dynamic>.from(response.data as Map);
   }
