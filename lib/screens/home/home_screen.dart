@@ -280,11 +280,18 @@ class _HomeScreenState extends State<HomeScreen> {
       final r = rang(a).compareTo(rang(b));
       return r != 0 ? r : rangs[a]!.compareTo(rangs[b]!);
     });
+    final estAdmin = AppRoles.canAdministerEtablissement(
+      auth.currentUser?.role,
+    );
     final acces = AccesGestion(
       equipe: canManageUsers,
       reglages: peutRegler,
       rapport:
-          auth.peut('stats.voir') || auth.peut('caisse.rapports') || peutRegler,
+          auth.aFonction('rapport') &&
+          (auth.peut('stats.voir') ||
+              auth.peut('caisse.rapports') ||
+              peutRegler),
+      abonnement: estAdmin,
     );
 
     // Le rôle peut changer le nombre d'onglets : on borne l'index courant.
@@ -304,6 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'En attente de vérification par Ngoni Santé : configurez tout, les patients verront votre établissement une fois vérifié.',
             ),
           ),
+        BandeauAbonnement(admin: estAdmin),
         if (_isOffline)
           Container(
             width: double.infinity,

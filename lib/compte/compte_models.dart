@@ -189,11 +189,15 @@ class Personne {
     required this.paysCode,
     required this.telephone,
     this.pro = false,
+    this.adminPlateforme = false,
   });
 
   final String uuid;
   final String nom;
   final String paysCode;
+
+  /// L'équipe Ngoni Santé : elle a la console (abonnements, validations).
+  final bool adminPlateforme;
 
   /// Professionnel de santé : il voit aussi la partie pro (son établissement).
   /// « Ma santé » reste à tout le monde : un soignant est aussi un patient.
@@ -210,6 +214,8 @@ class Personne {
     paysCode: (j['pays_code'] ?? Pays.defaut).toString(),
     telephone: (j['telephone'] ?? '').toString(),
     pro: j['pro'] == true || j['pro'] == 1,
+    adminPlateforme:
+        j['admin_plateforme'] == true || j['admin_plateforme'] == 1,
   );
 
   Map<String, dynamic> toJson() => {
@@ -218,6 +224,7 @@ class Personne {
     'pays_code': paysCode,
     'telephone': telephone,
     'pro': pro,
+    'admin_plateforme': adminPlateforme,
   };
 }
 

@@ -6,6 +6,8 @@ import '../../common/utils/kcolors.dart';
 import '../../common/widgets/feuille.dart';
 import '../../compte/compte_controller.dart';
 import '../../controllers/user_controller.dart';
+import '../../controllers/auth_controller.dart';
+import '../abonnement/abonnement_screen.dart';
 import '../compte/espaces_sheet.dart';
 import '../rapports/rapport_mensuel_screen.dart';
 import 'tabs/profile_tab_state.dart';
@@ -18,11 +20,66 @@ class AccesGestion {
     this.equipe = false,
     this.reglages = false,
     this.rapport = false,
+    this.abonnement = false,
   });
 
   final bool equipe;
   final bool reglages;
   final bool rapport;
+
+  /// Les administrateurs gèrent l'abonnement, même échu.
+  final bool abonnement;
+}
+
+/// En haut de l'espace : l'abonnement échu (le soin continue, la gestion est
+/// fermée) ou l'essai qui se termine, avec le bouton pour s'abonner.
+class BandeauAbonnement extends StatelessWidget {
+  const BandeauAbonnement({required this.admin, super.key});
+
+  final bool admin;
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthController>();
+    final jours = auth.joursRestants ?? 0;
+    final echu = auth.abonnementEchu;
+    final bientot =
+        !echu && auth.enEssai && auth.joursRestants != null && jours <= 3;
+    if (!echu && !bientot) return const SizedBox.shrink();
+
+    final texte = echu
+        ? 'Abonnement échu : le soin continue, la gestion est fermée (équipe, réglages, stock).'
+        : 'Essai gratuit : ${jours == 0 ? 'dernier jour' : '$jours jour${jours > 1 ? 's' : ''} restant${jours > 1 ? 's' : ''}'}.';
+    return Material(
+      color: echu ? Kolors.kRed : Kolors.kJauneDoux,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                admin ? texte : '$texte Prévenez l’administrateur.',
+                style: TextStyle(
+                  color: echu ? Kolors.kWhite : Kolors.kTextHigh,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (admin)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: echu ? Kolors.kJaune : Kolors.kPrimary,
+                ),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AbonnementScreen()),
+                ),
+                child: Text(echu ? 'Renouveler' : 'S’abonner'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// En haut de l'écran : le nom de l'établissement où l'on travaille. On le
@@ -84,6 +141,15 @@ class BoutonEtablissement extends StatelessWidget {
   );
 }
 
+String _resumeAbonnement(AuthController auth) {
+  final a = auth.abonnement;
+  if (a == null) return 'Formules et paiement';
+  final nom = '${a['formule_nom'] ?? 'Formule'}';
+  if (auth.abonnementEchu) return '$nom · échu';
+  final jours = auth.joursRestants;
+  return jours == null ? nom : '$nom · $jours j restants';
+}
+
 class _MenuEtablissement extends StatelessWidget {
   const _MenuEtablissement({required this.acces});
 
@@ -142,6 +208,20 @@ class _MenuEtablissement extends StatelessWidget {
                 title: const Text('Réglages'),
                 subtitle: const Text('Services, tarifs, droits de chacun'),
                 onTap: () => _page(context, 'Réglages', const ReglagesTab()),
+              ),
+            if (acces.abonnement)
+              ListTile(
+                leading: const Icon(Icons.workspace_premium_outlined),
+                title: const Text('Abonnement'),
+                subtitle: Text(
+                  _resumeAbonnement(context.watch<AuthController>()),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AbonnementScreen()),
+                  );
+                },
               ),
             if (acces.rapport)
               ListTile(

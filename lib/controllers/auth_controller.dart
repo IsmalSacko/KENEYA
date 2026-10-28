@@ -29,6 +29,21 @@ class AuthController extends ChangeNotifier {
   /// Vérifié par Ngoni Santé : visible des patients (recherche, tickets, RDV).
   bool etablissementValide = true;
 
+  /// L'abonnement de l'établissement (formule, fin, ce qu'il ouvre) ; null
+  /// tant que le serveur ne l'a pas dit.
+  Map<String, dynamic>? abonnement;
+
+  /// Échu : le soin continue, la gestion est fermée jusqu'au renouvellement.
+  bool get abonnementEchu => abonnement?['en_cours'] == false;
+  bool get enEssai => abonnement?['essai'] == true;
+  int? get joursRestants => int.tryParse('${abonnement?['jours_restants']}');
+
+  /// Écrans de salle et rapport du mois : inclus dans la formule ?
+  bool aFonction(String fonction) {
+    final f = abonnement?['fonctions'];
+    return f is! List || f.contains(fonction);
+  }
+
   /// Pharmacie ou dépôt : un commerce, où l'on vend plutôt qu'on soigne.
   bool get estOfficine =>
       profil == 'pharmacie' || profil == 'depot_medicaments';
@@ -271,6 +286,7 @@ class AuthController extends ChangeNotifier {
     _lireContexte({
       'permissions': data['permissions'],
       'etablissement': data['etablissement'],
+      'abonnement': data['abonnement'],
     });
     await LocalStore.write(_contexteKey, _contexte());
   }
@@ -279,6 +295,8 @@ class AuthController extends ChangeNotifier {
     if (contexte == null) return;
     final p = contexte['permissions'];
     if (p is List) permissions = p.map((e) => e.toString()).toList();
+    final a = contexte['abonnement'];
+    abonnement = a is Map ? Map<String, dynamic>.from(a) : null;
     final e = contexte['etablissement'];
     if (e is Map) {
       final m = e['modules'];
@@ -292,8 +310,16 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Après un renouvellement : le nouvel état, sans attendre la reconnexion.
+  Future<void> majAbonnement(Map<String, dynamic> etat) async {
+    abonnement = etat;
+    await LocalStore.write(_contexteKey, _contexte());
+    notifyListeners();
+  }
+
   Map<String, dynamic> _contexte() => {
     'permissions': permissions,
+    'abonnement': abonnement,
     'etablissement': {
       'modules': modules,
       'profil': profil,
