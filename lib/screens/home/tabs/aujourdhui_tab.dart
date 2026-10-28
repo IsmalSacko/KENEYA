@@ -293,29 +293,42 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (auth.peut('patients.gerer'))
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                  onPressed: _nouveauPatient,
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('Nouveau patient'),
-                ),
-              if (auth.aModule('file') && auth.peut('file.emettre'))
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                  onPressed: _ticket,
-                  icon: const Icon(Icons.confirmation_number_outlined),
-                  label: const Text('Donner un ticket'),
-                ),
-            ],
+          // Les deux gestes de l'accueil côte à côte, même au téléphone :
+          // chacun prend la moitié, le texte rétrécit au besoin.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Row(
+                children: [
+                  for (final (i, bouton) in [
+                    if (auth.peut('patients.gerer'))
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        onPressed: _nouveauPatient,
+                        icon: const Icon(Icons.person_add_alt_1_rounded),
+                        label: const FittedBox(child: Text('Nouveau patient')),
+                      ),
+                    if (auth.aModule('file') && auth.peut('file.emettre'))
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        onPressed: _ticket,
+                        icon: const Icon(Icons.confirmation_number_outlined),
+                        label: const FittedBox(child: Text('Donner un ticket')),
+                      ),
+                  ].indexed) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    Expanded(child: bouton),
+                  ],
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           if (chiffres != null) ...[
