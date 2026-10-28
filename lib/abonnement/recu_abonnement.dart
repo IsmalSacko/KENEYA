@@ -132,7 +132,7 @@ Future<Uint8List> recuAbonnementPdf({
           ),
           pw.Spacer(),
           pw.Text(
-            'Merci de votre confiance. Ce reçu atteste le paiement de l'abonnement '
+            'Merci de votre confiance. Ce reçu atteste le paiement de l\'abonnement '
             'Ngoni Santé pour la période indiquée.',
             style: pw.TextStyle(color: gris, fontSize: 9),
           ),
