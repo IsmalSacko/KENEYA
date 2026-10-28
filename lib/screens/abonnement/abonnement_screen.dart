@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../abonnement/abonnement_service.dart';
+import '../../abonnement/recu_abonnement.dart';
+import '../../compte/compte_controller.dart';
 import '../../caisse/caisse_models.dart';
 import '../../common/utils/kcolors.dart';
 import '../../common/whatsapp.dart';
@@ -198,6 +201,30 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
     }
   }
 
+  /// Le reçu PDF d'un abonnement payé, à partager (WhatsApp, e-mail…).
+  Future<void> _recu(Map<String, dynamic> d) async {
+    final etablissement =
+        context.read<CompteController>().espaceOuvert?.etablissementNom ??
+        'Établissement';
+    final octets = await recuAbonnementPdf(
+      demande: d,
+      etablissement: etablissement,
+    );
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile.fromData(
+            octets,
+            mimeType: 'application/pdf',
+            name: 'Recu-${d['recu_numero']}.pdf',
+          ),
+        ],
+        fileNameOverrides: ['Recu-${d['recu_numero']}.pdf'],
+        text: 'Reçu Ngoni Santé ${d['recu_numero']}',
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final donnees = _donnees;
@@ -301,6 +328,13 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
                           'annulee' => 'Annulée',
                           _ => 'En attente de validation',
                         }),
+                        trailing: d['statut'] == 'approuvee'
+                            ? IconButton(
+                                tooltip: 'Reçu (PDF)',
+                                icon: const Icon(Icons.receipt_long_rounded),
+                                onPressed: () => _recu(d),
+                              )
+                            : null,
                       ),
                   ],
                 ],
