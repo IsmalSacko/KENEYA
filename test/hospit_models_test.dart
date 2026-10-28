@@ -76,4 +76,50 @@ void main() {
     expect(v.tauxAssurance, 70);
     expect(v.reste, 3000);
   });
+
+  test('lit la sortie, l’annulation, la correction et la fin d’un soin', () {
+    final s = Sejour.fromJson({
+      'uuid': 's',
+      'statut': 'annulee',
+      'patient': 'Bakary',
+      'motif': 'X',
+      'bracelet': 'b',
+      'annulable': false,
+      'sortie_at': '2026-10-27T10:00:00Z',
+      'soins': [
+        {
+          'uuid': 'so',
+          'produit': 'Amoxicilline',
+          'voie': 'po',
+          'horaires': ['08:00'],
+          'fin': '2026-10-29',
+        },
+      ],
+      'plan': [
+        {
+          'soin_uuid': 'so',
+          'statut': 'faite',
+          'corrigee': true,
+          'corrigeable': true,
+        },
+      ],
+    });
+    expect(s.annule, isTrue);
+    expect(s.enCours, isFalse);
+    expect(s.sortie, isNotNull);
+    expect(s.soins.first.fin, DateTime(2026, 10, 29));
+    expect(s.plan.first.corrigee, isTrue);
+    expect(s.plan.first.corrigeable, isTrue);
+
+    final f = FactureNuits.fromJson({
+      'nuits': 2,
+      'montant': 10000,
+      'nouvelle': true,
+    });
+    expect(f.nuits, 2);
+    expect(f.nouvelle, isTrue);
+
+    final c = Chambre.fromJson({'uuid': 'c', 'nom': 'A', 'actif': false});
+    expect(c.actif, isFalse);
+  });
 }

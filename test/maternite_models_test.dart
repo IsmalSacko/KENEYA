@@ -84,4 +84,34 @@ void main() {
     expect(c.vaccins.first.fait, isTrue);
     expect(c.vaccins[2].fait, isFalse);
   });
+
+  test('lit une grossesse close, la CPN complète et la taille du bébé', () {
+    final g = Grossesse.fromJson({
+      'uuid': 'g',
+      'statut': 'terminee',
+      'issue': 'fausse_couche',
+      'terminee_at': '2026-10-20',
+      'patiente': 'Aminata',
+      'ddr': '2026-09-01',
+      'dpa': '2027-06-08',
+      'cpn': [
+        {
+          'uuid': 'c',
+          'numero': 1,
+          'semaines': 6,
+          'oedemes': true,
+          'albuminurie': '++',
+        },
+      ],
+    });
+    expect(g.enCours, isFalse);
+    expect(g.fin, 'Fausse couche');
+    expect(g.termineeLe, '2026-10-20');
+    expect(g.cpn.single.uuid, 'c');
+    expect(g.cpn.single.resume, contains('œdèmes'));
+    expect(g.cpn.single.resume, contains('albuminurie ++'));
+
+    final e = EnfantNe.fromJson({'sexe': 'F', 'taille_cm': 49});
+    expect(e.tailleCm, 49);
+  });
 }
