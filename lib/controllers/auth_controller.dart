@@ -44,6 +44,13 @@ class AuthController extends ChangeNotifier {
     return f is! List || f.contains(fonction);
   }
 
+  /// Fermé par la formule : le nom de la formule qui l'ouvre (« Pro »), à
+  /// afficher avec un cadenas ; null si c'est ouvert.
+  String? verrou(String code) {
+    final v = abonnement?['verrous'];
+    return v is Map ? v[code]?.toString() : null;
+  }
+
   /// Pharmacie ou dépôt : un commerce, où l'on vend plutôt qu'on soigne.
   bool get estOfficine =>
       profil == 'pharmacie' || profil == 'depot_medicaments';

@@ -292,7 +292,8 @@ class Espace {
   };
 }
 
-/// Les établissements que la personne a créés, et combien il lui en reste.
+/// Les établissements que la personne a créés, et combien sa formule lui en
+/// permet encore ; [max] null : sans limite.
 class LimiteEtablissements {
   const LimiteEtablissements({
     required this.crees,
@@ -301,16 +302,17 @@ class LimiteEtablissements {
   });
 
   final int crees;
-  final int max;
-  final int restants;
+  final int? max;
+  final int? restants;
+
+  bool get atteinte => restants != null && restants! <= 0;
 
   static LimiteEtablissements? fromJson(dynamic j) {
     if (j is! Map) return null;
-    int n(dynamic v) => int.tryParse('$v') ?? 0;
     return LimiteEtablissements(
-      crees: n(j['crees']),
-      max: n(j['max']),
-      restants: n(j['restants']),
+      crees: int.tryParse('${j['crees']}') ?? 0,
+      max: int.tryParse('${j['max']}'),
+      restants: int.tryParse('${j['restants']}'),
     );
   }
 

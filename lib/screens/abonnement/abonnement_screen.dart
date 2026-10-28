@@ -448,9 +448,13 @@ class _Places extends StatelessWidget {
           if (l != null)
             ListTile(
               leading: const Icon(Icons.storefront_outlined),
-              title: Text('Vos établissements : ${l.crees} sur ${l.max}'),
+              title: Text(
+                l.max == null
+                    ? 'Vos établissements : ${l.crees}, sans limite'
+                    : 'Vos établissements : ${l.crees} sur ${l.max}',
+              ),
               subtitle: Text(
-                '${_reste(l.restants)}. Chaque établissement a son propre abonnement.',
+                '${l.restants == null ? 'Selon votre formule' : _reste(l.restants!)}. Chaque établissement a son propre abonnement.',
               ),
             ),
         ],
@@ -512,12 +516,17 @@ class _CarteFormule extends StatelessWidget {
         .where((t) => t['mois'] == mois)
         .firstOrNull;
     final max = formule['max_membres'];
+    final etabs = formule['max_etablissements'];
     final inclus = [
       for (final m in (formule['modules'] as List?) ?? const [])
         libellesModules['$m'] ?? '$m',
       for (final f in (formule['fonctions'] as List?) ?? const [])
         libellesFonctions['$f'] ?? '$f',
       max == null ? 'Équipe sans limite' : 'Équipe : $max personnes',
+      if (formule.containsKey('max_etablissements'))
+        etabs == null
+            ? 'Établissements sans limite'
+            : 'Jusqu’à $etabs établissement${'$etabs' == '1' ? '' : 's'}',
     ];
     return Card(
       shape: RoundedRectangleBorder(

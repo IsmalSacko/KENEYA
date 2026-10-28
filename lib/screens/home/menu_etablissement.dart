@@ -8,6 +8,7 @@ import '../../compte/compte_controller.dart';
 import '../../controllers/user_controller.dart';
 import '../../controllers/auth_controller.dart';
 import '../abonnement/abonnement_screen.dart';
+import '../abonnement/verrou.dart';
 import '../compte/espaces_sheet.dart';
 import '../rapports/rapport_mensuel_screen.dart';
 import 'tabs/profile_tab_state.dart';
@@ -21,11 +22,15 @@ class AccesGestion {
     this.reglages = false,
     this.rapport = false,
     this.abonnement = false,
+    this.rapportVerrou,
   });
 
   final bool equipe;
   final bool reglages;
   final bool rapport;
+
+  /// Le rapport n'est pas dans la formule : celle qui l'ouvre (« Pro »).
+  final String? rapportVerrou;
 
   /// Les administrateurs gèrent l'abonnement, même échu.
   final bool abonnement;
@@ -228,6 +233,12 @@ class _MenuEtablissement extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const AbonnementScreen()),
                   );
                 },
+              ),
+            if (!acces.rapport && acces.rapportVerrou != null)
+              LigneVerrouillee(
+                icone: Icons.summarize_outlined,
+                titre: 'Rapport du mois',
+                formule: acces.rapportVerrou!,
               ),
             if (acces.rapport)
               ListTile(

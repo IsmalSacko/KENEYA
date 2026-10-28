@@ -18,6 +18,7 @@ import 'package:keneya_plus/screens/pharmacie/vendre_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/offline/sync_manager.dart';
+import '../abonnement/verrou.dart';
 import 'menu_etablissement.dart';
 import 'ouvrir_onglet.dart';
 import '../../controllers/auth_controller.dart';
@@ -264,6 +265,45 @@ class _HomeScreenState extends State<HomeScreen> {
           page: const PharmacieTab(),
         ),
     ];
+    final estAdmin = AppRoles.canAdministerEtablissement(
+      auth.currentUser?.role,
+    );
+    // Ce que la formule n'ouvre pas reste visible de l'administrateur, avec
+    // un cadenas et la formule qui l'ouvre.
+    if (estAdmin) {
+      const fermables = [
+        ('file', 'File d’attente', 'File', Icons.groups_2_outlined),
+        ('labo', 'Laboratoire', 'Labo', Icons.science_outlined),
+        ('maternite', 'Maternité', 'Matern.', Icons.pregnant_woman_outlined),
+        ('hospitalisation', 'Hospitalisation', 'Hospit.', Icons.bed_outlined),
+        ('badges', 'Entrée', 'Entrée', Icons.door_front_door_outlined),
+        ('rdv', 'Rendez-vous', 'RDV', Icons.event_note_outlined),
+        ('caisse', 'Caisse', 'Caisse', Icons.point_of_sale_outlined),
+        ('pharmacie', 'Pharmacie', 'Pharma.', Icons.local_pharmacy_outlined),
+      ];
+      for (final (module, titre, court, icone) in fermables) {
+        final formule = auth.verrou(module);
+        if (formule == null ||
+            !auth.aModule(module) ||
+            navTabs.any((t) => t.title == titre)) {
+          continue;
+        }
+        navTabs.add(
+          _NavTab(
+            title: titre,
+            shortLabel: court,
+            icon: Icons.lock_outline_rounded,
+            selectedIcon: icone,
+            page: FonctionVerrouillee(
+              titre: titre,
+              formule: formule,
+              admin: true,
+            ),
+          ),
+        );
+      }
+    }
+
     // Le métier de chacun d'abord : ses onglets à lui viennent en tête, le
     // reste passe sous « Plus ». Équipe, réglages et profil sont dans le menu
     // de l'établissement, en haut.
@@ -280,9 +320,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final r = rang(a).compareTo(rang(b));
       return r != 0 ? r : rangs[a]!.compareTo(rangs[b]!);
     });
-    final estAdmin = AppRoles.canAdministerEtablissement(
-      auth.currentUser?.role,
-    );
     final acces = AccesGestion(
       equipe: canManageUsers,
       reglages: peutRegler,
@@ -292,6 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
               auth.peut('caisse.rapports') ||
               peutRegler),
       abonnement: estAdmin,
+      rapportVerrou: estAdmin ? auth.verrou('rapport') : null,
     );
 
     // Le rôle peut changer le nombre d'onglets : on borne l'index courant.

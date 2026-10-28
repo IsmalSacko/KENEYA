@@ -240,10 +240,11 @@ class _Ligne extends StatelessWidget {
 
 /// Sous « Créer mon établissement » : combien il en reste.
 String sousTitreCreer(LimiteEtablissements? limite) => switch (limite) {
-  null => 'Cabinet, pharmacie, centre de santé, clinique…',
-  final l when l.restants <= 0 => 'Maximum atteint : ${l.crees} sur ${l.max}',
-  final l =>
-    'Cabinet, pharmacie, clinique… Il vous en reste ${l.restants} sur ${l.max}',
+  LimiteEtablissements(max: final int max, :final crees, atteinte: true) =>
+    'Votre formule en permet $max : vous en avez $crees',
+  LimiteEtablissements(max: final int max, restants: final int reste) =>
+    'Cabinet, pharmacie, clinique… Il vous en reste $reste sur $max',
+  _ => 'Cabinet, pharmacie, centre de santé, clinique…',
 };
 
 /// Utilisé par les écrans qui listent les espaces sans passer par la feuille.

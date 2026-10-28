@@ -8,6 +8,7 @@ import '../../../compte/compte_controller.dart';
 import '../../../compte/compte_models.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../services/reglages_service.dart';
+import '../../abonnement/verrou.dart';
 import '../etablissement_infos_screen.dart';
 
 /// Réglages de l'établissement : son nom et ses coordonnées, ses modules, et
@@ -113,11 +114,10 @@ class _ReglagesTabState extends State<ReglagesTab> {
               children: [
                 for (final entree in libellesModules.entries)
                   if (_horsFormule(auth, entree.key))
-                    SwitchListTile(
-                      title: Text(entree.value),
-                      subtitle: const Text('Pas dans votre formule'),
-                      value: false,
-                      onChanged: null,
+                    LigneVerrouillee(
+                      icone: Icons.extension_outlined,
+                      titre: entree.value,
+                      formule: auth.verrou(entree.key) ?? 'au-dessus',
                     )
                   else
                     SwitchListTile(

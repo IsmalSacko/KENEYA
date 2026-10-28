@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../common/utils/kcolors.dart';
 import '../../compte/compte_controller.dart';
+import '../../compte/compte_models.dart';
 import '../../controllers/auth_controller.dart';
 import 'cadre_acces.dart';
 
@@ -45,10 +46,10 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
 
   Future<void> _valider() async {
     final limite = context.read<CompteController>().limite;
-    if (limite != null && limite.restants <= 0) {
+    if (limite != null && limite.atteinte) {
       afficherMessage(
         context,
-        'Vous avez déjà ${limite.max} établissements, le maximum. Supprimez-en un ou écrivez-nous pour en ouvrir plus.',
+        'Votre formule permet ${limite.max} établissements. Passez à la formule au-dessus pour en ouvrir plus.',
       );
       return;
     }
@@ -100,14 +101,15 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
               'Ngoni Santé s’adapte à votre métier : ses modules se règlent ensuite dans Réglages.',
               style: TextStyle(color: Kolors.kTextMuted),
             ),
-            if (compte.limite case final l?) ...[
+            if (compte.limite
+                case LimiteEtablissements(max: final int max) && final l) ...[
               const SizedBox(height: 6),
               Text(
-                l.restants <= 0
-                    ? 'Maximum atteint : vous avez déjà ${l.crees} établissements sur ${l.max}.'
-                    : 'Établissements : ${l.crees} sur ${l.max}, il vous en reste ${l.restants}. Chacun a son propre abonnement, avec son essai gratuit.',
+                l.atteinte
+                    ? 'Votre formule permet $max établissements : vous les avez. Passez à la formule au-dessus pour en ouvrir plus.'
+                    : 'Établissements : ${l.crees} sur $max, il vous en reste ${l.restants}. Chacun a son propre abonnement.',
                 style: TextStyle(
-                  color: l.restants <= 0 ? Kolors.kRed : Kolors.kTextMuted,
+                  color: l.atteinte ? Kolors.kRed : Kolors.kTextMuted,
                   fontWeight: FontWeight.w600,
                 ),
               ),

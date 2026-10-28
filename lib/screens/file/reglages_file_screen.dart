@@ -8,6 +8,7 @@ import '../../common/utils/kcolors.dart';
 import '../../caisse/caisse_models.dart';
 import '../../caisse/caisse_service.dart';
 import '../../controllers/auth_controller.dart';
+import '../abonnement/verrou.dart';
 import 'package:provider/provider.dart';
 import '../../common/widgets/formulaire.dart';
 import '../../file/file_models.dart';
@@ -313,9 +314,12 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
                   ),
                   const SizedBox(height: 8),
                   if (!context.watch<AuthController>().aFonction('ecrans'))
-                    const Text(
-                      'Écrans et bornes ne sont pas dans votre formule : voyez Abonnement pour les ajouter.',
-                      style: TextStyle(color: Kolors.kTextMuted),
+                    LigneVerrouillee(
+                      icone: Icons.tv_rounded,
+                      titre: 'Ajouter un écran ou une borne',
+                      formule:
+                          context.watch<AuthController>().verrou('ecrans') ??
+                          'au-dessus',
                     )
                   else
                     Wrap(

@@ -49,5 +49,11 @@ void main() {
     expect(limite.restants, 1);
     expect(LimiteEtablissements.fromJson(limite.toJson())!.max, 3);
     expect(LimiteEtablissements.fromJson(null), isNull);
+    expect(limite.atteinte, isFalse);
+
+    // Sans limite (Hôpital réglé « illimité » dans la console).
+    final libre = LimiteEtablissements.fromJson({'crees': 4, 'max': null})!;
+    expect(libre.max, isNull);
+    expect(libre.atteinte, isFalse);
   });
 }
