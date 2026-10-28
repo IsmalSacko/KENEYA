@@ -28,9 +28,6 @@ class CompteApi {
           ),
         );
 
-  /// Le client au jeton de la personne (console de la plateforme).
-  static Dio get dio => _dio;
-
   static bool estHorsLigne(DioException e) => ApiClient.isNetworkError(e);
 
   Future<Map<String, dynamic>> _post(
