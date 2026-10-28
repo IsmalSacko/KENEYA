@@ -55,6 +55,12 @@ class RoleUi {
           Icons.science_rounded,
           Kolors.kViolet,
         );
+      case AppRoles.accueil:
+        return const RoleUi(
+          'Accueil',
+          Icons.waving_hand_rounded,
+          Kolors.kTeal,
+        );
       case AppRoles.caissier:
         return const RoleUi(
           'Caissier',

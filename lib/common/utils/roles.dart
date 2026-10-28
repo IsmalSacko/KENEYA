@@ -16,6 +16,7 @@ class AppRoles {
   static const String laborantin = 'laborantin';
   static const String caissier = 'caissier';
   static const String gestionnaire = 'gestionnaire';
+  static const String accueil = 'accueil';
 
   /// Tous les rôles connus.
   static const List<String> all = [
@@ -28,6 +29,7 @@ class AppRoles {
     laborantin,
     caissier,
     gestionnaire,
+    accueil,
   ];
 
   /// Administrateur de l'instance (peut gérer plusieurs établissements).

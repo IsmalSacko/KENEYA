@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:keneya_plus/common/utils/kcolors.dart';
 import 'package:keneya_plus/common/utils/roles.dart';
 import 'package:keneya_plus/screens/home/tabs/aujourdhui_tab.dart';
-import 'package:keneya_plus/screens/home/tabs/profile_tab_state.dart';
-import 'package:keneya_plus/screens/home/tabs/reglages_tab.dart';
 import 'package:keneya_plus/screens/file/file_tab.dart';
 import 'package:keneya_plus/screens/patients/patients_tab.dart';
 import 'package:keneya_plus/screens/labo/labo_tab.dart';
@@ -17,11 +15,11 @@ import 'package:keneya_plus/screens/rdv/rdv_tab.dart';
 import 'package:keneya_plus/screens/caisse/caisse_tab.dart';
 import 'package:keneya_plus/screens/pharmacie/pharmacie_tab.dart';
 import 'package:keneya_plus/screens/pharmacie/vendre_screen.dart';
-import 'package:keneya_plus/screens/home/tabs/users_tab.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/offline/sync_manager.dart';
-import '../compte/espaces_sheet.dart';
+import 'menu_etablissement.dart';
+import 'ouvrir_onglet.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/etablissement_controller.dart';
 import '../../controllers/medicament_controller.dart';
@@ -99,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Les onglets qui ne tiennent pas dans la barre du bas.
-  Future<void> _plus(List<_NavTab> onglets) async {
+  Future<void> _plus(List<_NavTab> onglets, int debut) async {
     final choix = await feuille<int>(
       context: context,
       showDragHandle: true,
@@ -108,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (var i = _visibles; i < onglets.length; i++)
+              for (var i = debut; i < onglets.length; i++)
                 ListTile(
                   leading: Icon(onglets[i].icon),
                   title: Text(onglets[i].title),
@@ -135,7 +133,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final isTablet = screenWidth >= 700 && screenWidth < 1000;
     final shouldUseCompactNavLabels = screenWidth < 480;
     final auth = context.watch<AuthController>();
-    final userCtrl = context.watch<UserController>();
 
     // L'onglet "Utilisateurs" (gestion du personnel) n'est visible que pour les
     // administrateurs (instance ou établissement).
@@ -266,30 +263,29 @@ class _HomeScreenState extends State<HomeScreen> {
           selectedIcon: Icons.local_pharmacy,
           page: const PharmacieTab(),
         ),
-      if (canManageUsers)
-        _NavTab(
-          title: 'Utilisateurs',
-          shortLabel: 'Utilis.',
-          icon: Icons.person_add_alt_outlined,
-          selectedIcon: Icons.person_add_alt_1,
-          page: UsersTab(userCtrl: userCtrl),
-        ),
-      if (peutRegler)
-        _NavTab(
-          title: 'Réglages',
-          shortLabel: 'Réglages',
-          icon: Icons.tune_outlined,
-          selectedIcon: Icons.tune,
-          page: const ReglagesTab(),
-        ),
-      _NavTab(
-        title: 'Profil',
-        shortLabel: 'Profil',
-        icon: Icons.account_circle_outlined,
-        selectedIcon: Icons.account_circle,
-        page: const ProfileTab(),
-      ),
     ];
+    // Le métier de chacun d'abord : ses onglets à lui viennent en tête, le
+    // reste passe sous « Plus ». Équipe, réglages et profil sont dans le menu
+    // de l'établissement, en haut.
+    final ordre = _ordreDuRole(auth.currentUser?.role);
+    int rang(_NavTab t) {
+      if (t.title == 'Vendre') return -2;
+      if (t.title == 'Accueil') return -1;
+      final i = ordre.indexOf(t.title);
+      return i < 0 ? ordre.length : i;
+    }
+
+    final rangs = {for (var i = 0; i < navTabs.length; i++) navTabs[i]: i};
+    navTabs.sort((a, b) {
+      final r = rang(a).compareTo(rang(b));
+      return r != 0 ? r : rangs[a]!.compareTo(rangs[b]!);
+    });
+    final acces = AccesGestion(
+      equipe: canManageUsers,
+      reglages: peutRegler,
+      rapport:
+          auth.peut('stats.voir') || auth.peut('caisse.rapports') || peutRegler,
+    );
 
     // Le rôle peut changer le nombre d'onglets : on borne l'index courant.
     final retenu = navTabs.indexWhere((t) => t.title == _ongletChoisi);
@@ -342,16 +338,30 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           },
         ),
-        Expanded(child: navTabs[safeIndex].page),
+        Expanded(
+          child: OuvrirOnglet(
+            ouvrirOnglet: (titre) {
+              final i = navTabs.indexWhere((t) => t.title == titre);
+              if (i >= 0) _choisir(navTabs, i);
+            },
+            child: navTabs[safeIndex].page,
+          ),
+        ),
       ],
     );
 
+    final appBar = AppBar(
+      centerTitle: false,
+      titleSpacing: 12,
+      title: BoutonEtablissement(acces: acces),
+    );
+
     if (isDesktop || isTablet) {
+      final visibles = isDesktop ? 6 : 5;
+      final avecPlus = navTabs.length > visibles + 1;
+      final rail = avecPlus ? navTabs.take(visibles).toList() : navTabs;
       return Scaffold(
-        appBar: AppBar(
-          title: Text(navTabs[safeIndex].title),
-          actions: const [BoutonEspaces()],
-        ),
+        appBar: appBar,
         body: Row(
           children: [
             // Beaucoup d'onglets : le rail défile au lieu de déborder.
@@ -361,18 +371,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   constraints: BoxConstraints(minHeight: c.maxHeight),
                   child: IntrinsicHeight(
                     child: NavigationRail(
-                      selectedIndex: safeIndex,
-                      onDestinationSelected: (value) =>
-                          _choisir(navTabs, value),
-                      labelType: isDesktop
-                          ? NavigationRailLabelType.all
-                          : NavigationRailLabelType.selected,
+                      selectedIndex: safeIndex < rail.length
+                          ? safeIndex
+                          : rail.length,
+                      onDestinationSelected: (value) => value < rail.length
+                          ? _choisir(navTabs, value)
+                          : _plus(navTabs, rail.length),
+                      // Peu d'onglets désormais : leurs noms restent visibles.
+                      labelType: NavigationRailLabelType.all,
                       destinations: [
-                        for (final t in navTabs)
+                        for (final t in rail)
                           NavigationRailDestination(
                             icon: Icon(t.icon),
                             selectedIcon: Icon(t.selectedIcon),
                             label: Text(t.title),
+                          ),
+                        if (avecPlus)
+                          NavigationRailDestination(
+                            icon: const Icon(Icons.more_horiz_rounded),
+                            label: Text(
+                              safeIndex >= rail.length
+                                  ? navTabs[safeIndex].title
+                                  : 'Plus',
+                            ),
                           ),
                       ],
                     ),
@@ -388,10 +409,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(navTabs[safeIndex].title),
-        actions: const [BoutonEspaces()],
-      ),
+      appBar: appBar,
       body: content,
       // Au téléphone, 4 onglets au plus ; les autres sous « Plus ».
       bottomNavigationBar: NavigationBar(
@@ -400,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
             : (navTabs.length > _visibles + 1 ? _visibles : safeIndex),
         onDestinationSelected: (value) {
           if (navTabs.length > _visibles + 1 && value == _visibles) {
-            _plus(navTabs);
+            _plus(navTabs, _visibles);
           } else {
             _choisir(navTabs, value);
           }
@@ -431,6 +449,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
 /// Onglets visibles dans la barre du bas d'un téléphone.
 const _visibles = 4;
+
+/// Les onglets du métier, dans l'ordre où on s'en sert.
+List<String> _ordreDuRole(String? role) => switch (role) {
+  AppRoles.accueil => ['File d’attente', 'Patients', 'Rendez-vous', 'Entrée'],
+  AppRoles.medecin || AppRoles.infirmier => [
+    'File d’attente',
+    'Patients',
+    'Rendez-vous',
+    'Hospitalisation',
+    'Laboratoire',
+  ],
+  AppRoles.sageFemme => [
+    'Maternité',
+    'File d’attente',
+    'Patients',
+    'Rendez-vous',
+  ],
+  AppRoles.laborantin => ['Laboratoire', 'File d’attente', 'Patients'],
+  AppRoles.caissier => ['Caisse', 'File d’attente', 'Patients'],
+  AppRoles.pharmacien => ['Stock', 'Pharmacie', 'Caisse'],
+  _ => ['File d’attente', 'Patients', 'Caisse', 'Rendez-vous'],
+};
 
 /// Description d'un onglet de navigation de l'accueil.
 class _NavTab {

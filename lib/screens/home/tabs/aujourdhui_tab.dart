@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import '../../rapports/rapport_mensuel_screen.dart';
 import '../../../caisse/caisse_models.dart';
 import '../../../caisse/caisse_service.dart';
 import '../../../common/utils/kcolors.dart';
@@ -16,9 +15,10 @@ import '../../../labo/labo_service.dart';
 import '../../../maternite/maternite_service.dart';
 import '../../file/donner_ticket_sheet.dart';
 import '../../patients/patient_screen.dart';
+import '../ouvrir_onglet.dart';
 
-/// La journée de l'établissement en un coup d'œil, et les gestes de
-/// l'accueil : enregistrer un patient, donner un ticket.
+/// Ce qu'il y a à faire maintenant, en une phrase et un bouton ; puis la
+/// journée de l'établissement en chiffres, et les gestes de l'accueil.
 class AujourdhuiTab extends StatefulWidget {
   const AujourdhuiTab({super.key});
 
@@ -35,8 +35,26 @@ class _Chiffre {
   final bool alerte;
 }
 
+/// Une chose à faire : une phrase, et le bouton qui ouvre le bon onglet.
+class _AFaire {
+  const _AFaire(
+    this.icone,
+    this.phrase,
+    this.bouton,
+    this.onglet, {
+    this.urgent = false,
+  });
+
+  final IconData icone;
+  final String phrase;
+  final String bouton;
+  final String onglet;
+  final bool urgent;
+}
+
 class _AujourdhuiTabState extends State<AujourdhuiTab> {
   List<_Chiffre>? _chiffres;
+  List<_AFaire> _aFaire = [];
 
   @override
   void initState() {
@@ -49,6 +67,9 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
   Future<void> _charger() async {
     final auth = context.read<AuthController>();
     final chiffres = <_Chiffre>[];
+    final aFaire = <_AFaire>[];
+    String fois(int n, String un, String plusieurs) =>
+        '$n ${n > 1 ? plusieurs : un}';
     Future<void> essayer(Future<void> Function() f) async {
       try {
         await f();
@@ -62,6 +83,17 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
       await essayer(() async {
         final services = await FileService().services();
         final attente = services.fold<int>(0, (s, x) => s + x.enAttente);
+        if (attente > 0 &&
+            (auth.peut('file.appeler') || auth.peut('file.gerer'))) {
+          aFaire.add(
+            _AFaire(
+              Icons.groups_2_rounded,
+              '${fois(attente, 'patient attend', 'patients attendent')}.',
+              'Voir la file',
+              'File d’attente',
+            ),
+          );
+        }
         chiffres.add(
           _Chiffre(
             'patients en attente',
@@ -76,6 +108,17 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
       await essayer(() async {
         final r = await CaisseService().rapport();
         final devise = '${r['devise'] ?? auth.devise}';
+        final impaye = int.tryParse('${r['impaye']}') ?? 0;
+        if (impaye > 0 && auth.peut('caisse.encaisser')) {
+          aFaire.add(
+            _AFaire(
+              Icons.point_of_sale_rounded,
+              '${formatMontant(impaye, devise)} restent à encaisser aujourd’hui.',
+              'Ouvrir la caisse',
+              'Caisse',
+            ),
+          );
+        }
         chiffres
           ..add(
             _Chiffre(
@@ -105,6 +148,19 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
         (auth.peut('labo.saisir') || auth.peut('labo.valider'))) {
       await essayer(() async {
         final d = await LaboService().demandes();
+        final urgentes = d.where((x) => x.urgent).length;
+        if (d.isNotEmpty) {
+          aFaire.add(
+            _AFaire(
+              Icons.science_rounded,
+              '${fois(d.length, 'analyse à faire', 'analyses à faire')}'
+                  '${urgentes > 0 ? ', dont ${fois(urgentes, 'urgente', 'urgentes')}' : ''}.',
+              'Commencer',
+              'Laboratoire',
+              urgent: urgentes > 0,
+            ),
+          );
+        }
         chiffres.add(
           _Chiffre(
             'analyses à faire',
@@ -121,6 +177,17 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
       await essayer(() async {
         final s = await HospitService().sejours();
         final retard = s.fold<int>(0, (n, x) => n + x.enRetard);
+        if (retard > 0) {
+          aFaire.add(
+            _AFaire(
+              Icons.alarm_rounded,
+              '${fois(retard, 'soin est en retard', 'soins sont en retard')}.',
+              'Voir les soins',
+              'Hospitalisation',
+              urgent: true,
+            ),
+          );
+        }
         chiffres
           ..add(_Chiffre('hospitalisés', '${s.length}', Icons.bed_rounded))
           ..add(
@@ -145,7 +212,14 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
         );
       });
     }
-    if (mounted) setState(() => _chiffres = chiffres);
+    // L'urgent d'abord.
+    aFaire.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
+    if (mounted) {
+      setState(() {
+        _chiffres = chiffres;
+        _aFaire = aFaire;
+      });
+    }
   }
 
   Future<void> _nouveauPatient() async {
@@ -241,24 +315,34 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
                   icon: const Icon(Icons.confirmation_number_outlined),
                   label: const Text('Donner un ticket'),
                 ),
-              if (auth.peut('stats.voir') ||
-                  auth.peut('caisse.rapports') ||
-                  auth.peut('etablissement.regler'))
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const RapportMensuelScreen(),
-                    ),
-                  ),
-                  icon: const Icon(Icons.summarize_outlined),
-                  label: const Text('Rapport du mois'),
-                ),
             ],
           ),
           const SizedBox(height: 16),
+          if (chiffres != null) ...[
+            const _Titre('À faire maintenant'),
+            if (_aFaire.isEmpty)
+              const Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: Icon(
+                    Icons.check_circle_rounded,
+                    color: Kolors.kSuccess,
+                  ),
+                  title: Text('Rien en attente : tout est à jour.'),
+                ),
+              )
+            else
+              for (final a in _aFaire)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _CarteAFaire(
+                    a,
+                    onPressed: () => OuvrirOnglet.ouvrir(context, a.onglet),
+                  ),
+                ),
+            const SizedBox(height: 16),
+            const _Titre('La journée'),
+          ],
           if (chiffres == null)
             const Padding(
               padding: EdgeInsets.only(top: 24),
@@ -339,4 +423,88 @@ String _appel(String nom) {
     return '${mots.first} ${mots.last}';
   }
   return mots.first;
+}
+
+class _Titre extends StatelessWidget {
+  const _Titre(this.texte);
+
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8, left: 2),
+    child: Text(
+      texte,
+      style: GoogleFonts.poppins(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: Kolors.kTextHigh,
+      ),
+    ),
+  );
+}
+
+class _CarteAFaire extends StatelessWidget {
+  const _CarteAFaire(this.a, {required this.onPressed});
+
+  final _AFaire a;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final couleur = a.urgent ? Kolors.kRed : Kolors.kPrimary;
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: couleur.withValues(alpha: 0.35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final phrase = Row(
+              children: [
+                Icon(a.icone, color: couleur, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    a.phrase,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: a.urgent ? Kolors.kRed : Kolors.kTextHigh,
+                    ),
+                  ),
+                ),
+              ],
+            );
+            final bouton = ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(0, 48),
+                backgroundColor: a.urgent ? Kolors.kRed : null,
+              ),
+              onPressed: onPressed,
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: Text(a.bouton),
+            );
+            // Au téléphone, le bouton passe sous la phrase, sur toute la
+            // largeur ; sur un grand écran, il se range à droite.
+            return c.maxWidth < 520
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [phrase, const SizedBox(height: 12), bouton],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: phrase),
+                      const SizedBox(width: 12),
+                      bouton,
+                    ],
+                  );
+          },
+        ),
+      ),
+    );
+  }
 }

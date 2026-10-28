@@ -784,16 +784,28 @@ class _PatientScreenState extends State<PatientScreen> {
             if (duJour != null)
               Card(
                 color: Kolors.kJauneDoux,
-                child: ListTile(
-                  leading: const Icon(Icons.today_rounded),
-                  title: const Text('Visite en cours aujourd’hui'),
-                  subtitle: Text(
-                    duJour.services.isEmpty
-                        ? 'Ouverte'
-                        : duJour.services.join(' › '),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _ouvrir(VisiteScreen(uuid: duJour.uuid)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.today_rounded),
+                      title: const Text('Visite en cours aujourd’hui'),
+                      subtitle: duJour.parcours.isEmpty
+                          ? Text(
+                              duJour.services.isEmpty
+                                  ? 'Ouverte'
+                                  : duJour.services.join(' › '),
+                            )
+                          : null,
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => _ouvrir(VisiteScreen(uuid: duJour.uuid)),
+                    ),
+                    if (duJour.parcours.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                        child: ParcoursPatient(duJour.parcours),
+                      ),
+                  ],
                 ),
               ),
             ..._actions(auth, p, duJour),
@@ -866,6 +878,81 @@ class _PatientScreenState extends State<PatientScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Arrivé ✓ → Consultation ✓ → **Labo** → Caisse : ce qui est fait est
+/// coché, l'étape où se trouve le patient est mise en avant.
+class ParcoursPatient extends StatelessWidget {
+  const ParcoursPatient(this.etapes, {super.key});
+
+  final List<({String libelle, bool fait})> etapes;
+
+  @override
+  Widget build(BuildContext context) {
+    final ici = etapes.indexWhere((e) => !e.fait);
+    return Wrap(
+      spacing: 4,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (var i = 0; i < etapes.length; i++) ...[
+          if (i > 0)
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: Kolors.kTextMuted,
+            ),
+          _Etape(etapes[i].libelle, fait: etapes[i].fait, ici: i == ici),
+        ],
+      ],
+    );
+  }
+}
+
+class _Etape extends StatelessWidget {
+  const _Etape(this.libelle, {required this.fait, required this.ici});
+
+  final String libelle;
+  final bool fait;
+  final bool ici;
+
+  @override
+  Widget build(BuildContext context) {
+    final fond = ici
+        ? Kolors.kPrimary
+        : fait
+        ? Kolors.kSuccess.withValues(alpha: 0.12)
+        : Kolors.kWhite;
+    final texte = ici
+        ? Kolors.kWhite
+        : fait
+        ? Kolors.kSuccess
+        : Kolors.kTextMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: fond,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: ici ? Kolors.kPrimary : Kolors.kBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (fait) ...[
+            Icon(Icons.check_rounded, size: 16, color: texte),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            libelle,
+            style: TextStyle(
+              color: texte,
+              fontWeight: ici ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

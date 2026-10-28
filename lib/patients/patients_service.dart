@@ -11,6 +11,7 @@ class VisitePatient {
     required this.reste,
     required this.devise,
     this.date,
+    this.parcours = const [],
   });
 
   final String uuid;
@@ -23,6 +24,10 @@ class VisitePatient {
   final int reste;
   final String devise;
   final DateTime? date;
+
+  /// Le chemin du patient pendant la visite en cours : « Arrivé »,
+  /// « Consultation », « Labo »… avec ce qui est fait.
+  final List<({String libelle, bool fait})> parcours;
 
   bool get ouverte => statut == 'ouverte';
 
@@ -53,6 +58,11 @@ class VisitePatient {
     reste: int.tryParse('${j['reste']}') ?? 0,
     devise: (j['devise'] ?? 'XOF').toString(),
     date: DateTime.tryParse('${j['ouverte_at']}')?.toLocal(),
+    parcours: [
+      if (j['parcours'] is List)
+        for (final e in (j['parcours'] as List).whereType<Map>())
+          (libelle: '${e['libelle'] ?? ''}', fait: e['etat'] == 'fait'),
+    ],
   );
 }
 

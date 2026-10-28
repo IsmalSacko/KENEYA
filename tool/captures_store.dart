@@ -285,7 +285,7 @@ final _patients = <Map<String, dynamic>>[
 final _patientDemo = Patient.fromJson({
   ..._patients.first,
   'visites': [
-    {'uuid': 'v1', 'ouverte_at': _il(0, 8, 12), 'statut': 'ouverte', 'services': ['Consultation', 'Laboratoire'], 'total': 3500, 'reste': 0, 'devise': 'XOF'},
+    {'uuid': 'v1', 'ouverte_at': _il(0, 8, 12), 'statut': 'ouverte', 'parcours': [{'etape': 'arrivee', 'libelle': 'Arrivé', 'etat': 'fait'}, {'etape': 'consultation', 'libelle': 'Consultation', 'etat': 'fait'}, {'etape': 'labo', 'libelle': 'Labo', 'etat': 'a_faire'}, {'etape': 'caisse', 'libelle': 'Caisse', 'etat': 'fait'}], 'services': ['Consultation', 'Laboratoire'], 'total': 3500, 'reste': 0, 'devise': 'XOF'},
     {'uuid': 'v0', 'ouverte_at': _il(42), 'statut': 'cloturee', 'services': ['Maternité'], 'total': 2000, 'reste': 0, 'devise': 'XOF'},
   ],
   'rendez_vous': [
@@ -409,7 +409,7 @@ Object? _reponse(String methode, String chemin) {
       'patient': {
         ..._patients.first,
         'visites': [
-          {'uuid': 'v1', 'ouverte_at': _il(0, 8, 12), 'statut': 'ouverte', 'services': ['Consultation', 'Laboratoire'], 'total': 3500, 'reste': 0, 'devise': 'XOF'},
+          {'uuid': 'v1', 'ouverte_at': _il(0, 8, 12), 'statut': 'ouverte', 'parcours': [{'etape': 'arrivee', 'libelle': 'Arrivé', 'etat': 'fait'}, {'etape': 'consultation', 'libelle': 'Consultation', 'etat': 'fait'}, {'etape': 'labo', 'libelle': 'Labo', 'etat': 'a_faire'}, {'etape': 'caisse', 'libelle': 'Caisse', 'etat': 'fait'}], 'services': ['Consultation', 'Laboratoire'], 'total': 3500, 'reste': 0, 'devise': 'XOF'},
           {'uuid': 'v0', 'ouverte_at': _il(42), 'statut': 'cloturee', 'services': ['Maternité'], 'total': 2000, 'reste': 0, 'devise': 'XOF'},
         ],
         'rendez_vous': [
