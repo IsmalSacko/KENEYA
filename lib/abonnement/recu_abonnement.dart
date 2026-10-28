@@ -34,7 +34,11 @@ Future<Uint8List> recuAbonnementPdf({
     '${demande['devise'] ?? 'XOF'}',
   ).replaceAll(' ', ' ').replaceAll(' ', ' ');
   final mois = int.tryParse('${demande['mois']}') ?? 1;
-  final duree = mois == 12 ? '1 an' : '$mois mois';
+  final duree = switch (mois) {
+    0 => 'à vie',
+    12 => '1 an',
+    _ => '$mois mois',
+  };
 
   pw.Widget ligne(String g, String d, {bool fort = false}) => pw.Padding(
     padding: const pw.EdgeInsets.symmetric(vertical: 5),

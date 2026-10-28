@@ -73,6 +73,7 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
   }
 
   static String _duree(int mois) => switch (mois) {
+    0 => 'à vie',
     1 => '1 mois',
     3 => '3 mois',
     6 => '6 mois',
