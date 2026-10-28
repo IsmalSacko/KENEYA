@@ -8,6 +8,23 @@ const modesAccouchement = {
   'cesarienne': 'Césarienne',
 };
 
+/// Comment finit une grossesse sans accouchement ici.
+const issuesGrossesse = {
+  'fausse_couche': 'Fausse couche',
+  'ivg': 'Interruption volontaire',
+  'geu': 'Grossesse extra-utérine',
+  'transferee': 'Suivie ailleurs (transférée)',
+  'perdue_de_vue': 'Perdue de vue',
+};
+
+const albuminuries = {
+  'negatif': 'Négatif',
+  'traces': 'Traces',
+  '+': '+',
+  '++': '++',
+  '+++': '+++',
+};
+
 const presentations = {
   'cephalique': 'Céphalique',
   'siege': 'Siège',
@@ -17,6 +34,7 @@ const presentations = {
 class CpnVisite {
   const CpnVisite({
     required this.numero,
+    this.uuid = '',
     required this.semaines,
     required this.etablissement,
     required this.fer,
@@ -29,12 +47,15 @@ class CpnVisite {
     this.hauteurUterine,
     this.bcf,
     this.presentation,
+    this.oedemes,
+    this.albuminurie,
     this.tpi,
     this.vat,
     this.observations,
     this.prochainRdv,
   });
 
+  final String uuid;
   final int numero;
   final int semaines;
   final String etablissement;
@@ -48,12 +69,15 @@ class CpnVisite {
   final int? hauteurUterine;
   final int? bcf;
   final String? presentation;
+  final bool? oedemes;
+  final String? albuminurie;
   final int? tpi;
   final int? vat;
   final String? observations;
   final String? prochainRdv;
 
   factory CpnVisite.fromJson(Map<String, dynamic> j) => CpnVisite(
+    uuid: (j['uuid'] ?? '').toString(),
     numero: _int(j['numero']) ?? 0,
     semaines: _int(j['semaines']) ?? 0,
     etablissement: (j['etablissement'] ?? '').toString(),
@@ -67,6 +91,8 @@ class CpnVisite {
     hauteurUterine: _int(j['hauteur_uterine']),
     bcf: _int(j['bcf']),
     presentation: _texte(j['presentation']),
+    oedemes: j['oedemes'] is bool ? j['oedemes'] as bool : null,
+    albuminurie: _texte(j['albuminurie']),
     tpi: _int(j['tpi']),
     vat: _int(j['vat']),
     observations: _texte(j['observations']),
@@ -80,6 +106,9 @@ class CpnVisite {
     if (hauteurUterine != null) 'HU $hauteurUterine cm',
     if (bcf != null) 'BCF $bcf',
     if (presentation != null) presentations[presentation] ?? presentation!,
+    if (oedemes == true) 'œdèmes',
+    if (albuminurie != null)
+      'albuminurie ${albuminuries[albuminurie] ?? albuminurie}',
     if (tpi != null) 'TPI $tpi',
     if (vat != null) 'VAT $vat',
     if (fer) 'fer',
@@ -92,6 +121,7 @@ class EnfantNe {
     required this.sexe,
     required this.vivant,
     this.poidsG,
+    this.tailleCm,
     this.apgar1,
     this.apgar5,
     this.dossierUuid,
@@ -101,6 +131,7 @@ class EnfantNe {
   final String sexe;
   final bool vivant;
   final int? poidsG;
+  final int? tailleCm;
   final int? apgar1;
   final int? apgar5;
   final String? dossierUuid;
@@ -110,6 +141,7 @@ class EnfantNe {
     sexe: (j['sexe'] ?? '').toString(),
     vivant: j['vivant'] != false,
     poidsG: _int(j['poids_g']),
+    tailleCm: _int(j['taille_cm']),
     apgar1: _int(j['apgar1']),
     apgar5: _int(j['apgar5']),
     dossierUuid: _texte(j['dossier_uuid']),
@@ -134,6 +166,8 @@ class Grossesse {
     this.accouchement,
     this.modeAccouchement,
     this.enfants = const [],
+    this.issue,
+    this.termineeLe,
   });
 
   final String uuid;
@@ -152,7 +186,16 @@ class Grossesse {
   final String? modeAccouchement;
   final List<EnfantNe> enfants;
 
+  /// Close sans accouchement : fausse couche, IVG, GEU, transférée…
+  final String? issue;
+  final String? termineeLe;
+
   bool get enCours => statut == 'en_cours';
+
+  /// « Accouchée », « Fausse couche le 20 oct. 2026 »…
+  String get fin => statut == 'accouchee'
+      ? 'Accouchée'
+      : issuesGrossesse[issue] ?? 'Terminée';
 
   /// « G3 P2 »
   String get gp => [
@@ -187,6 +230,8 @@ class Grossesse {
           for (final e in (acc!['enfants'] as List).whereType<Map>())
             EnfantNe.fromJson(Map<String, dynamic>.from(e)),
       ],
+      issue: _texte(j['issue']),
+      termineeLe: _texte(j['terminee_at']),
     );
   }
 }
