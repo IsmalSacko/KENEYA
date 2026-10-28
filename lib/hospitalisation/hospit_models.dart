@@ -50,6 +50,7 @@ class Chambre {
     required this.lits,
     this.service,
     this.prix,
+    this.actif = true,
   });
 
   final String uuid;
@@ -57,6 +58,9 @@ class Chambre {
   final List<LitInfo> lits;
   final String? service;
   final int? prix;
+
+  /// Fermée, ses lits ne reçoivent plus personne.
+  final bool actif;
 
   int get libres => lits.where((l) => l.libre).length;
 
@@ -70,6 +74,7 @@ class Chambre {
     ],
     service: _texte(j['service']),
     prix: int.tryParse('${j['prix']}'),
+    actif: j['actif'] != false,
   );
 }
 
@@ -83,6 +88,7 @@ class SoinPrescrit {
     this.dose,
     this.instructions,
     this.prescripteur,
+    this.fin,
   });
 
   final String uuid;
@@ -93,6 +99,9 @@ class SoinPrescrit {
   final String? dose;
   final String? instructions;
   final String? prescripteur;
+
+  /// Le dernier jour du traitement, s'il est fixé.
+  final DateTime? fin;
 
   /// « Artésunate 120 mg · IV · 08:00, 20:00 »
   String get resume => [
@@ -112,6 +121,7 @@ class SoinPrescrit {
     dose: _texte(j['dose']),
     instructions: _texte(j['instructions']),
     prescripteur: _texte(j['prescripteur']),
+    fin: DateTime.tryParse('${j['fin']}'),
   );
 }
 
@@ -129,6 +139,8 @@ class Prise {
     this.instructions,
     this.par,
     this.commentaire,
+    this.corrigee = false,
+    this.corrigeable = false,
   });
 
   final String soinUuid;
@@ -142,6 +154,12 @@ class Prise {
   final String? instructions;
   final String? par;
   final String? commentaire;
+
+  /// Notée puis corrigée : l'ancienne saisie reste au dossier.
+  final bool corrigee;
+
+  /// Notée il y a peu : elle se corrige encore.
+  final bool corrigeable;
 
   bool get aFaire => statut == 'a_faire';
 
@@ -157,6 +175,29 @@ class Prise {
     instructions: _texte(j['instructions']),
     par: _texte(j['par']),
     commentaire: _texte(j['commentaire']),
+    corrigee: j['corrigee'] == true,
+    corrigeable: j['corrigeable'] == true,
+  );
+}
+
+/// Ce que la sortie a mis sur la facture.
+class FactureNuits {
+  const FactureNuits({
+    required this.nuits,
+    required this.montant,
+    required this.nouvelle,
+  });
+
+  final int nuits;
+  final int montant;
+
+  /// La visite d'admission était close : une facture du jour les porte.
+  final bool nouvelle;
+
+  factory FactureNuits.fromJson(Map<String, dynamic> j) => FactureNuits(
+    nuits: int.tryParse('${j['nuits']}') ?? 1,
+    montant: int.tryParse('${j['montant']}') ?? 0,
+    nouvelle: j['nouvelle'] == true,
   );
 }
 
@@ -176,6 +217,9 @@ class Sejour {
     this.medecin,
     this.entree,
     this.modeSortie,
+    this.sortie,
+    this.resumeSortie,
+    this.annulable = false,
     this.enRetard = 0,
   });
 
@@ -193,9 +237,15 @@ class Sejour {
   final String? medecin;
   final DateTime? entree;
   final String? modeSortie;
+  final DateTime? sortie;
+  final String? resumeSortie;
+
+  /// Admis aujourd'hui : l'admission faite par erreur s'annule encore.
+  final bool annulable;
   final int enRetard;
 
   bool get enCours => statut == 'en_cours';
+  bool get annule => statut == 'annulee';
 
   factory Sejour.fromJson(Map<String, dynamic> j) => Sejour(
     uuid: (j['uuid'] ?? '').toString(),
@@ -220,6 +270,9 @@ class Sejour {
     medecin: _texte(j['medecin']),
     entree: DateTime.tryParse('${j['entree_at']}')?.toLocal(),
     modeSortie: _texte(j['mode_sortie']),
+    sortie: DateTime.tryParse('${j['sortie_at']}')?.toLocal(),
+    resumeSortie: _texte(j['resume_sortie']),
+    annulable: j['annulable'] == true,
     enRetard: int.tryParse('${j['en_retard']}') ?? 0,
   );
 }

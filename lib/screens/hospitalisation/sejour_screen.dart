@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../common/utils/kcolors.dart';
 import '../../common/widgets/carte_marque.dart';
 import '../../controllers/auth_controller.dart';
+import '../../caisse/caisse_models.dart';
 import '../../core/api/api_client.dart';
 import '../../file/impression_ticket.dart';
 import '../../hospitalisation/hospit_models.dart';
@@ -88,44 +90,73 @@ Future<LitInfo?> choisirLit(BuildContext context) async {
   );
 }
 
-/// Hospitaliser le patient de la visite : lit, motif, puis le séjour.
+/// Hospitaliser le patient de la visite : lit, motif, puis le séjour. Déjà
+/// hospitalisé, on ouvre son séjour : on ne le couche pas deux fois.
 Future<void> hospitaliser(BuildContext context, String visite) async {
+  final service = HospitService();
+  try {
+    final deja = await service.sejourDeLaVisite(visite);
+    if (deja != null) {
+      if (!context.mounted) return;
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => SejourScreen(sejour: deja)));
+      return;
+    }
+  } on DioException catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+    }
+    return;
+  }
+  if (!context.mounted) return;
   final lit = await choisirLit(context);
   if (lit == null || !context.mounted) return;
   final motif = TextEditingController();
+  String? erreur;
   final ok = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('Lit ${lit.numero}'),
-      content: SingleChildScrollView(
-        child: TextField(
-          controller: motif,
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            labelText: 'Motif d’hospitalisation',
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => AlertDialog(
+        title: Text('Lit ${lit.numero}'),
+        content: SingleChildScrollView(
+          child: TextField(
+            controller: motif,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Motif d’hospitalisation',
+              errorText: erreur,
+            ),
+            onChanged: (_) {
+              if (erreur != null) setState(() => erreur = null);
+            },
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (motif.text.trim().isEmpty) {
+                setState(() => erreur = 'Indiquez le motif.');
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Hospitaliser'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Hospitaliser'),
-        ),
-      ],
     ),
   );
-  if (ok != true || motif.text.trim().isEmpty || !context.mounted) return;
+  if (ok != true || !context.mounted) return;
   try {
-    final s = await HospitService().admettre(
-      visite,
-      lit.uuid,
-      motif.text.trim(),
-    );
+    final s = await service.admettre(visite, lit.uuid, motif.text.trim());
     if (!context.mounted) return;
     await Navigator.of(
       context,
@@ -137,6 +168,50 @@ Future<void> hospitaliser(BuildContext context, String visite) async {
       ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
     }
   }
+}
+
+/// Le bouton « Hospitaliser » d'une visite : « Ouvrir le séjour » quand le
+/// patient est déjà couché. [builder] reçoit le libellé et l'action.
+class BoutonHospitaliser extends StatefulWidget {
+  const BoutonHospitaliser({
+    required this.visite,
+    required this.builder,
+    super.key,
+  });
+
+  final String visite;
+  final Widget Function(String libelle, VoidCallback action) builder;
+
+  @override
+  State<BoutonHospitaliser> createState() => _BoutonHospitaliserState();
+}
+
+class _BoutonHospitaliserState extends State<BoutonHospitaliser> {
+  bool _hospitalise = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _verifier();
+  }
+
+  Future<void> _verifier() async {
+    try {
+      final s = await HospitService().sejourDeLaVisite(widget.visite);
+      if (mounted) setState(() => _hospitalise = s != null);
+    } on DioException {
+      // Le bouton reste « Hospitaliser » : l'action vérifie de nouveau.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(
+    _hospitalise ? 'Ouvrir le séjour' : 'Hospitaliser',
+    () async {
+      await hospitaliser(context, widget.visite);
+      await _verifier();
+    },
+  );
 }
 
 /// Le séjour : plan de soins du jour, prescriptions, bracelet, sortie.
@@ -175,6 +250,26 @@ class _SejourScreenState extends State<SejourScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
     }
   }
+
+  Future<bool> _confirmer(String titre, String texte, String action) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(titre),
+          content: Text(texte),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Non'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ==
+      true;
 
   Future<void> _donner(Prise p) async {
     final qr = await scannerQr(
@@ -224,6 +319,118 @@ class _SejourScreenState extends State<SejourScreen> {
     );
   }
 
+  /// Une prise notée par erreur : le bon statut, la raison ; « donné »
+  /// exige le bracelet, comme au lit.
+  Future<void> _corriger(Prise p) async {
+    const libelles = {
+      'faite': 'Donné',
+      'refusee': 'Refusé par le patient',
+      'omise': 'Non fait',
+    };
+    var statut = libelles.keys.firstWhere((k) => k != p.statut);
+    final motif = TextEditingController();
+    String? erreur;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text('Corriger : ${p.produit} de ${p.heure}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Noté : ${libelles[p.statut] ?? p.statut}.'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final e in libelles.entries)
+                      if (e.key != p.statut)
+                        ChoiceChip(
+                          label: Text(e.value),
+                          selected: statut == e.key,
+                          onSelected: (_) => setState(() => statut = e.key),
+                        ),
+                  ],
+                ),
+                TextField(
+                  controller: motif,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: 'Pourquoi corriger ?',
+                    errorText: erreur,
+                  ),
+                  onChanged: (_) {
+                    if (erreur != null) setState(() => erreur = null);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (motif.text.trim().isEmpty) {
+                  setState(() => erreur = 'Indiquez la raison.');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Corriger'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    String? bracelet;
+    if (statut == 'faite') {
+      bracelet = await scannerQr(
+        context,
+        titre: 'Bracelet du patient',
+        consigne: 'Scannez le bracelet du patient.',
+      );
+      if (bracelet == null) return;
+    }
+    await _faire(
+      () => _service.corrigerPrise(
+        _s.uuid,
+        p,
+        statut: statut,
+        motif: motif.text.trim(),
+        bracelet: bracelet,
+      ),
+      'Prise corrigée.',
+    );
+  }
+
+  Future<void> _arreter(SoinPrescrit soin) async {
+    if (await _confirmer(
+      'Arrêter ce soin ?',
+      '${soin.resume}\n\nLes prises à venir disparaissent du plan.',
+      'Arrêter',
+    )) {
+      await _faire(() => _service.arreter(soin.uuid), 'Soin arrêté.');
+    }
+  }
+
+  Future<void> _annulerAdmission() async {
+    if (!await _confirmer(
+      'Annuler l’admission ?',
+      'Pour une admission faite par erreur : le lit se libère, rien n’est facturé, les soins prescrits s’arrêtent.',
+      'Annuler l’admission',
+    )) {
+      return;
+    }
+    await _faire(() => _service.annuler(_s.uuid), 'Admission annulée.');
+  }
+
   Future<void> _prescrire() async {
     final produit = TextEditingController();
     final dose = TextEditingController();
@@ -241,6 +448,16 @@ class _SejourScreenState extends State<SejourScreen> {
       '22:00',
       '00:00',
     ];
+    final aujourdhui = DateUtils.dateOnly(DateTime.now());
+    // La durée : null = jusqu'à l'arrêt ou la sortie.
+    DateTime? fin;
+    String? erreurProduit;
+    String? erreurHeures;
+    String duree(DateTime f) {
+      final jours = f.difference(aujourdhui).inDays + 1;
+      return '$jours jour${jours > 1 ? 's' : ''}, jusqu’au ${dateCourte(f)}';
+    }
+
     final donnees = await formulaire<Map<String, dynamic>>(
       context,
       titre: const Text('Prescrire un soin'),
@@ -252,9 +469,13 @@ class _SejourScreenState extends State<SejourScreen> {
           TextField(
             controller: produit,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Produit (ex. Artésunate)',
+              errorText: erreurProduit,
             ),
+            onChanged: (_) {
+              if (erreurProduit != null) setState(() => erreurProduit = null);
+            },
           ),
           TextField(
             controller: dose,
@@ -283,12 +504,52 @@ class _SejourScreenState extends State<SejourScreen> {
                 FilterChip(
                   label: Text(h),
                   selected: horaires.contains(h),
-                  onSelected: (oui) => setState(
-                    () => oui ? horaires.add(h) : horaires.remove(h),
-                  ),
+                  onSelected: (oui) => setState(() {
+                    oui ? horaires.add(h) : horaires.remove(h);
+                    erreurHeures = null;
+                  }),
                 ),
             ],
           ),
+          if (erreurHeures != null)
+            Text(erreurHeures!, style: const TextStyle(color: Kolors.kRed)),
+          const SizedBox(height: 10),
+          const Text('Durée'),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ChoiceChip(
+                label: const Text('Jusqu’à l’arrêt'),
+                selected: fin == null,
+                onSelected: (_) => setState(() => fin = null),
+              ),
+              for (final jours in const [3, 5, 7])
+                ChoiceChip(
+                  label: Text('$jours jours'),
+                  selected: fin == aujourdhui.add(Duration(days: jours - 1)),
+                  onSelected: (_) => setState(
+                    () => fin = aujourdhui.add(Duration(days: jours - 1)),
+                  ),
+                ),
+              ActionChip(
+                avatar: const Icon(Icons.event_rounded, size: 18),
+                label: const Text('Autre date'),
+                onPressed: () async {
+                  final d = await showDatePicker(
+                    context: ctx,
+                    initialDate: fin ?? aujourdhui,
+                    firstDate: aujourdhui,
+                    lastDate: aujourdhui.add(const Duration(days: 365)),
+                    helpText: 'Dernier jour du traitement',
+                  );
+                  if (d != null) setState(() => fin = d);
+                },
+              ),
+            ],
+          ),
+          if (fin != null)
+            Text(duree(fin!), style: const TextStyle(color: Kolors.kTextMuted)),
           TextField(
             controller: instructions,
             decoration: const InputDecoration(
@@ -303,13 +564,25 @@ class _SejourScreenState extends State<SejourScreen> {
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, {
-            'produit': produit.text.trim(),
-            'dose': dose.text.trim(),
-            'voie': voie,
-            'horaires': horaires.toList()..sort(),
-            'instructions': instructions.text.trim(),
-          }),
+          onPressed: () {
+            setState(() {
+              erreurProduit = produit.text.trim().isEmpty
+                  ? 'Indiquez le produit.'
+                  : null;
+              erreurHeures = horaires.isEmpty
+                  ? 'Choisissez au moins une heure.'
+                  : null;
+            });
+            if (erreurProduit != null || erreurHeures != null) return;
+            Navigator.pop(ctx, {
+              'produit': produit.text.trim(),
+              'dose': dose.text.trim(),
+              'voie': voie,
+              'horaires': horaires.toList()..sort(),
+              'instructions': instructions.text.trim(),
+              if (fin != null) 'fin': DateFormat('yyyy-MM-dd').format(fin!),
+            });
+          },
           child: const Text('Prescrire'),
         ),
       ],
@@ -365,11 +638,23 @@ class _SejourScreenState extends State<SejourScreen> {
         ),
       ],
     );
-    if (ok != true) return;
-    await _faire(
-      () => _service.sortie(_s.uuid, mode, resume.text.trim()),
-      'Sortie notée : les nuits sont sur la facture.',
-    );
+    if (ok != true || !mounted) return;
+    final devise = context.read<AuthController>().devise;
+    try {
+      final (s, f) = await _service.sortie(_s.uuid, mode, resume.text.trim());
+      if (!mounted) return;
+      setState(() => _s = s);
+      final nuits = f == null ? '' : '${f.nuits} nuit${f.nuits > 1 ? 's' : ''}';
+      _dire(
+        f == null
+            ? 'Sortie notée. La chambre n’a pas de prix : rien n’est facturé.'
+            : f.nouvelle
+            ? 'Sortie notée. La visite d’admission était close : $nuits (${formatMontant(f.montant, devise)}) sur une nouvelle facture, à régler à la caisse.'
+            : 'Sortie notée : $nuits (${formatMontant(f.montant, devise)}) ajoutées à la facture.',
+      );
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
   }
 
   Future<void> _imprimer() async {
@@ -413,7 +698,9 @@ class _SejourScreenState extends State<SejourScreen> {
                         Text(
                           s.enCours
                               ? '${s.motif} · ${s.nuits} nuit${s.nuits > 1 ? 's' : ''}'
-                              : 'Sorti · ${modesSortie[s.modeSortie] ?? ''}',
+                              : s.annule
+                              ? 'Admission annulée'
+                              : 'Sorti le ${dateCourte(s.sortie)} · ${modesSortie[s.modeSortie] ?? ''}',
                           style: const TextStyle(
                             color: Kolors.kJaune,
                             fontWeight: FontWeight.w700,
@@ -473,6 +760,12 @@ class _SejourScreenState extends State<SejourScreen> {
                     icon: const Icon(Icons.logout_rounded),
                     label: const Text('Sortie'),
                   ),
+                if (gere && s.annulable)
+                  TextButton.icon(
+                    onPressed: _annulerAdmission,
+                    icon: const Icon(Icons.undo_rounded),
+                    label: const Text('Annuler l’admission'),
+                  ),
                 OutlinedButton.icon(
                   onPressed: _imprimer,
                   icon: const Icon(Icons.print_rounded),
@@ -480,6 +773,17 @@ class _SejourScreenState extends State<SejourScreen> {
                 ),
               ],
             ),
+            if (!s.enCours && s.resumeSortie != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Résumé de sortie',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(s.resumeSortie!),
+            ],
             const SizedBox(height: 16),
             Text(
               'Soins du jour',
@@ -521,6 +825,7 @@ class _SejourScreenState extends State<SejourScreen> {
                       if (p.statut == 'refusee') 'refusé',
                       if (p.statut == 'omise') 'non fait',
                       if (p.aFaire && p.enRetard) 'EN RETARD',
+                      if (p.corrigee) 'corrigé',
                       ?p.commentaire,
                     ].join(' · '),
                   ),
@@ -552,6 +857,11 @@ class _SejourScreenState extends State<SejourScreen> {
                             ),
                           ],
                         )
+                      : !p.aFaire && p.corrigeable && soigne
+                      ? TextButton(
+                          onPressed: () => _corriger(p),
+                          child: const Text('Corriger'),
+                        )
                       : null,
                 ),
               ),
@@ -577,12 +887,16 @@ class _SejourScreenState extends State<SejourScreen> {
                       ),
                     ),
                     subtitle: Text(
-                      [?soin.instructions, ?soin.prescripteur].join(' · '),
+                      [
+                        if (soin.fin != null)
+                          'jusqu’au ${dateCourte(soin.fin)}',
+                        ?soin.instructions,
+                        ?soin.prescripteur,
+                      ].join(' · '),
                     ),
                     trailing: prescrit && !soin.arrete
                         ? TextButton(
-                            onPressed: () =>
-                                _faire(() => _service.arreter(soin.uuid)),
+                            onPressed: () => _arreter(soin),
                             child: const Text('Arrêter'),
                           )
                         : null,

@@ -19,10 +19,36 @@ class HospitService {
     await ApiClient.dio.patch('/hospitalisation/chambres/$uuid', data: d);
   }
 
-  Future<List<Sejour>> sejours() async {
-    final res = await ApiClient.dio.get('/hospitalisation/sejours');
+  /// Les hospitalisés ; [sortis] : ceux qui sont sortis, les derniers d'abord.
+  Future<List<Sejour>> sejours({bool sortis = false, String? q}) async {
+    final res = await ApiClient.dio.get(
+      '/hospitalisation/sejours',
+      queryParameters: {
+        if (sortis) 'statut': 'sortie',
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+      },
+    );
     return [for (final m in _liste(res.data)) Sejour.fromJson(m)];
   }
+
+  /// Le séjour en cours du patient de la visite, s'il est déjà hospitalisé.
+  Future<Sejour?> sejourDeLaVisite(String visite) async {
+    final res = await ApiClient.dio.get('/visites/$visite/hospitalisation');
+    final s = (res.data as Map)['sejour'];
+    return s is Map ? Sejour.fromJson(Map<String, dynamic>.from(s)) : null;
+  }
+
+  /// Admettre sans visite, depuis un lit libre.
+  Future<Sejour> admettreDossier(
+    String dossier,
+    String lit,
+    String motif,
+  ) async => _s(
+    (await ApiClient.dio.post(
+      '/hospitalisation/sejours',
+      data: {'dossier_uuid': dossier, 'lit_uuid': lit, 'motif': motif},
+    )).data,
+  );
 
   Future<Sejour> sejour(String uuid) async =>
       _s((await ApiClient.dio.get('/hospitalisation/sejours/$uuid')).data);
@@ -48,11 +74,25 @@ class HospitService {
     )).data,
   );
 
-  Future<Sejour> sortie(String uuid, String mode, String resume) async => _s(
-    (await ApiClient.dio.post(
+  /// La sortie, et ce qu'elle a mis sur la facture (null : pas de prix de nuit).
+  Future<(Sejour, FactureNuits?)> sortie(
+    String uuid,
+    String mode,
+    String resume,
+  ) async {
+    final res = await ApiClient.dio.post(
       '/hospitalisation/sejours/$uuid/sortie',
       data: {'mode_sortie': mode, 'resume': resume},
-    )).data,
+    );
+    final f = (res.data as Map)['facture'];
+    return (
+      _s(res.data),
+      f is Map ? FactureNuits.fromJson(Map<String, dynamic>.from(f)) : null,
+    );
+  }
+
+  Future<Sejour> annuler(String uuid) async => _s(
+    (await ApiClient.dio.post('/hospitalisation/sejours/$uuid/annuler')).data,
   );
 
   Future<Sejour> prescrire(String uuid, Map<String, dynamic> d) async => _s(
@@ -82,6 +122,25 @@ class HospitService {
         'bracelet': ?bracelet,
         if (commentaire != null && commentaire.isNotEmpty)
           'commentaire': commentaire,
+      },
+    )).data,
+  );
+
+  Future<Sejour> corrigerPrise(
+    String uuid,
+    Prise p, {
+    required String statut,
+    required String motif,
+    String? bracelet,
+  }) async => _s(
+    (await ApiClient.dio.post(
+      '/hospitalisation/sejours/$uuid/administrations/corriger',
+      data: {
+        'soin_uuid': p.soinUuid,
+        'prevue_at': p.prevueAt,
+        'statut': statut,
+        'motif': motif,
+        'bracelet': ?bracelet,
       },
     )).data,
   );
