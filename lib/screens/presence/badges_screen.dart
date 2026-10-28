@@ -19,7 +19,9 @@ class BadgesScreen extends StatefulWidget {
 
 class _BadgesScreenState extends State<BadgesScreen> {
   final _service = PresenceService();
-  final _mois = DateFormat('yyyy-MM').format(DateTime.now());
+
+  /// Le premier jour du mois du rapport.
+  DateTime _mois = DateTime(DateTime.now().year, DateTime.now().month);
   List<BadgeMembre>? _badges;
   List<Map<String, dynamic>>? _rapport;
   String? _erreur;
@@ -33,16 +35,26 @@ class _BadgesScreenState extends State<BadgesScreen> {
   Future<void> _charger() async {
     try {
       final b = await _service.badges();
-      final r = await _service.rapport(_mois);
+      final r = await _service.rapport(DateFormat('yyyy-MM').format(_mois));
       if (mounted) {
         setState(() {
           _badges = b;
           _rapport = r;
+          _erreur = null;
         });
       }
     } on DioException catch (e) {
       if (mounted) setState(() => _erreur = messageErreur(e));
     }
+  }
+
+  /// Le mois précédent ou suivant ([sens] = -1 ou 1), jamais après ce mois-ci.
+  void _changerMois(int sens) {
+    setState(() {
+      _mois = DateTime(_mois.year, _mois.month + sens);
+      _rapport = null;
+    });
+    _charger();
   }
 
   Future<void> _voir(BadgeMembre m) async {
@@ -114,7 +126,27 @@ class _BadgesScreenState extends State<BadgesScreen> {
         ),
       ),
     );
-    if (renouveler != true) return;
+    if (renouveler != true || !mounted) return;
+    final sur = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Badge perdu ?'),
+        content: Text(
+          'Le badge de ${m.nom} ne marchera plus tout de suite. Un nouveau badge est créé : à imprimer ou à montrer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Nouveau badge'),
+          ),
+        ],
+      ),
+    );
+    if (sur != true) return;
     try {
       await _service.renouveler(m.uuid);
       await _charger();
@@ -138,9 +170,12 @@ class _BadgesScreenState extends State<BadgesScreen> {
   Widget build(BuildContext context) {
     final b = _badges;
     final r = _rapport;
+    final maintenant = DateTime.now();
+    final ceMois =
+        _mois.year == maintenant.year && _mois.month == maintenant.month;
     return Scaffold(
       appBar: AppBar(title: const Text('Badges et présence')),
-      body: b == null || r == null
+      body: b == null || (r == null && _erreur != null)
           ? Center(
               child: _erreur == null
                   ? const CircularProgressIndicator()
@@ -149,30 +184,59 @@ class _BadgesScreenState extends State<BadgesScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(
-                  'Présence du mois',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Présence de ${DateFormat('MMMM yyyy', 'fr').format(_mois)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Mois précédent',
+                      icon: const Icon(Icons.chevron_left_rounded),
+                      onPressed: () => _changerMois(-1),
+                    ),
+                    IconButton(
+                      tooltip: 'Mois suivant',
+                      icon: const Icon(Icons.chevron_right_rounded),
+                      onPressed: ceMois ? null : () => _changerMois(1),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                Card(
-                  child: Column(
-                    children: [
-                      for (final l in r)
-                        ListTile(
-                          dense: true,
-                          title: Text('${l['nom']}'),
-                          subtitle: Text('${l['role']}'),
-                          trailing: Text(
-                            '${l['jours']} j · ${l['heures']} h',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                if (r == null)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (r.isEmpty)
+                  const Text(
+                    'Personne n’a pointé ce mois-là.',
+                    style: TextStyle(color: Kolors.kTextMuted),
+                  )
+                else
+                  Card(
+                    child: Column(
+                      children: [
+                        for (final l in r)
+                          ListTile(
+                            dense: true,
+                            title: Text('${l['nom']}'),
+                            subtitle: Text('${l['role']}'),
+                            trailing: Text(
+                              '${l['jours']} j · ${l['heures']} h',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 const SizedBox(height: 16),
                 Text(
                   'Badges',
