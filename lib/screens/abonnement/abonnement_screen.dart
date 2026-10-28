@@ -429,6 +429,7 @@ class _Places extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = limite;
+    if (membres == null && l == null) return const SizedBox.shrink();
     return Card(
       child: Column(
         children: [
