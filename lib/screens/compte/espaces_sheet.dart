@@ -6,7 +6,6 @@ import '../../common/utils/kcolors.dart';
 import '../../compte/compte_controller.dart';
 import '../../compte/compte_models.dart';
 import '../../controllers/auth_controller.dart';
-import '../console/console_screen.dart';
 import 'cadre_acces.dart';
 import 'connexion_screen.dart';
 import 'creer_etablissement_screen.dart';
@@ -108,18 +107,6 @@ class _FeuilleEspaces extends StatelessWidget {
                 actif: compte.espaceActif == null,
                 onTap: () => _ouvrir(context, () => compte.quitterEspace(auth)),
               ),
-              if (compte.personne?.adminPlateforme == true)
-                _Ligne(
-                  icone: Icons.admin_panel_settings_rounded,
-                  titre: 'Console Ngoni Santé',
-                  sousTitre: 'Établissements, abonnements, formules',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ConsoleScreen()),
-                    );
-                  },
-                ),
               for (final espace in compte.espaces)
                 _Ligne(
                   icone: Icons.local_hospital_rounded,
