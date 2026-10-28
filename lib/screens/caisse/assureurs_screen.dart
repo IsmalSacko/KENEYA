@@ -1,3 +1,5 @@
+import 'package:share_plus/share_plus.dart';
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -118,8 +120,73 @@ class _AssureursScreenState extends State<AssureursScreen> {
     }
   }
 
+  /// Le mois à réclamer : celui-ci ou un des 11 précédents.
+  Future<String?> _choisirMois() {
+    final maintenant = DateTime.now();
+    final mois = [
+      for (var i = 0; i < 12; i++)
+        DateTime(maintenant.year, maintenant.month - i),
+    ];
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Bordereau de quel mois ?'),
+        children: [
+          for (final m in mois)
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.pop(ctx, DateFormat('yyyy-MM').format(m)),
+              child: Text(DateFormat.yMMMM('fr').format(m)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Le bordereau en CSV (point-virgule, comme le serveur), à envoyer.
+  Future<void> _partager(
+    Assureur a,
+    String mois,
+    List<Map> lignes,
+    Map<String, dynamic> b,
+  ) async {
+    String c(Object? v) => '"${'${v ?? ''}'.replaceAll('"', '""')}"';
+    final csv = StringBuffer(
+      'Date;Patient;N° assuré;Total;Taux %;Part assureur (${b['devise']})\n',
+    );
+    for (final l in lignes) {
+      csv.writeln(
+        [
+          l['date'],
+          l['patient'],
+          l['numero_assure'],
+          l['total'],
+          l['taux'],
+          l['part_assureur'],
+        ].map(c).join(';'),
+      );
+    }
+    csv.writeln(';;;;Total;${b['total']}');
+    final nom =
+        'Bordereau-${a.nom.replaceAll(RegExp(r'[^\w-]+'), '-')}-$mois.csv';
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile.fromData(
+            Uint8List.fromList(utf8.encode('\uFEFF$csv')),
+            mimeType: 'text/csv',
+            name: nom,
+          ),
+        ],
+        fileNameOverrides: [nom],
+        text: 'Bordereau ${a.nom} · $mois',
+      ),
+    );
+  }
+
   Future<void> _bordereau(Assureur a) async {
-    final mois = DateFormat('yyyy-MM').format(DateTime.now());
+    final mois = await _choisirMois();
+    if (mois == null) return;
     final Map<String, dynamic> b;
     try {
       b = await _service.bordereau(a.uuid, mois);
@@ -133,7 +200,17 @@ class _AssureursScreenState extends State<AssureursScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: Text('${a.nom} · $mois')),
+          appBar: AppBar(
+            title: Text('${a.nom} · $mois'),
+            actions: [
+              if (lignes.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () => _partager(a, mois, lignes, b),
+                  icon: const Icon(Icons.ios_share_rounded),
+                  label: const Text('Envoyer (CSV)'),
+                ),
+            ],
+          ),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -176,15 +253,11 @@ class _AssureursScreenState extends State<AssureursScreen> {
     final devise = context.watch<AuthController>().devise;
     final l = _liste;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Assureurs'),
-        actions: [
-          IconButton(
-            tooltip: 'Nouvel assureur',
-            icon: const Icon(Icons.add),
-            onPressed: () => _editer(),
-          ),
-        ],
+      appBar: AppBar(title: const Text('Assureurs')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _editer(),
+        icon: const Icon(Icons.add),
+        label: const Text('Nouvel assureur'),
       ),
       body: l == null
           ? Center(
@@ -199,7 +272,7 @@ class _AssureursScreenState extends State<AssureursScreen> {
                   const Padding(
                     padding: EdgeInsets.only(top: 40),
                     child: Text(
-                      'Aucun assureur. Touchez + pour ajouter l’AMO ou une mutuelle.',
+                      'Aucun assureur. « Nouvel assureur » pour ajouter l’AMO ou une mutuelle.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Kolors.kTextMuted),
                     ),

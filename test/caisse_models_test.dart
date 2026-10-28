@@ -23,5 +23,12 @@ void main() {
     expect(lireMontant('2 000', 'XOF'), 2000);
     expect(lireMontant('12,5', 'GHS'), 1250);
     expect(lireMontant('abc', 'XOF'), isNull);
+    // Les séparateurs de milliers ne font jamais des centimes en FCFA.
+    expect(lireMontant('50.000', 'XOF'), 50000);
+    expect(lireMontant('50,000', 'XOF'), 50000);
+    expect(lireMontant('50\u202f000', 'XOF'), 50000);
+    expect(lireMontant('1.250,50', 'GHS'), 125050);
+    expect(lireMontant('1,250.50', 'GHS'), 125050);
+    expect(lireMontant('', 'XOF'), isNull);
   });
 }

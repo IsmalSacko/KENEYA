@@ -114,6 +114,63 @@ class _VisiteScreenState extends State<VisiteScreen> {
     }
   }
 
+  void _dire(String m) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    }
+  }
+
+  Future<bool> _confirmer(String titre, String texte, String action) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(titre),
+          content: Text(texte),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Non'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ==
+      true;
+
+  Future<void> _retirerLigne(Visite v, LigneVisite l) async {
+    if (await _confirmer(
+      'Retirer cette ligne ?',
+      '${l.libelle} · ${formatMontant(l.montant, v.devise)}',
+      'Retirer',
+    )) {
+      await _faire(() => _service.retirerLigne(v.uuid, l.uuid));
+    }
+  }
+
+  Future<void> _rembourser(Visite v, EncaissementVisite e) async {
+    if (await _confirmer(
+      'Rembourser ce paiement ?',
+      '${e.moyenLabel} · ${formatMontant(e.montant, v.devise)}${e.reference == null ? '' : ' (réf. ${e.reference})'}\n\nRendez l’argent au client : la facture le doit à nouveau et la caisse ne le compte plus.',
+      'Rembourser',
+    )) {
+      await _faire(() => _service.rembourser(v.uuid, e.uuid));
+    }
+  }
+
+  Future<void> _annulerFacture(Visite v) async {
+    if (await _confirmer(
+      'Annuler cette facture ?',
+      'Elle a été ouverte par erreur : elle disparaît de la caisse.',
+      'Annuler la facture',
+    )) {
+      await _faire(() => _service.annulerVisite(v.uuid));
+      if (mounted && _visite?.statut == 'annulee') Navigator.of(context).pop();
+    }
+  }
+
   Future<void> _ouvrir(Widget ecran) async {
     await Navigator.of(
       context,
@@ -159,6 +216,14 @@ class _VisiteScreenState extends State<VisiteScreen> {
       );
       if (ok != true) return;
     }
+    if (v.reste > 0 &&
+        !await _confirmer(
+          'Clôturer avec un impayé ?',
+          'Il reste ${formatMontant(v.reste, v.devise)} à payer. La facture restera dans les impayés.',
+          'Clôturer',
+        )) {
+      return;
+    }
     await _faire(() => _service.cloturerVisite(v.uuid));
   }
 
@@ -170,8 +235,10 @@ class _VisiteScreenState extends State<VisiteScreen> {
       showDragHandle: true,
       builder: (_) => _ChoixActe(tarifs: _tarifs, devise: v.devise),
     );
-    if (choix is Tarif) {
-      await _faire(() => _service.ajouterActe(v.uuid, choix));
+    if (choix is (Tarif, int)) {
+      await _faire(
+        () => _service.ajouterActe(v.uuid, choix.$1, quantite: choix.$2),
+      );
     } else if (choix is (String, int)) {
       await _faire(
         () => _service.ajouterLigneLibre(v.uuid, choix.$1, choix.$2),
@@ -247,13 +314,23 @@ class _VisiteScreenState extends State<VisiteScreen> {
         ),
       ],
     );
-    if (ok != true || numero.text.trim().isEmpty) return;
+    if (ok != true) return;
+    if (numero.text.trim().isEmpty) {
+      _dire('Indiquez le numéro d’assuré (sur la carte).');
+      return;
+    }
     await _faire(() => _service.couvrir(v.uuid, choisi, numero.text.trim()));
   }
 
   Future<void> _encaisser() async {
     final v = _visite!;
-    final session = await _service.session();
+    final Map<String, dynamic> session;
+    try {
+      session = await _service.session();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+      return;
+    }
     if (!mounted) return;
     if (session['session'] == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -433,10 +510,7 @@ class _VisiteScreenState extends State<VisiteScreen> {
                                       Icons.close_rounded,
                                       size: 18,
                                     ),
-                                    onPressed: () => _faire(
-                                      () =>
-                                          _service.retirerLigne(v.uuid, l.uuid),
-                                    ),
+                                    onPressed: () => _retirerLigne(v, l),
                                   ),
                               ],
                             ),
@@ -473,12 +547,23 @@ class _VisiteScreenState extends State<VisiteScreen> {
                                 onPressed: _assurer,
                                 child: const Text('Ajouter'),
                               )
-                            : TextButton(
-                                onPressed: () => _faire(
-                                  () => _service.retirerAssurance(v.uuid),
-                                ),
+                            : (auth.peut('caisse.encaisser') ||
+                                  auth.peut('assurances.gerer'))
+                            ? TextButton(
+                                onPressed: () async {
+                                  if (await _confirmer(
+                                    'Retirer l’assurance ?',
+                                    'Le patient paiera toute la facture.',
+                                    'Retirer',
+                                  )) {
+                                    await _faire(
+                                      () => _service.retirerAssurance(v.uuid),
+                                    );
+                                  }
+                                },
                                 child: const Text('Retirer'),
-                              ),
+                              )
+                            : null,
                       ),
                     ),
                   ],
@@ -493,16 +578,46 @@ class _VisiteScreenState extends State<VisiteScreen> {
                         children: [
                           for (final e in v.encaissements)
                             ListTile(
-                              leading: const Icon(
-                                Icons.check_circle_rounded,
-                                color: Kolors.kSuccess,
+                              leading: Icon(
+                                e.rembourse
+                                    ? Icons.undo_rounded
+                                    : Icons.check_circle_rounded,
+                                color: e.rembourse
+                                    ? Kolors.kTextMuted
+                                    : Kolors.kSuccess,
                               ),
-                              title: Text(e.moyenLabel),
-                              subtitle: e.reference == null
-                                  ? null
-                                  : Text('Réf. ${e.reference}'),
-                              trailing: Text(
-                                formatMontant(e.montant, v.devise),
+                              title: Text(
+                                e.rembourse
+                                    ? '${e.moyenLabel} · remboursé'
+                                    : e.moyenLabel,
+                              ),
+                              subtitle: Text(
+                                [
+                                  if (e.at != null)
+                                    '${e.at!.hour.toString().padLeft(2, '0')}:${e.at!.minute.toString().padLeft(2, '0')}',
+                                  if (e.par != null) 'par ${e.par}',
+                                  if (e.reference != null)
+                                    'réf. ${e.reference}',
+                                ].join(' · '),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    formatMontant(e.montant, v.devise),
+                                    style: TextStyle(
+                                      decoration: e.rembourse
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                  if (peutEncaisser && e.remboursable)
+                                    IconButton(
+                                      tooltip: 'Rembourser',
+                                      icon: const Icon(Icons.undo_rounded),
+                                      onPressed: () => _rembourser(v, e),
+                                    ),
+                                ],
                               ),
                             ),
                         ],
@@ -620,16 +735,41 @@ class _VisiteScreenState extends State<VisiteScreen> {
                       ),
                     ),
                   ],
-                  if (v.ouverte &&
-                      peutEncaisser &&
-                      v.reste == 0 &&
-                      v.total > 0) ...[
+                  if (v.ouverte && peutEncaisser && v.total > 0) ...[
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => _cloturer(v),
                       child: const Text('Clôturer la visite'),
                     ),
                   ],
+                  if (v.ouverte &&
+                      peutEncaisser &&
+                      !v.encaissements.any((e) => !e.rembourse))
+                    TextButton(
+                      style: TextButton.styleFrom(foregroundColor: Kolors.kRed),
+                      onPressed: () => _annulerFacture(v),
+                      child: const Text(
+                        'Annuler la facture (ouverte par erreur)',
+                      ),
+                    ),
+                  if (v.statut == 'cloturee' && peutEncaisser) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _faire(() => _service.rouvrirVisite(v.uuid)),
+                      icon: const Icon(Icons.lock_open_rounded),
+                      label: const Text('Rouvrir la visite (acte oublié)'),
+                    ),
+                  ],
+                  if (v.statut == 'annulee')
+                    const Padding(
+                      padding: EdgeInsets.only(top: 10),
+                      child: Text(
+                        'Facture annulée.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Kolors.kTextMuted),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -652,6 +792,8 @@ class _ChoixActeState extends State<_ChoixActe> {
   final _recherche = TextEditingController();
   final _libelle = TextEditingController();
   final _prix = TextEditingController();
+  int _quantite = 1;
+  String? _erreurLibre;
 
   @override
   Widget build(BuildContext context) {
@@ -678,12 +820,44 @@ class _ChoixActeState extends State<_ChoixActe> {
                 prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('Quantité'),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Moins',
+                  onPressed: _quantite > 1
+                      ? () => setState(() => _quantite--)
+                      : null,
+                  icon: const Icon(Icons.remove_circle_outline),
+                ),
+                Text(
+                  '$_quantite',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Plus',
+                  onPressed: _quantite < 999
+                      ? () => setState(() => _quantite++)
+                      : null,
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
+            ),
             for (final t in tarifs)
               ListTile(
                 title: Text(t.nom),
                 subtitle: Text(libellesCategories[t.categorie] ?? t.categorie),
-                trailing: Text(formatMontant(t.prix, widget.devise)),
-                onTap: () => Navigator.pop(context, t),
+                trailing: Text(
+                  _quantite > 1
+                      ? '$_quantite × ${formatMontant(t.prix, widget.devise)}'
+                      : formatMontant(t.prix, widget.devise),
+                ),
+                onTap: () => Navigator.pop(context, (t, _quantite)),
               ),
             if (widget.tarifs.isEmpty)
               const Padding(
@@ -723,15 +897,29 @@ class _ChoixActeState extends State<_ChoixActe> {
                   ),
                 ),
                 IconButton.filled(
+                  tooltip: 'Ajouter',
                   onPressed: () {
                     final prix = lireMontant(_prix.text, widget.devise);
-                    if (_libelle.text.trim().isEmpty || prix == null) return;
+                    if (_libelle.text.trim().isEmpty || prix == null) {
+                      setState(
+                        () => _erreurLibre = 'Indiquez le libellé et le prix.',
+                      );
+                      return;
+                    }
                     Navigator.pop(context, (_libelle.text.trim(), prix));
                   },
                   icon: const Icon(Icons.add),
                 ),
               ],
             ),
+            if (_erreurLibre != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _erreurLibre!,
+                  style: const TextStyle(color: Kolors.kRed),
+                ),
+              ),
           ],
         ),
       ),
@@ -763,7 +951,30 @@ class _EncaissementState extends State<_Encaissement> {
     ).replaceAll(RegExp(r'[^\d,]'), ''),
   );
   final _reference = TextEditingController();
+  final _recu = TextEditingController();
   String _moyen = 'especes';
+  String? _erreur;
+
+  void _valider() {
+    final montant = lireMontant(_montant.text, widget.devise);
+    final mobile = _moyen != 'especes';
+    final probleme = montant == null || montant <= 0
+        ? 'Indiquez le montant payé.'
+        : montant > widget.reste
+        ? 'C’est plus que le reste (${formatMontant(widget.reste, widget.devise)}) : notez ce qui est dû, et la monnaie à rendre en dessous.'
+        : mobile && _reference.text.trim().isEmpty
+        ? 'Indiquez la référence reçue par SMS.'
+        : null;
+    if (probleme != null) {
+      setState(() => _erreur = probleme);
+      return;
+    }
+    Navigator.pop(context, (
+      montant!,
+      _moyen,
+      mobile ? _reference.text.trim() : null,
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -791,6 +1002,7 @@ class _EncaissementState extends State<_Encaissement> {
             TextField(
               controller: _montant,
               keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() => _erreur = null),
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
               decoration: InputDecoration(
                 labelText: 'Montant (${widget.devise})',
@@ -813,26 +1025,42 @@ class _EncaissementState extends State<_Encaissement> {
               const SizedBox(height: 12),
               TextField(
                 controller: _reference,
+                onChanged: (_) => setState(() => _erreur = null),
                 decoration: const InputDecoration(
                   labelText: 'Référence de la transaction (reçue par SMS)',
                   prefixIcon: Icon(Icons.tag_rounded),
                 ),
               ),
+            ] else ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _recu,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'Reçu du client (facultatif)',
+                  helperText: switch ((
+                    lireMontant(_recu.text, widget.devise),
+                    lireMontant(_montant.text, widget.devise),
+                  )) {
+                    (final recu?, final du?) when recu >= du =>
+                      'À rendre : ${formatMontant(recu - du, widget.devise)}',
+                    (final _?, final _?) => 'Moins que le montant payé.',
+                    _ => 'Pour calculer la monnaie à rendre.',
+                  },
+                  prefixIcon: const Icon(Icons.payments_outlined),
+                ),
+              ),
+            ],
+            if (_erreur != null) ...[
+              const SizedBox(height: 10),
+              Text(_erreur!, style: const TextStyle(color: Kolors.kRed)),
             ],
             const SizedBox(height: 16),
             SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: () {
-                  final montant = lireMontant(_montant.text, widget.devise);
-                  if (montant == null || montant <= 0) return;
-                  if (mobile && _reference.text.trim().isEmpty) return;
-                  Navigator.pop(context, (
-                    montant,
-                    _moyen,
-                    mobile ? _reference.text.trim() : null,
-                  ));
-                },
+                onPressed: _valider,
                 child: const Text('Valider le paiement'),
               ),
             ),

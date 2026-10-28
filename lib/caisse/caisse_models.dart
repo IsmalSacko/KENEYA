@@ -15,12 +15,22 @@ String formatMontant(int montant, String devise) {
   return '$texte $symbole';
 }
 
-/// Montant saisi (« 2000 », « 12,5 ») → unité mineure.
+/// Montant saisi → unité mineure. Sans centimes (FCFA), points, virgules et
+/// espaces ne sont que des séparateurs de milliers : « 50.000 », « 50 000 »
+/// et « 50,000 » font 50 000. Avec centimes, le dernier séparateur est la
+/// virgule décimale : « 1.250,50 » ou « 1,250.50 » font 1 250,50.
 int? lireMontant(String saisi, String devise) {
   final decimales = const {'XOF': 0, 'XAF': 0, 'GNF': 0}[devise] ?? 2;
-  final v = double.tryParse(saisi.replaceAll(' ', '').replaceAll(',', '.'));
-  if (v == null) return null;
-  return (decimales == 0 ? v : v * 100).round();
+  final brut = saisi.replaceAll(RegExp(r'[\s\u00a0\u202f]'), '');
+  if (brut.isEmpty) return null;
+  if (decimales == 0) return int.tryParse(brut.replaceAll(RegExp('[.,]'), ''));
+  final dernier = brut.lastIndexOf(RegExp('[.,]'));
+  final entier = dernier < 0 ? brut : brut.substring(0, dernier);
+  final fraction = dernier < 0 ? '' : brut.substring(dernier + 1);
+  final v = double.tryParse(
+    '${entier.replaceAll(RegExp('[.,]'), '')}.${fraction.isEmpty ? '0' : fraction}',
+  );
+  return v == null ? null : (v * 100).round();
 }
 
 const Map<String, String> libellesMoyens = {
@@ -92,6 +102,8 @@ class LigneVisite {
 
 class EncaissementVisite {
   const EncaissementVisite({
+    this.uuid = '',
+    this.remboursable = false,
     required this.montant,
     required this.moyen,
     this.reference,
@@ -100,6 +112,10 @@ class EncaissementVisite {
     this.rembourse = false,
   });
 
+  final String uuid;
+
+  /// Sa caisse est encore ouverte : il peut être remboursé.
+  final bool remboursable;
   final int montant;
   final String moyen;
   final String? reference;
@@ -115,6 +131,8 @@ class EncaissementVisite {
 
   factory EncaissementVisite.fromJson(Map<String, dynamic> j) =>
       EncaissementVisite(
+        uuid: (j['uuid'] ?? '').toString(),
+        remboursable: j['remboursable'] == true,
         montant: _int(j['montant']),
         moyen: (j['moyen'] ?? '').toString(),
         reference: j['reference']?.toString(),

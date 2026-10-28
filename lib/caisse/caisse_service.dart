@@ -23,12 +23,13 @@ class CaisseService {
     await ApiClient.dio.delete('/tarifs/$uuid');
   }
 
-  Future<List<Visite>> visites({String? recherche, bool toutes = false}) async {
+  /// [filtre] : null (ouvertes des dernières 24 h), « toutes », « impayees ».
+  Future<List<Visite>> visites({String? recherche, String? filtre}) async {
     final res = await ApiClient.dio.get(
       '/visites',
       queryParameters: {
         if (recherche != null && recherche.isNotEmpty) 'q': recherche,
-        if (toutes) 'statut': 'toutes',
+        'statut': ?filtre,
       },
     );
     return _liste(res.data).map(Visite.fromJson).toList();
@@ -93,6 +94,25 @@ class CaisseService {
     );
     return _visite(res.data);
   }
+
+  /// Un paiement saisi par erreur ; la visite le doit à nouveau.
+  Future<Visite> rembourser(String visite, String encaissement) async =>
+      _visite(
+        (await ApiClient.dio.post(
+          '/visites/$visite/encaissements/$encaissement/rembourser',
+        )).data,
+      );
+
+  Future<Visite> rouvrirVisite(String visite) async =>
+      _visite((await ApiClient.dio.post('/visites/$visite/rouvrir')).data);
+
+  /// Une facture ouverte par erreur, sans paiement.
+  Future<Visite> annulerVisite(String visite) async =>
+      _visite((await ApiClient.dio.post('/visites/$visite/annuler')).data);
+
+  /// Les caisses des 30 derniers jours, avec l'écart à la clôture.
+  Future<List<Map<String, dynamic>>> sessions() async =>
+      _liste((await ApiClient.dio.get('/caisse/sessions')).data);
 
   Future<Visite> cloturerVisite(String visite) async {
     final res = await ApiClient.dio.post('/visites/$visite/cloturer');
@@ -159,8 +179,12 @@ class CaisseService {
     return Map<String, dynamic>.from(res.data as Map);
   }
 
-  Future<Map<String, dynamic>> rapport() async {
-    final res = await ApiClient.dio.get('/caisse/rapport');
+  /// Le rapport d'une journée ([jour] : AAAA-MM-JJ, aujourd'hui sinon).
+  Future<Map<String, dynamic>> rapport({String? jour}) async {
+    final res = await ApiClient.dio.get(
+      '/caisse/rapport',
+      queryParameters: {'jour': ?jour},
+    );
     return Map<String, dynamic>.from(res.data as Map);
   }
 
