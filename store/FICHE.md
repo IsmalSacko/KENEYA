@@ -86,7 +86,7 @@ Une question : ismael-dev.com
 ## Notes de version (500 caractères)
 
 ```
-Reçu après chaque encaissement : numéro de facture, imprimé, en PDF ou par WhatsApp. Un seul ticket par patient, même pris depuis chez lui. « Je suis arrivé » à portée de main pour les patients. Appairage des écrans et bornes plus clair. Corrections d'affichage (affiche de l'accueil, ordonnance).
+Pharmacie : catégories à vous, supprimer un produit, corriger ou retirer un lot, historique du stock, fournisseurs. Caisse : rembourser, rouvrir ou annuler une facture, quantité, monnaie à rendre, impayés. Labo, maternité, hospitalisation : corriger un résultat, clore une grossesse, modifier une chambre. File et rendez-vous : déplacer un rendez-vous, rappeler un absent, SMS au patient. Établissement modifiable, retour au dernier espace.
 ```
 
 ## Catégorie et classement
