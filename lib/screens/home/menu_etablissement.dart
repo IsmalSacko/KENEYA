@@ -244,6 +244,7 @@ class _MenuEtablissement extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.summarize_outlined),
                 title: const Text('Rapport du mois'),
+                subtitle: const Text('Patients, recettes et activité du mois'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.of(context).push(
