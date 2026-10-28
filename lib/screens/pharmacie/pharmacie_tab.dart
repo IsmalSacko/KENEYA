@@ -14,6 +14,8 @@ import '../../pharmacie/verification_ordonnance.dart';
 import '../commun/scanner_qr_screen.dart';
 import 'a_commander_screen.dart';
 import 'delivrance_screen.dart';
+import 'fournisseurs_screen.dart';
+import 'historique_produit_screen.dart';
 import 'inventaire_screen.dart';
 import 'vendre_screen.dart';
 import '../../common/widgets/feuille.dart';
@@ -212,41 +214,30 @@ class _PharmacieTabState extends State<PharmacieTab> {
             const SizedBox(height: 16),
           ],
           if (nbAlertes > 0) _Alertes(alertes: a!),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _recherche,
-                  onSubmitted: (_) => _charger(),
-                  decoration: const InputDecoration(
-                    hintText: 'Produit ou molécule',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                ),
-              ),
-              if (gereStock) ...[
-                IconButton(
-                  tooltip: 'Inventaire',
-                  icon: const Icon(Icons.fact_check_outlined),
+          TextField(
+            controller: _recherche,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _charger(),
+            decoration: const InputDecoration(
+              hintText: 'Produit ou molécule',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+          ),
+          if (gereStock) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonalIcon(
                   onPressed: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const InventaireScreen(),
-                      ),
-                    );
+                    await editerProduit(context);
                     _charger();
                   },
+                  icon: const Icon(Icons.add_box_outlined),
+                  label: const Text('Nouveau produit'),
                 ),
-                IconButton(
-                  tooltip: 'À commander',
-                  icon: const Icon(Icons.assignment_outlined),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ACommanderScreen()),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Réception d’une livraison',
-                  icon: const Icon(Icons.local_shipping_outlined),
+                OutlinedButton.icon(
                   onPressed: () async {
                     await Navigator.of(context).push(
                       MaterialPageRoute(
@@ -255,18 +246,40 @@ class _PharmacieTabState extends State<PharmacieTab> {
                     );
                     _charger();
                   },
+                  icon: const Icon(Icons.local_shipping_outlined),
+                  label: const Text('Réception'),
                 ),
-                IconButton(
-                  tooltip: 'Nouveau produit',
-                  icon: const Icon(Icons.add_box_outlined),
+                OutlinedButton.icon(
                   onPressed: () async {
-                    await editerProduit(context);
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const InventaireScreen(),
+                      ),
+                    );
                     _charger();
                   },
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Inventaire'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ACommanderScreen()),
+                  ),
+                  icon: const Icon(Icons.assignment_outlined),
+                  label: const Text('À commander'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const FournisseursScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.storefront_outlined),
+                  label: const Text('Fournisseurs'),
                 ),
               ],
-            ],
-          ),
+            ),
+          ],
           const SizedBox(height: 10),
           if (_chargement)
             const Center(child: CircularProgressIndicator())
@@ -275,11 +288,16 @@ class _PharmacieTabState extends State<PharmacieTab> {
               'Aucun produit. Ajoutez vos produits, puis la première livraison.',
               style: TextStyle(color: Kolors.kTextMuted),
             )
+          else if (_visibles.isEmpty)
+            Text(
+              'Aucun produit ne correspond à « ${_recherche.text.trim()} ».',
+              style: const TextStyle(color: Kolors.kTextMuted),
+            )
           else
             Card(
               child: Column(
                 children: [
-                  for (final p in _produits)
+                  for (final p in _visibles)
                     ExpansionTile(
                       title: Text(
                         p.nom,
@@ -313,20 +331,72 @@ class _PharmacieTabState extends State<PharmacieTab> {
                                   : 'Périme le ${l.peremption}',
                             ),
                             trailing: gereStock
-                                ? TextButton(
-                                    onPressed: () => _inventaire(l),
-                                    child: const Text('Compter'),
+                                ? PopupMenuButton<String>(
+                                    tooltip: 'Actions sur le lot',
+                                    onSelected: (a) => _actionLot(a, l),
+                                    itemBuilder: (_) => [
+                                      const PopupMenuItem(
+                                        value: 'compter',
+                                        child: Text('Compter (inventaire)'),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'corriger',
+                                        child: Text(
+                                          'Corriger le numéro ou la péremption',
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'retirer',
+                                        child: Text(
+                                          'Retirer du stock (périmé, abîmé…)',
+                                        ),
+                                      ),
+                                      if (l.intact)
+                                        const PopupMenuItem(
+                                          value: 'annuler',
+                                          child: Text(
+                                            'Annuler la réception (erreur)',
+                                          ),
+                                        ),
+                                    ],
                                   )
                                 : null,
                           ),
                         if (gereStock)
-                          TextButton.icon(
-                            onPressed: () async {
-                              await editerProduit(context, p);
-                              _charger();
-                            },
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text('Modifier le produit'),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                            child: Wrap(
+                              spacing: 4,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    await editerProduit(context, p);
+                                    _charger();
+                                  },
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Modifier'),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          HistoriqueProduitScreen(produit: p),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.history_rounded),
+                                  label: const Text('Historique'),
+                                ),
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Kolors.kRed,
+                                  ),
+                                  onPressed: () => _supprimerProduit(p),
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: const Text('Supprimer'),
+                                ),
+                              ],
+                            ),
                           ),
                       ],
                     ),
@@ -336,6 +406,178 @@ class _PharmacieTabState extends State<PharmacieTab> {
         ],
       ),
     );
+  }
+
+  /// La recherche filtre pendant la frappe ; Entrée interroge le serveur.
+  List<Produit> get _visibles {
+    final q = _recherche.text.trim().toLowerCase();
+    if (q.isEmpty) return _produits;
+    return _produits
+        .where(
+          (p) =>
+              p.nom.toLowerCase().contains(q) ||
+              p.description.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
+  Future<void> _supprimerProduit(Produit p) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Supprimer ${p.nom} ?'),
+        content: Text(
+          [
+            'Il ne sera plus proposé à la vente ni dans les ordonnances.',
+            if (p.stockUnites > 0)
+              'Son stock (${p.stockLabel}) sort et reste noté dans les mouvements.',
+            'Les ventes passées gardent son nom.',
+          ].join(' '),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Kolors.kRed),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _service.supprimerProduit(p.uuid);
+      _dire('${p.nom} est supprimé.');
+      await _charger();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  Future<void> _actionLot(String action, LotProduit l) async {
+    switch (action) {
+      case 'compter':
+        return _inventaire(l);
+      case 'corriger':
+        return _corrigerLot(l);
+      case 'retirer':
+        final raison = await showDialog<String>(
+          context: context,
+          builder: (ctx) => SimpleDialog(
+            title: Text(
+              'Retirer le lot ${l.numero ?? 'sans numéro'} (${l.quantite} unité(s)) ?',
+            ),
+            children: [
+              for (final r in [
+                'Périmé',
+                'Abîmé',
+                'Perdu ou volé',
+                'Rappel du fabricant',
+              ])
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, r),
+                  child: Text(r),
+                ),
+            ],
+          ),
+        );
+        if (raison == null) return;
+        await _faire(() => _service.retirerLot(l.uuid, raison));
+      case 'annuler':
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Annuler cette réception ?'),
+            content: Text(
+              'Le lot ${l.numero ?? 'sans numéro'} (${l.quantite} unité(s)) disparaît, comme s’il n’avait jamais été reçu.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Non'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Annuler la réception'),
+              ),
+            ],
+          ),
+        );
+        if (ok == true) await _faire(() => _service.annulerReception(l.uuid));
+    }
+  }
+
+  Future<void> _corrigerLot(LotProduit l) async {
+    final numero = TextEditingController(text: l.numero ?? '');
+    var peremption = DateTime.tryParse(l.peremption ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Corriger le lot'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: numero,
+                decoration: const InputDecoration(labelText: 'Numéro de lot'),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_outlined),
+                title: Text(
+                  peremption == null
+                      ? 'Péremption inconnue'
+                      : 'Périme le ${DateFormat('dd/MM/yyyy').format(peremption!)}',
+                ),
+                onTap: () async {
+                  final choix = await showDatePicker(
+                    context: ctx,
+                    initialDate: peremption ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (choix != null) setD(() => peremption = choix);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    await _faire(
+      () => _service.modifierLot(
+        l.uuid,
+        numero: numero.text.trim().isEmpty ? null : numero.text.trim(),
+        peremption: peremption == null
+            ? null
+            : DateFormat('yyyy-MM-dd').format(peremption!),
+      ),
+    );
+  }
+
+  Future<void> _faire(Future<void> Function() action) async {
+    try {
+      await action();
+      await _charger();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
   }
 
   Future<void> _inventaire(LotProduit l) async {

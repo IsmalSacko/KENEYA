@@ -51,6 +51,57 @@ class PharmacieService {
     );
   }
 
+  Future<void> modifierFournisseur(
+    String uuid,
+    String nom,
+    String? telephone,
+  ) async {
+    await ApiClient.dio.patch(
+      '/pharmacie/fournisseurs/$uuid',
+      data: {'nom': nom, 'telephone': telephone},
+    );
+  }
+
+  Future<void> supprimerFournisseur(String uuid) async {
+    await ApiClient.dio.delete('/pharmacie/fournisseurs/$uuid');
+  }
+
+  /// Retiré de la vente : son stock sort, l'historique garde son nom.
+  Future<void> supprimerProduit(String uuid) async {
+    await ApiClient.dio.delete('/pharmacie/produits/$uuid');
+  }
+
+  /// Entrées et sorties du produit, la plus récente d'abord.
+  Future<List<Map<String, dynamic>>> mouvements(String uuid) async {
+    final res = await ApiClient.dio.get('/pharmacie/produits/$uuid/mouvements');
+    return _liste(res.data);
+  }
+
+  /// Corriger un lot mal saisi ; [peremption] : AAAA-MM-JJ.
+  Future<void> modifierLot(
+    String uuid, {
+    String? numero,
+    String? peremption,
+  }) async {
+    await ApiClient.dio.patch(
+      '/pharmacie/lots/$uuid',
+      data: {'numero': numero, 'peremption': peremption},
+    );
+  }
+
+  /// Périmé, abîmé, perdu : le reste du lot sort du stock.
+  Future<void> retirerLot(String uuid, String raison) async {
+    await ApiClient.dio.post(
+      '/pharmacie/lots/$uuid/retirer',
+      data: {'raison': raison},
+    );
+  }
+
+  /// Réception saisie par erreur, tant que rien n'en est sorti.
+  Future<void> annulerReception(String uuid) async {
+    await ApiClient.dio.delete('/pharmacie/lots/$uuid');
+  }
+
   Future<void> inventorier(String lot, int quantite) async {
     await ApiClient.dio.post(
       '/pharmacie/lots/$lot/inventaire',

@@ -18,11 +18,15 @@ class LotProduit {
     required this.perime,
     this.numero,
     this.peremption,
+    this.intact = false,
   });
 
   final String uuid;
   final int quantite;
   final bool perime;
+
+  /// Rien n'en est sorti : la réception peut encore s'annuler.
+  final bool intact;
   final String? numero;
   final String? peremption;
 
@@ -32,6 +36,7 @@ class LotProduit {
     perime: j['perime'] == true,
     numero: j['numero']?.toString(),
     peremption: j['peremption']?.toString(),
+    intact: j['intact'] == true,
   );
 }
 
