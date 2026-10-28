@@ -10,7 +10,8 @@ import '../../maternite/maternite_service.dart';
 import '../dossier/dossier_widgets.dart';
 import 'grossesse_screen.dart';
 
-/// Les grossesses suivies ici, le terme le plus proche d'abord.
+/// Les grossesses suivies ici, le terme le plus proche d'abord ; les
+/// terminées (accouchées, closes) à part.
 class MaterniteTab extends StatefulWidget {
   const MaterniteTab({super.key});
 
@@ -22,6 +23,7 @@ class _MaterniteTabState extends State<MaterniteTab> {
   final _service = MaterniteService();
   final _recherche = TextEditingController();
   Timer? _attente;
+  bool _terminees = false;
   List<Grossesse>? _liste;
   String? _erreur;
 
@@ -39,7 +41,10 @@ class _MaterniteTabState extends State<MaterniteTab> {
 
   Future<void> _charger() async {
     try {
-      final l = await _service.grossesses(recherche: _recherche.text.trim());
+      final l = await _service.grossesses(
+        recherche: _recherche.text.trim(),
+        terminees: _terminees,
+      );
       if (mounted) {
         setState(() {
           _liste = l;
@@ -59,6 +64,21 @@ class _MaterniteTabState extends State<MaterniteTab> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('En cours')),
+              ButtonSegment(value: true, label: Text('Accouchées et closes')),
+            ],
+            selected: {_terminees},
+            onSelectionChanged: (s) {
+              setState(() {
+                _terminees = s.first;
+                _liste = null;
+              });
+              _charger();
+            },
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _recherche,
             decoration: const InputDecoration(
@@ -81,12 +101,14 @@ class _MaterniteTabState extends State<MaterniteTab> {
               ),
             )
           else if (l.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 40),
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
               child: Text(
-                'Aucune grossesse suivie. Elle se déclare depuis la visite de la patiente (Dossier › Grossesse).',
+                _terminees
+                    ? 'Aucune grossesse terminée.'
+                    : 'Aucune grossesse suivie. Elle se déclare depuis la visite de la patiente (Dossier › Grossesse).',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Kolors.kTextMuted),
+                style: const TextStyle(color: Kolors.kTextMuted),
               ),
             )
           else
@@ -94,23 +116,41 @@ class _MaterniteTabState extends State<MaterniteTab> {
               Card(
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Kolors.kJauneDoux,
-                    child: Text(
-                      '${g.semaines ?? ''}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Kolors.kPrimaryDark,
-                      ),
-                    ),
+                    backgroundColor: g.enCours
+                        ? Kolors.kJauneDoux
+                        : Kolors.kGrayLight,
+                    child: g.enCours
+                        ? Text(
+                            '${g.semaines ?? ''}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Kolors.kPrimaryDark,
+                            ),
+                          )
+                        : Icon(
+                            g.statut == 'accouchee'
+                                ? Icons.child_friendly_rounded
+                                : Icons.do_not_disturb_on_outlined,
+                            color: Kolors.kPrimaryDark,
+                          ),
                   ),
                   title: Text(g.patiente),
                   subtitle: Text(
-                    [
-                      'Terme ${dateCourte(DateTime.tryParse(g.dpa))}',
-                      '${g.cpn.length} CPN',
-                      if (g.prochainRdv != null)
-                        'revoir le ${dateCourte(DateTime.tryParse(g.prochainRdv!))}',
-                    ].join(' · '),
+                    g.enCours
+                        ? [
+                            'Terme ${dateCourte(DateTime.tryParse(g.dpa))}',
+                            '${g.cpn.length} CPN',
+                            if (g.prochainRdv != null)
+                              'revoir le ${dateCourte(DateTime.tryParse(g.prochainRdv!))}',
+                          ].join(' · ')
+                        : [
+                            g.fin,
+                            if (g.accouchement != null)
+                              'le ${dateCourte(g.accouchement)}'
+                            else if (g.termineeLe != null)
+                              'le ${dateCourte(DateTime.tryParse(g.termineeLe!))}',
+                            '${g.cpn.length} CPN',
+                          ].join(' · '),
                   ),
                   trailing: g.risques != null
                       ? const Tooltip(

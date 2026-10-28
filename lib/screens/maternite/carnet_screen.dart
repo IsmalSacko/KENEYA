@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 import '../../common/utils/kcolors.dart';
 import '../../core/api/api_client.dart';
@@ -42,36 +43,69 @@ class _CarnetScreenState extends State<CarnetScreen> {
         });
   }
 
+  void _dire(String m) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    }
+  }
+
   Future<void> _vacciner(VaccinCarnet v) async {
     final lot = TextEditingController();
+    final aujourdhui = DateUtils.dateOnly(DateTime.now());
+    final naissance = DateTime.tryParse(_c?.enfant.dateNaissance ?? '');
+    // Un vaccin fait ailleurs ou oublié se note à sa vraie date.
+    var le = aujourdhui;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(v.nom),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Vaccin fait aujourd’hui.'),
-              TextField(
-                controller: lot,
-                decoration: const InputDecoration(
-                  labelText: 'Numéro de lot (facultatif)',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(v.nom),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event_rounded),
+                  title: Text(
+                    le == aujourdhui
+                        ? 'Fait aujourd’hui'
+                        : 'Fait le ${dateCourte(le)}',
+                  ),
+                  subtitle: const Text('Toucher pour changer la date'),
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: ctx,
+                      initialDate: le,
+                      firstDate:
+                          naissance ??
+                          aujourdhui.subtract(const Duration(days: 365 * 6)),
+                      lastDate: aujourdhui,
+                      helpText: 'Date du vaccin',
+                    );
+                    if (d != null) setState(() => le = d);
+                  },
                 ),
-              ),
-            ],
+                TextField(
+                  controller: lot,
+                  decoration: const InputDecoration(
+                    labelText: 'Numéro de lot (facultatif)',
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Noter'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Noter'),
-          ),
-        ],
       ),
     );
     if (ok != true) return;
@@ -80,14 +114,41 @@ class _CarnetScreenState extends State<CarnetScreen> {
         widget.dossierUuid,
         v.code,
         lot: lot.text.trim(),
+        faitLe: DateFormat('yyyy-MM-dd').format(le),
       );
       if (mounted) setState(() => _c = c);
     } on DioException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
-      }
+      _dire(messageErreur(e));
+    }
+  }
+
+  Future<void> _annuler(VaccinCarnet v) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler ce vaccin ?'),
+        content: Text(
+          '${v.nom}, noté le ${dateCourte(DateTime.tryParse(v.faitLe ?? ''))}. Pour un vaccin noté par erreur : il redevient à faire.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Annuler ce vaccin'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final c = await _service.annulerVaccin(widget.dossierUuid, v.code);
+      if (mounted) setState(() => _c = c);
+      _dire('Vaccin retiré du carnet.');
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
     }
   }
 
@@ -104,18 +165,22 @@ class _CarnetScreenState extends State<CarnetScreen> {
             )
           : ListView(
               padding: const EdgeInsets.all(16),
-              children: [CarnetVaccins(c, onVacciner: _vacciner)],
+              children: [
+                CarnetVaccins(c, onVacciner: _vacciner, onAnnuler: _annuler),
+              ],
             ),
     );
   }
 }
 
 /// Le carnet, vaccin par vaccin. Sans [onVacciner] : en lecture seule.
+/// [onAnnuler] retire un vaccin noté par erreur.
 class CarnetVaccins extends StatelessWidget {
-  const CarnetVaccins(this.c, {this.onVacciner, super.key});
+  const CarnetVaccins(this.c, {this.onVacciner, this.onAnnuler, super.key});
 
   final CarnetEnfant c;
   final void Function(VaccinCarnet)? onVacciner;
+  final void Function(VaccinCarnet)? onAnnuler;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +230,16 @@ class CarnetVaccins extends StatelessWidget {
                       ? TextButton(
                           onPressed: () => onVacciner!(v),
                           child: const Text('Fait'),
+                        )
+                      : v.fait && onAnnuler != null
+                      ? PopupMenuButton<void>(
+                          tooltip: 'Plus',
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              onTap: () => onAnnuler!(v),
+                              child: const Text('Annuler ce vaccin'),
+                            ),
+                          ],
                         )
                       : null,
                 ),

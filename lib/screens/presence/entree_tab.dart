@@ -32,22 +32,38 @@ class _EntreeTabState extends State<EntreeTab> {
   List<VisiteurPresent>? _listeVisiteurs;
   String? _erreur;
 
-  bool get _badges => context.read<AuthController>().aModule('badges');
-  bool get _hospit => context.read<AuthController>().aModule('hospitalisation');
+  /// Le pointage du personnel : module badges, et le droit de le voir.
+  static bool voitPersonnel(AuthController a) =>
+      a.aModule('badges') && (a.peut('badges.gerer') || a.peut('file.emettre'));
+
+  /// Les visiteurs des hospitalisés : module hospitalisation, et le droit.
+  static bool voitVisiteurs(AuthController a) =>
+      a.aModule('hospitalisation') &&
+      (a.peut('file.emettre') || a.peut('hospitalisation.gerer'));
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_badges && _hospit) setState(() => _visiteurs = true);
+      final a = context.read<AuthController>();
+      if (!voitPersonnel(a) && voitVisiteurs(a)) {
+        setState(() => _visiteurs = true);
+      }
       _charger();
     });
   }
 
   Future<void> _charger() async {
+    // Chaque liste selon le droit : un rôle qui ne voit que les visiteurs
+    // (ou que le personnel) ne bute plus sur un refus.
+    final a = context.read<AuthController>();
     try {
-      final p = _badges ? await _service.presents() : <Map<String, dynamic>>[];
-      final v = _hospit ? await _service.visiteurs() : <VisiteurPresent>[];
+      final p = voitPersonnel(a)
+          ? await _service.presents()
+          : <Map<String, dynamic>>[];
+      final v = voitVisiteurs(a)
+          ? await _service.visiteurs()
+          : <VisiteurPresent>[];
       if (mounted) {
         setState(() {
           _presents = p;
@@ -105,6 +121,7 @@ class _EntreeTabState extends State<EntreeTab> {
     final nom = TextEditingController();
     final telephone = TextEditingController();
     String? sejour;
+    String? erreurNom;
     final ok = await formulaire<bool>(
       context,
       titre: const Text('Nouveau visiteur'),
@@ -115,7 +132,13 @@ class _EntreeTabState extends State<EntreeTab> {
           TextField(
             controller: nom,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Nom du visiteur'),
+            decoration: InputDecoration(
+              labelText: 'Nom du visiteur',
+              errorText: erreurNom,
+            ),
+            onChanged: (_) {
+              if (erreurNom != null) setState(() => erreurNom = null);
+            },
           ),
           TextField(
             controller: telephone,
@@ -149,12 +172,18 @@ class _EntreeTabState extends State<EntreeTab> {
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, true),
+          onPressed: () {
+            if (nom.text.trim().isEmpty) {
+              setState(() => erreurNom = 'Indiquez le nom du visiteur.');
+              return;
+            }
+            Navigator.pop(ctx, true);
+          },
           child: const Text('Entrer'),
         ),
       ],
     );
-    if (ok != true || nom.text.trim().isEmpty) return;
+    if (ok != true) return;
     try {
       final v = await _service.entrer({
         'nom': nom.text.trim(),
@@ -163,6 +192,38 @@ class _EntreeTabState extends State<EntreeTab> {
       });
       await _charger();
       if (mounted) await _montrerBadge(v);
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  Future<void> _sortirVisiteur(VisiteurPresent v) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${v.nom} est sorti(e) ?'),
+        content: Text(
+          v.patient == null
+              ? 'Son badge ne servira plus.'
+              : 'Visite chez ${v.patient} terminée ; son badge ne servira plus.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sorti'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _service.sortir(uuid: v.uuid);
+      _dire('Sortie notée.');
+      await _charger();
     } on DioException catch (e) {
       _dire(messageErreur(e));
     }
@@ -234,55 +295,52 @@ class _EntreeTabState extends State<EntreeTab> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
-    final badges = auth.aModule('badges');
-    final hospit = auth.aModule('hospitalisation');
+    final badges = voitPersonnel(auth);
+    final hospit = voitVisiteurs(auth);
     final presents = _presents;
     final visiteurs = _listeVisiteurs;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'entree',
-        onPressed: _scanner,
-        icon: const Icon(Icons.qr_code_scanner_rounded),
-        label: Text(_visiteurs ? 'Sortie visiteur' : 'Pointer'),
-      ),
+      floatingActionButton: !badges && !hospit
+          ? null
+          : FloatingActionButton.extended(
+              heroTag: 'entree',
+              onPressed: _scanner,
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: Text(_visiteurs ? 'Sortie visiteur' : 'Pointer'),
+            ),
       body: RefreshIndicator(
         onRefresh: _charger,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            Row(
-              children: [
-                if (badges && hospit)
-                  Expanded(
-                    child: SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(value: false, label: Text('Personnel')),
-                        ButtonSegment(value: true, label: Text('Visiteurs')),
-                      ],
-                      selected: {_visiteurs},
-                      onSelectionChanged: (s) =>
-                          setState(() => _visiteurs = s.first),
-                    ),
-                  )
-                else
-                  const Spacer(),
-                if (!_visiteurs && auth.peut('badges.gerer'))
-                  IconButton(
-                    tooltip: 'Badges et présence du mois',
-                    icon: const Icon(Icons.badge_outlined),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BadgesScreen()),
-                    ),
-                  ),
-                if (_visiteurs)
-                  IconButton(
-                    tooltip: 'Nouveau visiteur',
-                    icon: const Icon(Icons.person_add_alt_1_rounded),
-                    onPressed: _nouveauVisiteur,
-                  ),
-              ],
-            ),
+            if (badges && hospit)
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Personnel')),
+                  ButtonSegment(value: true, label: Text('Visiteurs')),
+                ],
+                selected: {_visiteurs},
+                onSelectionChanged: (s) => setState(() => _visiteurs = s.first),
+              ),
+            if (!_visiteurs && auth.peut('badges.gerer')) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const BadgesScreen())),
+                icon: const Icon(Icons.badge_outlined),
+                label: const Text('Badges et présence du mois'),
+              ),
+            ],
+            if (_visiteurs && hospit) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _nouveauVisiteur,
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('Nouveau visiteur'),
+              ),
+            ],
             const SizedBox(height: 12),
             if (presents == null || visiteurs == null)
               Padding(
@@ -291,6 +349,15 @@ class _EntreeTabState extends State<EntreeTab> {
                   child: _erreur == null
                       ? const CircularProgressIndicator()
                       : Text(_erreur!),
+                ),
+              )
+            else if (!badges && !hospit)
+              const Padding(
+                padding: EdgeInsets.only(top: 40),
+                child: Text(
+                  'Votre rôle ne gère ni le pointage ni les visiteurs.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Kolors.kTextMuted),
                 ),
               )
             else if (!_visiteurs) ...[
@@ -335,14 +402,7 @@ class _EntreeTabState extends State<EntreeTab> {
                       ].join(' · '),
                     ),
                     trailing: TextButton(
-                      onPressed: () async {
-                        try {
-                          await _service.sortir(uuid: v.uuid);
-                          await _charger();
-                        } on DioException catch (e) {
-                          _dire(messageErreur(e));
-                        }
-                      },
+                      onPressed: () => _sortirVisiteur(v),
                       child: const Text('Sorti'),
                     ),
                     onTap: () => _montrerBadge(v),

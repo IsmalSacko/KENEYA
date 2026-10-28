@@ -57,4 +57,29 @@ void main() {
     expect(a.normaleMax, 1.1);
     expect(a.prix, 1500);
   });
+
+  test('lit les corrections, le rejet et l’annulation', () {
+    final d = DemandeLabo.fromJson({
+      'uuid': 'd',
+      'statut': 'demandee',
+      'patient': 'Fanta',
+      'etablissement': 'CSCom',
+      'rejet_motif': 'Hémolysé',
+      'lignes': [
+        {
+          'uuid': 'l',
+          'nom': 'Glycémie',
+          'resultat': '1,5',
+          'commentaire': 'À jeun',
+          'corrections': [
+            {'ancien': '0,95', 'motif': 'Inversion de tubes', 'par': 'Admin'},
+          ],
+        },
+      ],
+    });
+    expect(d.rejetMotif, 'Hémolysé');
+    expect(d.lignes.first.commentaire, 'À jeun');
+    expect(d.lignes.first.corrections.single.ancien, '0,95');
+    expect(d.lignes.first.corrections.single.motif, 'Inversion de tubes');
+  });
 }

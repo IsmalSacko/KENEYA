@@ -676,7 +676,7 @@ class _PatientScreenState extends State<PatientScreen> {
     DossierScreen ecranDossier() =>
         DossierScreen(visiteUuid: visite, dossier: dossier);
 
-    final tuiles = <_Action>[
+    final tuiles = <Widget>[
       if (envoyer && duJour != null)
         _Action(Icons.confirmation_number_outlined, 'Autre service', _envoyer),
       // Le médecin consulte lui-même ; l'envoyer dans la file reste possible.
@@ -719,10 +719,10 @@ class _PatientScreenState extends State<PatientScreen> {
       if (visite != null &&
           auth.aModule('hospitalisation') &&
           auth.peut('hospitalisation.gerer'))
-        _Action(
-          Icons.bed_outlined,
-          'Hospitaliser',
-          () => hospitaliser(context, visite),
+        BoutonHospitaliser(
+          visite: visite,
+          builder: (libelle, action) =>
+              _Action(Icons.bed_outlined, libelle, action),
         ),
       if (auth.aModule('rdv') && auth.peut('rdv.gerer'))
         _Action(Icons.event_available_outlined, 'Rendez-vous', _rendezVous),

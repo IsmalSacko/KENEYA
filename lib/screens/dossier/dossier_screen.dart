@@ -357,11 +357,13 @@ class _DossierScreenState extends State<DossierScreen> {
                       auth.peut('hospitalisation.gerer'))
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: OutlinedButton.icon(
-                        onPressed: () =>
-                            hospitaliser(context, widget.visiteUuid!),
-                        icon: const Icon(Icons.bed_rounded),
-                        label: const Text('Hospitaliser'),
+                      child: BoutonHospitaliser(
+                        visite: widget.visiteUuid!,
+                        builder: (libelle, action) => OutlinedButton.icon(
+                          onPressed: action,
+                          icon: const Icon(Icons.bed_rounded),
+                          label: Text(libelle),
+                        ),
                       ),
                     ),
                   if (d.accesHistorique)

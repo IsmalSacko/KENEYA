@@ -22,7 +22,7 @@ Future<void> ouvrirGrossesse(BuildContext context, String visite) async {
     var g = await service.pourVisite(visite);
     if (g == null) {
       if (!context.mounted) return;
-      final donnees = await _declarer(context);
+      final donnees = await _formGrossesse(context);
       if (donnees == null) return;
       g = await service.declarer(visite, donnees);
     }
@@ -35,14 +35,18 @@ Future<void> ouvrirGrossesse(BuildContext context, String visite) async {
   }
 }
 
-Future<Map<String, dynamic>?> _declarer(BuildContext context) {
-  DateTime? ddr;
-  final gestite = TextEditingController();
-  final parite = TextEditingController();
-  final risques = TextEditingController();
+/// Déclarer la grossesse, ou corriger [g] (DDR, gestité, parité, risques).
+Future<Map<String, dynamic>?> _formGrossesse(
+  BuildContext context, {
+  Grossesse? g,
+}) {
+  DateTime? ddr = DateTime.tryParse(g?.ddr ?? '');
+  final gestite = TextEditingController(text: g?.gestite?.toString() ?? '');
+  final parite = TextEditingController(text: g?.parite?.toString() ?? '');
+  final risques = TextEditingController(text: g?.risques ?? '');
   return formulaire<Map<String, dynamic>>(
     context,
-    titre: const Text('Nouvelle grossesse'),
+    titre: Text(g == null ? 'Nouvelle grossesse' : 'Modifier la grossesse'),
     corps: (ctx, setState) => Column(
       spacing: 12,
       mainAxisSize: MainAxisSize.min,
@@ -58,13 +62,19 @@ Future<Map<String, dynamic>?> _declarer(BuildContext context) {
           onTap: () async {
             final choix = await showDatePicker(
               context: ctx,
-              initialDate: DateTime.now().subtract(const Duration(days: 60)),
+              initialDate:
+                  ddr ?? DateTime.now().subtract(const Duration(days: 60)),
               firstDate: DateTime.now().subtract(const Duration(days: 300)),
               lastDate: DateTime.now(),
             );
             if (choix != null) setState(() => ddr = choix);
           },
         ),
+        if (g != null && ddr != null)
+          Text(
+            'Terme : ${dateCourte(ddr!.add(const Duration(days: 280)))}',
+            style: const TextStyle(color: Kolors.kTextMuted),
+          ),
         Row(
           children: [
             Expanded(
@@ -109,7 +119,77 @@ Future<Map<String, dynamic>?> _declarer(BuildContext context) {
                 'parite': int.tryParse(parite.text),
                 'risques': risques.text.trim(),
               }),
-        child: const Text('Déclarer'),
+        child: Text(g == null ? 'Déclarer' : 'Enregistrer'),
+      ),
+    ],
+  );
+}
+
+/// Clore la grossesse sans accouchement ici : l'issue et la date.
+Future<(String, DateTime)?> _clore(BuildContext context) {
+  String? issue;
+  var le = DateUtils.dateOnly(DateTime.now());
+  String? erreur;
+  return formulaire<(String, DateTime)>(
+    context,
+    titre: const Text('Clore la grossesse'),
+    corps: (ctx, setState) => Column(
+      spacing: 12,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Pour une grossesse qui ne finit pas par un accouchement ici. Une nouvelle grossesse pourra être déclarée.',
+          style: TextStyle(color: Kolors.kTextMuted),
+        ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final i in issuesGrossesse.entries)
+              ChoiceChip(
+                label: Text(i.value),
+                selected: issue == i.key,
+                onSelected: (_) => setState(() {
+                  issue = i.key;
+                  erreur = null;
+                }),
+              ),
+          ],
+        ),
+        if (erreur != null)
+          Text(erreur!, style: const TextStyle(color: Kolors.kRed)),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.event_rounded),
+          title: Text('Le ${dateCourte(le)}'),
+          subtitle: const Text('Toucher pour changer la date'),
+          onTap: () async {
+            final d = await showDatePicker(
+              context: ctx,
+              initialDate: le,
+              firstDate: DateTime.now().subtract(const Duration(days: 320)),
+              lastDate: DateTime.now(),
+            );
+            if (d != null) setState(() => le = d);
+          },
+        ),
+      ],
+    ),
+    actions: (ctx, setState) => [
+      TextButton(
+        onPressed: () => Navigator.pop(ctx),
+        child: const Text('Annuler'),
+      ),
+      ElevatedButton(
+        onPressed: () {
+          if (issue == null) {
+            setState(() => erreur = 'Choisissez comment la grossesse a fini.');
+            return;
+          }
+          Navigator.pop(ctx, (issue!, le));
+        },
+        child: const Text('Clore'),
       ),
     ],
   );
@@ -135,6 +215,60 @@ class _GrossesseScreenState extends State<GrossesseScreen> {
     if (g != null && mounted) setState(() => _g = g);
   }
 
+  void _dire(String m) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    }
+  }
+
+  Future<void> _modifier() async {
+    final d = await _formGrossesse(context, g: _g);
+    if (d == null) return;
+    try {
+      final g = await MaterniteService().modifier(_g.uuid, d);
+      if (mounted) setState(() => _g = g);
+      _dire('Grossesse enregistrée.');
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  Future<void> _terminer() async {
+    final choix = await _clore(context);
+    if (choix == null || !mounted) return;
+    final (issue, le) = choix;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clore la grossesse ?'),
+        content: Text(
+          '${issuesGrossesse[issue]} le ${dateCourte(le)}. Le suivi (CPN, rappels) s’arrête.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clore'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final g = await MaterniteService().terminer(
+        _g.uuid,
+        issue,
+        DateFormat('yyyy-MM-dd').format(le),
+      );
+      if (mounted) setState(() => _g = g);
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final g = _g;
@@ -148,7 +282,7 @@ class _GrossesseScreenState extends State<GrossesseScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  g.enCours ? '${g.semaines} SA' : 'Accouchée',
+                  g.enCours ? '${g.semaines} SA' : g.fin,
                   style: GoogleFonts.poppins(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -162,6 +296,13 @@ class _GrossesseScreenState extends State<GrossesseScreen> {
                   ].join(' · '),
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
+                if (!g.enCours && g.issue != null && g.termineeLe != null)
+                  Text(
+                    'Le ${dateCourte(DateTime.tryParse(g.termineeLe!))}',
+                    style: TextStyle(
+                      color: Kolors.kWhite.withValues(alpha: 0.85),
+                    ),
+                  ),
                 if (g.prochainRdv != null && g.enCours)
                   Text(
                     'Prochaine CPN le ${dateCourte(DateTime.tryParse(g.prochainRdv!))}',
@@ -195,6 +336,16 @@ class _GrossesseScreenState extends State<GrossesseScreen> {
                   icon: const Icon(Icons.child_friendly_rounded),
                   label: const Text('Accouchement'),
                 ),
+                OutlinedButton.icon(
+                  onPressed: _modifier,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Modifier (DDR, G/P, risques)'),
+                ),
+                TextButton.icon(
+                  onPressed: _terminer,
+                  icon: const Icon(Icons.do_not_disturb_on_outlined),
+                  label: const Text('Clore la grossesse'),
+                ),
               ],
             ),
           if (g.accouchement != null) ...[
@@ -215,6 +366,7 @@ class _GrossesseScreenState extends State<GrossesseScreen> {
                     [
                       e.sexe == 'F' ? 'Fille' : 'Garçon',
                       if (e.poidsG != null) '${e.poidsG} g',
+                      if (e.tailleCm != null) '${e.tailleCm} cm',
                       if (e.apgar1 != null && e.apgar5 != null)
                         'Apgar ${e.apgar1}/${e.apgar5}',
                     ].join(' · '),
@@ -247,7 +399,14 @@ class _GrossesseScreenState extends State<GrossesseScreen> {
               'Aucune CPN notée.',
               style: TextStyle(color: Kolors.kTextMuted),
             ),
-          for (final c in g.cpn.reversed) CarteCpn(c),
+          for (final c in g.cpn.reversed)
+            CarteCpn(
+              c,
+              // Seule la dernière CPN se corrige.
+              onCorriger: g.enCours && c == g.cpn.last
+                  ? () => _ouvrir(CpnScreen(grossesse: g, cpn: c))
+                  : null,
+            ),
         ],
       ),
     );
@@ -255,9 +414,10 @@ class _GrossesseScreenState extends State<GrossesseScreen> {
 }
 
 class CarteCpn extends StatelessWidget {
-  const CarteCpn(this.c, {super.key});
+  const CarteCpn(this.c, {this.onCorriger, super.key});
 
   final CpnVisite c;
+  final VoidCallback? onCorriger;
 
   @override
   Widget build(BuildContext context) {
@@ -267,9 +427,20 @@ class CarteCpn extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'CPN ${c.numero} · ${c.semaines} SA',
-              style: const TextStyle(fontWeight: FontWeight.w800),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'CPN ${c.numero} · ${c.semaines} SA',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                if (onCorriger != null)
+                  TextButton(
+                    onPressed: onCorriger,
+                    child: const Text('Corriger'),
+                  ),
+              ],
             ),
             Text(
               [
@@ -294,11 +465,12 @@ class CarteCpn extends StatelessWidget {
   }
 }
 
-/// La consultation prénatale.
+/// La consultation prénatale ; avec [cpn], la corriger.
 class CpnScreen extends StatefulWidget {
-  const CpnScreen({required this.grossesse, super.key});
+  const CpnScreen({required this.grossesse, this.cpn, super.key});
 
   final Grossesse grossesse;
+  final CpnVisite? cpn;
 
   @override
   State<CpnScreen> createState() => _CpnScreenState();
@@ -319,10 +491,38 @@ class _CpnScreenState extends State<CpnScreen> {
   };
   final _observations = TextEditingController();
   String? _presentation;
+  bool? _oedemes;
+  String? _albuminurie;
   bool _fer = true;
   bool _moustiquaire = false;
   DateTime? _revoir;
   bool _envoi = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.cpn;
+    if (c == null) return;
+    String n(num? v) => v == null
+        ? ''
+        : v == v.roundToDouble()
+        ? '${v.toInt()}'
+        : '$v';
+    _champs['poids']!.text = n(c.poids);
+    _champs['ta_sys']!.text = n(c.taSys);
+    _champs['ta_dia']!.text = n(c.taDia);
+    _champs['hauteur_uterine']!.text = n(c.hauteurUterine);
+    _champs['bcf']!.text = n(c.bcf);
+    _champs['tpi']!.text = n(c.tpi);
+    _champs['vat']!.text = n(c.vat);
+    _observations.text = c.observations ?? '';
+    _presentation = c.presentation;
+    _oedemes = c.oedemes;
+    _albuminurie = c.albuminurie;
+    _fer = c.fer;
+    _moustiquaire = c.moustiquaire;
+    _revoir = DateTime.tryParse(c.prochainRdv ?? '');
+  }
 
   static const _libelles = {
     'poids': ('Poids', 'kg'),
@@ -336,18 +536,26 @@ class _CpnScreenState extends State<CpnScreen> {
 
   Future<void> _valider() async {
     setState(() => _envoi = true);
+    final corrige = widget.cpn;
+    // Tout est envoyé, vide compris : un champ vidé à la correction s'efface.
+    final donnees = {
+      for (final e in _champs.entries)
+        e.key: num.tryParse(e.value.text.replaceAll(',', '.')),
+      'presentation': _presentation,
+      'oedemes': _oedemes,
+      'albuminurie': _albuminurie,
+      'fer': _fer,
+      'moustiquaire': _moustiquaire,
+      'observations': _observations.text.trim(),
+      if (_revoir != null &&
+          (corrige == null ||
+              _revoir!.isAfter(DateUtils.dateOnly(DateTime.now()))))
+        'prochain_rdv': DateFormat('yyyy-MM-dd').format(_revoir!),
+    };
     try {
-      final g = await MaterniteService().cpn(widget.grossesse.uuid, {
-        for (final e in _champs.entries)
-          if (num.tryParse(e.value.text.replaceAll(',', '.')) != null)
-            e.key: num.parse(e.value.text.replaceAll(',', '.')),
-        'presentation': ?_presentation,
-        'fer': _fer,
-        'moustiquaire': _moustiquaire,
-        'observations': _observations.text.trim(),
-        if (_revoir != null)
-          'prochain_rdv': DateFormat('yyyy-MM-dd').format(_revoir!),
-      });
+      final g = corrige == null
+          ? await MaterniteService().cpn(widget.grossesse.uuid, donnees)
+          : await MaterniteService().modifierCpn(corrige.uuid, donnees);
       if (mounted) Navigator.pop(context, g);
     } on DioException catch (e) {
       if (mounted) {
@@ -363,7 +571,13 @@ class _CpnScreenState extends State<CpnScreen> {
   Widget build(BuildContext context) {
     final g = widget.grossesse;
     return Scaffold(
-      appBar: AppBar(title: Text('CPN ${g.cpn.length + 1} · ${g.semaines} SA')),
+      appBar: AppBar(
+        title: Text(
+          widget.cpn == null
+              ? 'CPN ${g.cpn.length + 1} · ${g.semaines} SA'
+              : 'Corriger la CPN ${widget.cpn!.numero}',
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -408,6 +622,39 @@ class _CpnScreenState extends State<CpnScreen> {
                 ),
             ],
           ),
+          const SizedBox(height: 12),
+          const Text('Œdèmes'),
+          Wrap(
+            spacing: 6,
+            children: [
+              ChoiceChip(
+                label: const Text('Non'),
+                selected: _oedemes == false,
+                onSelected: (oui) =>
+                    setState(() => _oedemes = oui ? false : null),
+              ),
+              ChoiceChip(
+                label: const Text('Oui'),
+                selected: _oedemes == true,
+                onSelected: (oui) =>
+                    setState(() => _oedemes = oui ? true : null),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text('Albuminurie (bandelette)'),
+          Wrap(
+            spacing: 6,
+            children: [
+              for (final a in albuminuries.entries)
+                ChoiceChip(
+                  label: Text(a.value),
+                  selected: _albuminurie == a.key,
+                  onSelected: (oui) =>
+                      setState(() => _albuminurie = oui ? a.key : null),
+                ),
+            ],
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Fer et acide folique donnés'),
@@ -449,7 +696,11 @@ class _CpnScreenState extends State<CpnScreen> {
             height: 52,
             child: ElevatedButton(
               onPressed: _envoi ? null : _valider,
-              child: const Text('Enregistrer la CPN'),
+              child: Text(
+                widget.cpn == null
+                    ? 'Enregistrer la CPN'
+                    : 'Enregistrer la correction',
+              ),
             ),
           ),
         ],
@@ -463,6 +714,7 @@ class _Enfant {
   bool vivant = true;
   final prenom = TextEditingController();
   final poids = TextEditingController();
+  final taille = TextEditingController();
   final apgar1 = TextEditingController();
   final apgar5 = TextEditingController();
 }
@@ -484,6 +736,60 @@ class _AccouchementScreenState extends State<AccouchementScreen> {
   DateTime _quand = DateTime.now();
   bool _envoi = false;
 
+  /// Le récapitulatif avant d'enregistrer : un dossier s'ouvre par enfant
+  /// né vivant, l'erreur se rattrape mal.
+  Future<void> _confirmer() async {
+    final enfants = [
+      for (final (i, e) in _enfants.indexed)
+        [
+          _enfants.length > 1 ? 'Enfant ${i + 1}' : 'Enfant',
+          e.sexe == 'F' ? 'fille' : 'garçon',
+          if (!e.vivant) 'mort-né(e)',
+          if (e.prenom.text.trim().isNotEmpty) e.prenom.text.trim(),
+          if (e.poids.text.isNotEmpty) '${e.poids.text} g',
+          if (e.taille.text.isNotEmpty) '${e.taille.text} cm',
+          if (e.apgar1.text.isNotEmpty || e.apgar5.text.isNotEmpty)
+            'Apgar ${e.apgar1.text}/${e.apgar5.text}',
+        ].join(' · '),
+    ];
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enregistrer l’accouchement ?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 6,
+            children: [
+              Text(
+                '${DateFormat('d MMM yyyy à HH:mm', 'fr').format(_quand)} · ${modesAccouchement[_mode]}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              for (final e in enfants) Text(e),
+              const SizedBox(height: 4),
+              const Text(
+                'Chaque enfant né vivant reçoit son dossier, rattaché à celui de sa mère.',
+                style: TextStyle(color: Kolors.kTextMuted),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Corriger'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _valider();
+  }
+
   Future<void> _valider() async {
     setState(() => _envoi = true);
     try {
@@ -498,6 +804,7 @@ class _AccouchementScreenState extends State<AccouchementScreen> {
               'vivant': e.vivant,
               'prenom': e.prenom.text.trim(),
               'poids_g': ?int.tryParse(e.poids.text),
+              'taille_cm': ?int.tryParse(e.taille.text),
               'apgar1': ?int.tryParse(e.apgar1.text),
               'apgar5': ?int.tryParse(e.apgar5.text),
             },
@@ -534,16 +841,33 @@ class _AccouchementScreenState extends State<AccouchementScreen> {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.schedule_rounded),
             title: Text(DateFormat('d MMM yyyy à HH:mm', 'fr').format(_quand)),
-            subtitle: const Text('Toucher pour changer l’heure'),
+            subtitle: const Text(
+              'Toucher pour changer le jour et l’heure (accouchement noté après coup)',
+            ),
             onTap: () async {
+              final n = DateTime.now();
+              final jour = await showDatePicker(
+                context: context,
+                initialDate: _quand,
+                firstDate: n.subtract(const Duration(days: 60)),
+                lastDate: n,
+                helpText: 'Jour de l’accouchement',
+              );
+              if (jour == null || !context.mounted) return;
               final h = await showTimePicker(
                 context: context,
                 initialTime: TimeOfDay.fromDateTime(_quand),
+                helpText: 'Heure de l’accouchement',
               );
               if (h == null) return;
-              final n = DateTime.now();
-              var choix = DateTime(n.year, n.month, n.day, h.hour, h.minute);
-              // Une heure « future » est celle de la nuit passée.
+              var choix = DateTime(
+                jour.year,
+                jour.month,
+                jour.day,
+                h.hour,
+                h.minute,
+              );
+              // Pas d'accouchement dans le futur : l'heure de la nuit passée.
               if (choix.isAfter(n)) {
                 choix = choix.subtract(const Duration(days: 1));
               }
@@ -615,7 +939,13 @@ class _AccouchementScreenState extends State<AccouchementScreen> {
                           labelText: 'Prénom (facultatif)',
                         ),
                       ),
-                    _nombre(e.poids, 'Poids (g)'),
+                    Row(
+                      children: [
+                        Expanded(child: _nombre(e.poids, 'Poids (g)')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _nombre(e.taille, 'Taille (cm)')),
+                      ],
+                    ),
                     Row(
                       children: [
                         Expanded(child: _nombre(e.apgar1, 'Apgar 1 min')),
@@ -642,7 +972,7 @@ class _AccouchementScreenState extends State<AccouchementScreen> {
           SizedBox(
             height: 52,
             child: ElevatedButton(
-              onPressed: _envoi ? null : _valider,
+              onPressed: _envoi ? null : _confirmer,
               child: const Text('Enregistrer l’accouchement'),
             ),
           ),

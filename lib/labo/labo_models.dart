@@ -68,6 +68,23 @@ class AnalyseLabo {
   );
 }
 
+/// Un résultat validé puis corrigé : l'ancien reste écrit.
+class CorrectionLabo {
+  const CorrectionLabo({required this.motif, this.ancien, this.par, this.le});
+
+  final String motif;
+  final String? ancien;
+  final String? par;
+  final DateTime? le;
+
+  factory CorrectionLabo.fromJson(Map<String, dynamic> j) => CorrectionLabo(
+    motif: (j['motif'] ?? '').toString(),
+    ancien: _texte(j['ancien']),
+    par: _texte(j['par']),
+    le: DateTime.tryParse('${j['le']}')?.toLocal(),
+  );
+}
+
 class LigneLabo {
   const LigneLabo({
     required this.uuid,
@@ -79,6 +96,7 @@ class LigneLabo {
     this.resultat,
     this.anormal,
     this.commentaire,
+    this.corrections = const [],
   });
 
   final String uuid;
@@ -90,6 +108,7 @@ class LigneLabo {
   final String? resultat;
   final bool? anormal;
   final String? commentaire;
+  final List<CorrectionLabo> corrections;
 
   factory LigneLabo.fromJson(Map<String, dynamic> j) => LigneLabo(
     uuid: (j['uuid'] ?? '').toString(),
@@ -101,6 +120,11 @@ class LigneLabo {
     resultat: _texte(j['resultat']),
     anormal: j['anormal'] is bool ? j['anormal'] as bool : null,
     commentaire: _texte(j['commentaire']),
+    corrections: [
+      if (j['corrections'] is List)
+        for (final c in (j['corrections'] as List).whereType<Map>())
+          CorrectionLabo.fromJson(Map<String, dynamic>.from(c)),
+    ],
   );
 
   /// « 0,95 g/L »
@@ -126,6 +150,8 @@ class DemandeLabo {
     this.prescripteur,
     this.validePar,
     this.renseignements,
+    this.motifAnnulation,
+    this.rejetMotif,
   });
 
   final String uuid;
@@ -141,6 +167,10 @@ class DemandeLabo {
   final String? prescripteur;
   final String? validePar;
   final String? renseignements;
+  final String? motifAnnulation;
+
+  /// L'échantillon a été rejeté : à prélever de nouveau.
+  final String? rejetMotif;
 
   String get statutLabel => statutsLabo[statut] ?? statut;
   bool get validee => statut == 'validee';
@@ -166,6 +196,8 @@ class DemandeLabo {
     prescripteur: _texte(j['prescripteur']),
     validePar: _texte(j['valide_par']),
     renseignements: _texte(j['renseignements']),
+    motifAnnulation: _texte(j['motif_annulation']),
+    rejetMotif: _texte(j['rejet_motif']),
   );
 }
 

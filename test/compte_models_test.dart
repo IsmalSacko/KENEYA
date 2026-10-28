@@ -31,29 +31,32 @@ void main() {
     expect(Espace.fromJson(espace.toJson()).membreUuid, 'm-1');
   });
 
-  test('le propriétaire et la limite d’établissements se lisent et se gardent', () {
-    final espace = Espace.fromJson({
-      'membre_uuid': 'm-2',
-      'proprietaire': true,
-      'etablissement': {'uuid': 'e-2', 'nom': 'Cabinet'},
-    });
-    expect(espace.proprietaire, isTrue);
-    expect(Espace.fromJson(espace.toJson()).proprietaire, isTrue);
-    expect(Espace.fromJson({'membre_uuid': 'm-3'}).proprietaire, isFalse);
+  test(
+    'le propriétaire et la limite d’établissements se lisent et se gardent',
+    () {
+      final espace = Espace.fromJson({
+        'membre_uuid': 'm-2',
+        'proprietaire': true,
+        'etablissement': {'uuid': 'e-2', 'nom': 'Cabinet'},
+      });
+      expect(espace.proprietaire, isTrue);
+      expect(Espace.fromJson(espace.toJson()).proprietaire, isTrue);
+      expect(Espace.fromJson({'membre_uuid': 'm-3'}).proprietaire, isFalse);
 
-    final limite = LimiteEtablissements.fromJson({
-      'crees': 2,
-      'max': 3,
-      'restants': 1,
-    })!;
-    expect(limite.restants, 1);
-    expect(LimiteEtablissements.fromJson(limite.toJson())!.max, 3);
-    expect(LimiteEtablissements.fromJson(null), isNull);
-    expect(limite.atteinte, isFalse);
+      final limite = LimiteEtablissements.fromJson({
+        'crees': 2,
+        'max': 3,
+        'restants': 1,
+      })!;
+      expect(limite.restants, 1);
+      expect(LimiteEtablissements.fromJson(limite.toJson())!.max, 3);
+      expect(LimiteEtablissements.fromJson(null), isNull);
+      expect(limite.atteinte, isFalse);
 
-    // Sans limite (Hôpital réglé « illimité » dans la console).
-    final libre = LimiteEtablissements.fromJson({'crees': 4, 'max': null})!;
-    expect(libre.max, isNull);
-    expect(libre.atteinte, isFalse);
-  });
+      // Sans limite (Hôpital réglé « illimité » dans la console).
+      final libre = LimiteEtablissements.fromJson({'crees': 4, 'max': null})!;
+      expect(libre.max, isNull);
+      expect(libre.atteinte, isFalse);
+    },
+  );
 }

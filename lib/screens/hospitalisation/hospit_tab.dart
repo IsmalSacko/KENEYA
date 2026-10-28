@@ -9,7 +9,10 @@ import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
 import '../../hospitalisation/hospit_models.dart';
 import '../../hospitalisation/hospit_service.dart';
+import '../../patients/patients_service.dart';
 import '../commun/scanner_qr_screen.dart';
+import '../dossier/dossier_widgets.dart';
+import '../patients/choix_patient.dart';
 import 'sejour_screen.dart';
 import '../../common/widgets/formulaire.dart';
 
@@ -21,10 +24,14 @@ class HospitTab extends StatefulWidget {
   State<HospitTab> createState() => _HospitTabState();
 }
 
+/// Ce que montre l'onglet.
+enum _Vue { patients, sortis, lits }
+
 class _HospitTabState extends State<HospitTab> {
   final _service = HospitService();
-  bool _lits = false;
+  _Vue _vue = _Vue.patients;
   List<Sejour>? _sejours;
+  List<Sejour>? _sortis;
   List<Chambre>? _chambres;
   String? _erreur;
 
@@ -38,16 +45,32 @@ class _HospitTabState extends State<HospitTab> {
     try {
       final s = await _service.sejours();
       final c = await _service.chambres();
+      // Les sortis ne se chargent qu'une fois l'onglet ouvert.
+      final sortis = _vue == _Vue.sortis
+          ? await _service.sejours(sortis: true)
+          : _sortis;
       if (mounted) {
         setState(() {
           _sejours = s;
           _chambres = c;
+          _sortis = sortis;
           _erreur = null;
         });
       }
     } on DioException catch (e) {
       if (mounted) setState(() => _erreur = messageErreur(e));
     }
+  }
+
+  void _dire(String m) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    }
+  }
+
+  void _changerVue(_Vue v) {
+    setState(() => _vue = v);
+    if (v == _Vue.sortis) _charger();
   }
 
   Future<void> _ouvrir(Future<Sejour> Function() charger) async {
@@ -82,6 +105,7 @@ class _HospitTabState extends State<HospitTab> {
     final service = TextEditingController();
     final lits = TextEditingController(text: '4');
     final prix = TextEditingController();
+    String? erreurNom;
     final ok = await formulaire<bool>(
       context,
       titre: const Text('Nouvelle chambre'),
@@ -92,9 +116,13 @@ class _HospitTabState extends State<HospitTab> {
           TextField(
             controller: nom,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Nom (ex. Salle d’observation)',
+              errorText: erreurNom,
             ),
+            onChanged: (_) {
+              if (erreurNom != null) setState(() => erreurNom = null);
+            },
           ),
           TextField(
             controller: service,
@@ -123,12 +151,18 @@ class _HospitTabState extends State<HospitTab> {
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, true),
+          onPressed: () {
+            if (nom.text.trim().isEmpty) {
+              setState(() => erreurNom = 'Indiquez le nom de la chambre.');
+              return;
+            }
+            Navigator.pop(ctx, true);
+          },
           child: const Text('Créer'),
         ),
       ],
     );
-    if (ok != true || nom.text.trim().isEmpty) return;
+    if (ok != true) return;
     try {
       await _service.creerChambre({
         'nom': nom.text.trim(),
@@ -138,12 +172,179 @@ class _HospitTabState extends State<HospitTab> {
       });
       await _charger();
     } on DioException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
-      }
+      _dire(messageErreur(e));
     }
+  }
+
+  /// Modifier la chambre : nom, service, prix, lits en plus, fermer.
+  Future<void> _modifierChambre(Chambre c) async {
+    final devise = context.read<AuthController>().devise;
+    final nom = TextEditingController(text: c.nom);
+    final service = TextEditingController(text: c.service ?? '');
+    final prix = TextEditingController(text: c.prix?.toString() ?? '');
+    final ajout = TextEditingController();
+    var actif = c.actif;
+    final occupee = c.lits.any((l) => l.sejourUuid != null);
+    String? erreurNom;
+    final ok = await formulaire<bool>(
+      context,
+      titre: const Text('Modifier la chambre'),
+      corps: (ctx, setState) => Column(
+        spacing: 12,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nom,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(labelText: 'Nom', errorText: erreurNom),
+            onChanged: (_) {
+              if (erreurNom != null) setState(() => erreurNom = null);
+            },
+          ),
+          TextField(
+            controller: service,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(labelText: 'Service'),
+          ),
+          TextField(
+            controller: prix,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'Prix de la nuit ($devise)',
+              helperText: 'Vide : la nuit n’est pas facturée.',
+            ),
+          ),
+          TextField(
+            controller: ajout,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'Lits à ajouter',
+              helperText:
+                  'La chambre a ${c.lits.length} lit${c.lits.length > 1 ? 's' : ''}.',
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Chambre ouverte'),
+            subtitle: Text(
+              actif
+                  ? 'Ses lits libres reçoivent des patients.'
+                  : 'Fermée : ses lits ne reçoivent plus personne.',
+            ),
+            value: actif,
+            onChanged: (v) => setState(() => actif = v),
+          ),
+          if (!actif && occupee)
+            const Text(
+              'Des patients y sont couchés : changez-les de lit avant de fermer la chambre.',
+              style: TextStyle(color: Kolors.kRed),
+            ),
+        ],
+      ),
+      actions: (ctx, setState) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (nom.text.trim().isEmpty) {
+              setState(() => erreurNom = 'Indiquez le nom de la chambre.');
+              return;
+            }
+            Navigator.pop(ctx, true);
+          },
+          child: const Text('Enregistrer'),
+        ),
+      ],
+    );
+    if (ok != true) return;
+    final lits = int.tryParse(ajout.text) ?? 0;
+    try {
+      await _service.modifierChambre(c.uuid, {
+        'nom': nom.text.trim(),
+        'service': service.text.trim().isEmpty ? null : service.text.trim(),
+        'prix': int.tryParse(prix.text),
+        'actif': actif,
+        if (lits > 0) 'ajouter_lits': lits,
+      });
+      _dire('Chambre enregistrée.');
+      await _charger();
+    } on DioException catch (e) {
+      _dire(messageErreur(e));
+    }
+  }
+
+  /// Un lit libre : on y couche un patient cherché par son nom.
+  Future<void> _admettreSurLit(Chambre c, LitInfo l) async {
+    Patient? patient;
+    final motif = TextEditingController();
+    String? erreurPatient;
+    String? erreurMotif;
+    final ok = await formulaire<bool>(
+      context,
+      titre: Text('${c.nom} · lit ${l.numero}'),
+      corps: (ctx, setState) => Column(
+        spacing: 12,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ChoixPatient(
+            patient: patient,
+            onChoisi: (p) => setState(() {
+              patient = p;
+              erreurPatient = null;
+            }),
+          ),
+          if (erreurPatient != null)
+            Text(erreurPatient!, style: const TextStyle(color: Kolors.kRed)),
+          TextField(
+            controller: motif,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Motif d’hospitalisation',
+              errorText: erreurMotif,
+            ),
+            onChanged: (_) {
+              if (erreurMotif != null) setState(() => erreurMotif = null);
+            },
+          ),
+          const Text(
+            'Le patient a une visite aujourd’hui ? Hospitalisez-le depuis sa fiche : les nuits iront sur sa facture.',
+            style: TextStyle(color: Kolors.kTextMuted),
+          ),
+        ],
+      ),
+      actions: (ctx, setState) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              erreurPatient = patient == null
+                  ? 'Cherchez le patient par son nom.'
+                  : null;
+              erreurMotif = motif.text.trim().isEmpty
+                  ? 'Indiquez le motif.'
+                  : null;
+            });
+            if (erreurPatient == null && erreurMotif == null) {
+              Navigator.pop(ctx, true);
+            }
+          },
+          child: const Text('Hospitaliser'),
+        ),
+      ],
+    );
+    final p = patient;
+    if (ok != true || p == null) return;
+    await _ouvrir(
+      () => _service.admettreDossier(p.uuid, l.uuid, motif.text.trim()),
+    );
   }
 
   @override
@@ -152,8 +353,10 @@ class _HospitTabState extends State<HospitTab> {
     final devise = auth.devise;
     final sejours = _sejours;
     final chambres = _chambres;
+    final sortis = _sortis;
     final regle =
         auth.peut('hospitalisation.gerer') || auth.peut('etablissement.regler');
+    final admet = auth.peut('hospitalisation.gerer');
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -167,26 +370,23 @@ class _HospitTabState extends State<HospitTab> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('Patients')),
-                      ButtonSegment(value: true, label: Text('Lits')),
-                    ],
-                    selected: {_lits},
-                    onSelectionChanged: (s) => setState(() => _lits = s.first),
-                  ),
-                ),
-                if (_lits && regle)
-                  IconButton(
-                    tooltip: 'Nouvelle chambre',
-                    icon: const Icon(Icons.add),
-                    onPressed: _nouvelleChambre,
-                  ),
+            SegmentedButton<_Vue>(
+              segments: const [
+                ButtonSegment(value: _Vue.patients, label: Text('Patients')),
+                ButtonSegment(value: _Vue.sortis, label: Text('Sortis')),
+                ButtonSegment(value: _Vue.lits, label: Text('Lits')),
               ],
+              selected: {_vue},
+              onSelectionChanged: (s) => _changerVue(s.first),
             ),
+            if (_vue == _Vue.lits && regle) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _nouvelleChambre,
+                icon: const Icon(Icons.add),
+                label: const Text('Nouvelle chambre'),
+              ),
+            ],
             const SizedBox(height: 12),
             if (sejours == null || chambres == null)
               Padding(
@@ -197,12 +397,12 @@ class _HospitTabState extends State<HospitTab> {
                       : Text(_erreur!),
                 ),
               )
-            else if (!_lits) ...[
+            else if (_vue == _Vue.patients) ...[
               if (sejours.isEmpty)
                 const Padding(
                   padding: EdgeInsets.only(top: 40),
                   child: Text(
-                    'Personne n’est hospitalisé. On hospitalise depuis la visite du patient.',
+                    'Personne n’est hospitalisé. On hospitalise depuis la visite du patient, ou en touchant un lit libre.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Kolors.kTextMuted),
                   ),
@@ -228,14 +428,50 @@ class _HospitTabState extends State<HospitTab> {
                     onTap: () => _ouvrir(() => _service.sejour(s.uuid)),
                   ),
                 ),
-            ] else ...[
-              if (chambres.isEmpty)
+            ] else if (_vue == _Vue.sortis) ...[
+              if (sortis == null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (sortis.isEmpty)
                 const Padding(
                   padding: EdgeInsets.only(top: 40),
                   child: Text(
-                    'Aucune chambre. Touchez + pour créer les chambres et leurs lits.',
+                    'Aucun patient sorti.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Kolors.kTextMuted),
+                  ),
+                ),
+              for (final s in sortis ?? const <Sejour>[])
+                Card(
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.logout_rounded,
+                      color: Kolors.kTextMuted,
+                    ),
+                    title: Text(s.patient),
+                    subtitle: Text(
+                      [
+                        'Sorti le ${dateCourte(s.sortie)}',
+                        ?modesSortie[s.modeSortie],
+                        '${s.nuits} nuit${s.nuits > 1 ? 's' : ''}',
+                        s.motif,
+                      ].join(' · '),
+                    ),
+                    onTap: () => _ouvrir(() => _service.sejour(s.uuid)),
+                  ),
+                ),
+            ] else ...[
+              if (chambres.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: Text(
+                    regle
+                        ? 'Aucune chambre. Touchez « Nouvelle chambre » pour créer les chambres et leurs lits.'
+                        : 'Aucune chambre.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Kolors.kTextMuted),
                   ),
                 ),
               for (final c in chambres)
@@ -245,14 +481,33 @@ class _HospitTabState extends State<HospitTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          [
-                            c.nom,
-                            ?c.service,
-                            if (c.prix != null)
-                              '${formatMontant(c.prix!, devise)} / nuit',
-                          ].join(' · '),
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        InkWell(
+                          onTap: regle ? () => _modifierChambre(c) : null,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  [
+                                    c.nom,
+                                    ?c.service,
+                                    if (c.prix != null)
+                                      '${formatMontant(c.prix!, devise)} / nuit',
+                                    if (!c.actif) 'fermée',
+                                  ].join(' · '),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: c.actif ? null : Kolors.kTextMuted,
+                                  ),
+                                ),
+                              ),
+                              if (regle)
+                                const Icon(
+                                  Icons.edit_outlined,
+                                  size: 18,
+                                  color: Kolors.kTextMuted,
+                                ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Wrap(
@@ -275,11 +530,13 @@ class _HospitTabState extends State<HospitTab> {
                                       ? 'Lit ${l.numero}'
                                       : '${l.numero} · ${l.patient}',
                                 ),
-                                onPressed: l.sejourUuid == null
-                                    ? null
-                                    : () => _ouvrir(
+                                onPressed: l.sejourUuid != null
+                                    ? () => _ouvrir(
                                         () => _service.sejour(l.sejourUuid!),
-                                      ),
+                                      )
+                                    : l.libre && admet
+                                    ? () => _admettreSurLit(c, l)
+                                    : null,
                               ),
                           ],
                         ),

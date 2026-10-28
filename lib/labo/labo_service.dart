@@ -26,11 +26,19 @@ class LaboService {
     }
   }
 
-  /// [validees] : les résultats validés des dernières 24 h.
-  Future<List<DemandeLabo>> demandes({bool validees = false}) async {
+  /// [validees] : les résultats validés des [jours] derniers jours ; [q]
+  /// cherche le nom du patient.
+  Future<List<DemandeLabo>> demandes({
+    bool validees = false,
+    int jours = 1,
+    String q = '',
+  }) async {
     final res = await ApiClient.dio.get(
       '/labo/demandes',
-      queryParameters: {if (validees) 'statut': 'validee'},
+      queryParameters: {
+        if (validees) ...{'statut': 'validee', 'jours': jours},
+        if (q.trim().isNotEmpty) 'q': q.trim(),
+      },
     );
     return [for (final m in _liste(res.data)) DemandeLabo.fromJson(m)];
   }
@@ -67,26 +75,66 @@ class LaboService {
     (await ApiClient.dio.post('/labo/demandes/$uuid/prelever')).data,
   );
 
+  /// [resultats] et [commentaires] : par ligne (uuid).
   Future<DemandeLabo> saisir(
     String uuid,
-    Map<String, String> resultats,
-  ) async => _demande(
+    Map<String, String> resultats, {
+    Map<String, String> commentaires = const {},
+  }) async => _demande(
     (await ApiClient.dio.post(
       '/labo/demandes/$uuid/resultats',
-      data: {
-        'resultats': [
-          for (final e in resultats.entries)
-            {'uuid': e.key, 'resultat': e.value},
-        ],
-      },
+      data: {'resultats': _resultats(resultats, commentaires)},
     )).data,
   );
 
   Future<DemandeLabo> valider(String uuid) async =>
       _demande((await ApiClient.dio.post('/labo/demandes/$uuid/valider')).data);
 
-  Future<DemandeLabo> annuler(String uuid) async =>
-      _demande((await ApiClient.dio.post('/labo/demandes/$uuid/annuler')).data);
+  /// Corriger des résultats validés, avec la raison.
+  Future<DemandeLabo> corriger(
+    String uuid,
+    Map<String, String> resultats, {
+    required String motif,
+    Map<String, String> commentaires = const {},
+  }) async => _demande(
+    (await ApiClient.dio.post(
+      '/labo/demandes/$uuid/corriger',
+      data: {'motif': motif, 'resultats': _resultats(resultats, commentaires)},
+    )).data,
+  );
+
+  /// L'échantillon est inutilisable : à prélever de nouveau.
+  Future<DemandeLabo> rejeter(String uuid, String motif) async => _demande(
+    (await ApiClient.dio.post(
+      '/labo/demandes/$uuid/rejeter',
+      data: {'motif': motif},
+    )).data,
+  );
+
+  /// Annule ; la note dit si les analyses restent sur la facture.
+  Future<(DemandeLabo, String?)> annuler(String uuid, {String? motif}) async {
+    final res = await ApiClient.dio.post(
+      '/labo/demandes/$uuid/annuler',
+      data: {if (motif != null && motif.isNotEmpty) 'motif': motif},
+    );
+    final note = (res.data as Map)['note'];
+    return (_demande(res.data), note is String ? note : null);
+  }
+
+  List<Map<String, String?>> _resultats(
+    Map<String, String> resultats,
+    Map<String, String> commentaires,
+  ) => [
+    for (final e in resultats.entries)
+      {
+        'uuid': e.key,
+        'resultat': e.value,
+        if (commentaires.containsKey(e.key))
+          'commentaire': commentaires[e.key]!.isEmpty
+              ? null
+              : commentaires[e.key],
+      },
+  ];
 
   /// L'étiquette du tube (58 mm) : patient, analyses, QR.
   static Future<bool> imprimerEtiquette(DemandeLabo d) async {

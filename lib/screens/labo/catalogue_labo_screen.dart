@@ -49,8 +49,19 @@ class _CatalogueLaboScreenState extends State<CatalogueLaboScreen> {
     final prix = TextEditingController(
       text: a?.prix == null ? '' : '${a!.prix}',
     );
+    // Les réponses possibles d'une analyse « à choix », séparées par des virgules.
+    final choix = TextEditingController(text: a?.choix.join(', ') ?? '');
+    String? normal = a?.choixNormal;
     var type = a?.typeResultat ?? 'nombre';
+    var categorie = a?.categorie ?? 'autre';
     var actif = a?.actif ?? true;
+    String? erreurCode;
+    String? erreurNom;
+    String? erreurChoix;
+    List<String> reponses() => [
+      for (final c in choix.text.split(','))
+        if (c.trim().isNotEmpty) c.trim(),
+    ];
 
     final donnees = await formulaire<Map<String, dynamic>>(
       context,
@@ -58,28 +69,51 @@ class _CatalogueLaboScreenState extends State<CatalogueLaboScreen> {
       corps: (ctx, setState) => Column(
         spacing: 12,
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (a == null) ...[
+          if (a == null)
             TextField(
               controller: code,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(labelText: 'Code (ex. CRP)'),
+              decoration: InputDecoration(
+                labelText: 'Code (ex. CRP)',
+                errorText: erreurCode,
+              ),
+              onChanged: (_) {
+                if (erreurCode != null) setState(() => erreurCode = null);
+              },
             ),
-            TextField(
-              controller: nom,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Nom'),
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'nombre', label: Text('Nombre')),
-                ButtonSegment(value: 'texte', label: Text('Texte')),
-              ],
-              selected: {type},
-              onSelectionChanged: (s) => setState(() => type = s.first),
-            ),
-          ],
+          TextField(
+            controller: nom,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(labelText: 'Nom', errorText: erreurNom),
+            onChanged: (_) {
+              if (erreurNom != null) setState(() => erreurNom = null);
+            },
+          ),
+          const Text('Catégorie'),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final c in categoriesLabo.entries)
+                ChoiceChip(
+                  label: Text(c.value),
+                  selected: categorie == c.key,
+                  onSelected: (_) => setState(() => categorie = c.key),
+                ),
+            ],
+          ),
+          const Text('Résultat'),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'nombre', label: Text('Nombre')),
+              ButtonSegment(value: 'choix', label: Text('Choix')),
+              ButtonSegment(value: 'texte', label: Text('Texte')),
+            ],
+            selected: {type},
+            onSelectionChanged: (s) => setState(() => type = s.first),
+          ),
           TextField(
             controller: prix,
             keyboardType: TextInputType.number,
@@ -117,6 +151,38 @@ class _CatalogueLaboScreenState extends State<CatalogueLaboScreen> {
               ],
             ),
           ],
+          if (type == 'choix') ...[
+            TextField(
+              controller: choix,
+              decoration: InputDecoration(
+                labelText: 'Réponses possibles, séparées par des virgules',
+                hintText: 'Négatif, Positif',
+                errorText: erreurChoix,
+              ),
+              onChanged: (_) => setState(() {
+                erreurChoix = null;
+                if (!reponses().contains(normal)) normal = null;
+              }),
+            ),
+            if (reponses().isNotEmpty) ...[
+              const Text(
+                'Réponse normale (les autres sont marquées anormales)',
+              ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final r in reponses())
+                    ChoiceChip(
+                      label: Text(r),
+                      selected: normal == r,
+                      onSelected: (oui) =>
+                          setState(() => normal = oui ? r : null),
+                    ),
+                ],
+              ),
+            ],
+          ],
           if (a != null)
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -132,20 +198,38 @@ class _CatalogueLaboScreenState extends State<CatalogueLaboScreen> {
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, {
-            if (a == null) ...{
-              'code': code.text.trim(),
+          onPressed: () {
+            setState(() {
+              erreurCode = a == null && code.text.trim().isEmpty
+                  ? 'Indiquez un code.'
+                  : null;
+              erreurNom = nom.text.trim().isEmpty ? 'Indiquez le nom.' : null;
+              erreurChoix = type == 'choix' && reponses().length < 2
+                  ? 'Au moins deux réponses.'
+                  : null;
+            });
+            if (erreurCode != null ||
+                erreurNom != null ||
+                erreurChoix != null) {
+              return;
+            }
+            Navigator.pop(ctx, {
+              if (a == null) 'code': code.text.trim() else 'actif': actif,
               'nom': nom.text.trim(),
+              'categorie': categorie,
               'type_resultat': type,
-            } else
-              'actif': actif,
-            'prix': int.tryParse(prix.text) ?? 0,
-            if (type == 'nombre') ...{
-              'unite': unite.text.trim(),
-              'normale_min': double.tryParse(min.text.replaceAll(',', '.')),
-              'normale_max': double.tryParse(max.text.replaceAll(',', '.')),
-            },
-          }),
+              'prix': int.tryParse(prix.text) ?? 0,
+              if (type == 'nombre') ...{
+                'unite': unite.text.trim(),
+                'normale_min': double.tryParse(min.text.replaceAll(',', '.')),
+                'normale_max': double.tryParse(max.text.replaceAll(',', '.')),
+              },
+              if (type == 'choix') ...{
+                'choix': reponses(),
+                'choix_normal': normal,
+              },
+            });
+          },
           child: const Text('Enregistrer'),
         ),
       ],
@@ -168,15 +252,12 @@ class _CatalogueLaboScreenState extends State<CatalogueLaboScreen> {
     final devise = context.watch<AuthController>().devise;
     final l = _liste;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analyses et prix'),
-        actions: [
-          IconButton(
-            tooltip: 'Nouvelle analyse',
-            icon: const Icon(Icons.add),
-            onPressed: () => _editer(),
-          ),
-        ],
+      appBar: AppBar(title: const Text('Analyses et prix')),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'nouvelle-analyse',
+        onPressed: () => _editer(),
+        icon: const Icon(Icons.add),
+        label: const Text('Nouvelle analyse'),
       ),
       body: l == null
           ? Center(
@@ -185,7 +266,7 @@ class _CatalogueLaboScreenState extends State<CatalogueLaboScreen> {
                   : Text(_erreur!),
             )
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               children: [
                 for (final (i, a) in l.indexed) ...[
                   if (i == 0 || l[i - 1].categorie != a.categorie)
@@ -208,7 +289,9 @@ class _CatalogueLaboScreenState extends State<CatalogueLaboScreen> {
                         ),
                       ),
                       subtitle: a.normale == null
-                          ? null
+                          ? (a.typeResultat == 'choix' && a.choix.isNotEmpty
+                                ? Text(a.choix.join(' / '))
+                                : null)
                           : Text('Normale : ${a.normale}'),
                       trailing: Text(
                         a.prix == null
