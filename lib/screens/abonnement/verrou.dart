@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../../common/utils/kcolors.dart';
+import '../../controllers/auth_controller.dart';
 import 'abonnement_screen.dart';
+
+/// « Avec la formule Pro », ou « Renouvelez » quand l'abonnement est échu.
+String raisonVerrou(BuildContext context, String formule) =>
+    context.watch<AuthController>().abonnementEchu
+    ? 'Abonnement échu : renouvelez-le'
+    : 'Avec la formule $formule';
 
 /// Un module ou une fonction que la formule n'ouvre pas : visible, avec un
 /// cadenas et la formule qui l'ouvre.
@@ -56,8 +64,8 @@ class FonctionVerrouillee extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               admin
-                  ? 'Avec la formule $formule.'
-                  : 'Avec la formule $formule : demandez à votre administrateur.',
+                  ? '${raisonVerrou(context, formule)}.'
+                  : '${raisonVerrou(context, formule)} : demandez à votre administrateur.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Kolors.kTextMuted),
             ),
@@ -94,7 +102,7 @@ class LigneVerrouillee extends StatelessWidget {
     return ListTile(
       leading: Icon(icone, color: Kolors.kTextMuted),
       title: Text(titre, style: const TextStyle(color: Kolors.kTextMuted)),
-      subtitle: Text('Avec la formule $formule'),
+      subtitle: Text(raisonVerrou(context, formule)),
       trailing: const Icon(Icons.lock_rounded, color: Kolors.kTextMuted),
       onTap: () => ouvrirAbonnement(context),
     );

@@ -252,6 +252,7 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
                     membres: int.tryParse('${_etat['membres']}'),
                     maxMembres: int.tryParse('${_etat['max_membres']}'),
                     limite: context.watch<CompteController>().limite,
+                    espace: context.watch<CompteController>().espaceOuvert,
                   ),
                   const SizedBox(height: 12),
                   if (_etat['demande_en_attente'] is Map)
@@ -418,17 +419,21 @@ class _Places extends StatelessWidget {
     required this.membres,
     required this.maxMembres,
     required this.limite,
+    required this.espace,
   });
 
   final int? membres;
   final int? maxMembres;
   final LimiteEtablissements? limite;
+  final Espace? espace;
 
-  static String _reste(int n) => n <= 0 ? 'plus de place' : 'il en reste $n';
+  static String _reste(int n) => n <= 0 ? 'Plus de place' : 'Il en reste $n';
 
   @override
   Widget build(BuildContext context) {
-    final l = limite;
+    // Le compte des établissements ne regarde que leur propriétaire.
+    final l = espace?.proprietaire == true ? limite : null;
+    final demo = espace?.demo == true;
     if (membres == null && l == null) return const SizedBox.shrink();
     return Card(
       child: Column(
@@ -445,16 +450,25 @@ class _Places extends StatelessWidget {
                   ? null
                   : Text(_reste(maxMembres! - membres!)),
             ),
-          if (l != null)
+          if (l != null && demo)
+            const ListTile(
+              leading: Icon(Icons.storefront_outlined),
+              title: Text('Établissement de démonstration'),
+              subtitle: Text(
+                'Il ne compte pas dans vos établissements et sa formule ne vous en ouvre pas d’autres.',
+              ),
+            )
+          else if (l != null)
             ListTile(
               leading: const Icon(Icons.storefront_outlined),
-              title: Text(
-                l.max == null
-                    ? 'Vos établissements : ${l.crees}, sans limite'
-                    : 'Vos établissements : ${l.crees} sur ${l.max}',
-              ),
+              title: Text(switch (l.max) {
+                null => 'Vos établissements : ${l.crees}, sans limite',
+                final max when l.crees > max =>
+                  'Vos établissements : ${l.crees}, votre formule en permet $max',
+                final max => 'Vos établissements : ${l.crees} sur $max',
+              }),
               subtitle: Text(
-                '${l.restants == null ? 'Selon votre formule' : _reste(l.restants!)}. Chaque établissement a son propre abonnement.',
+                '${l.explication}. ${l.restants == null ? '' : '${_reste(l.restants!)}. '}Chaque établissement paie son abonnement.',
               ),
             ),
         ],

@@ -107,7 +107,7 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
               Text(
                 l.atteinte
                     ? 'Votre formule permet $max établissements : vous les avez. Passez à la formule au-dessus pour en ouvrir plus.'
-                    : 'Établissements : ${l.crees} sur $max, il vous en reste ${l.restants}. Chacun a son propre abonnement.',
+                    : 'Établissements : ${l.crees} sur $max, il vous en reste ${l.restants} (s${l.explication.substring(1)}). Chacun paie son abonnement.',
                 style: TextStyle(
                   color: l.atteinte ? Kolors.kRed : Kolors.kTextMuted,
                   fontWeight: FontWeight.w600,

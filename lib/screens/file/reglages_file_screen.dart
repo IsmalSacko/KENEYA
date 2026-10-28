@@ -313,13 +313,12 @@ class _ReglagesFileScreenState extends State<ReglagesFileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (!context.watch<AuthController>().aFonction('ecrans'))
+                  if (context.watch<AuthController>().verrou('ecrans')
+                      case final formule?)
                     LigneVerrouillee(
                       icone: Icons.tv_rounded,
                       titre: 'Ajouter un écran ou une borne',
-                      formule:
-                          context.watch<AuthController>().verrou('ecrans') ??
-                          'au-dessus',
+                      formule: formule,
                     )
                   else
                     Wrap(

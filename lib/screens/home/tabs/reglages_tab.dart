@@ -65,10 +65,8 @@ class _ReglagesTabState extends State<ReglagesTab> {
   }
 
   /// La formule ne l'ouvre pas : l'allumer ne changerait rien.
-  bool _horsFormule(AuthController auth, String module) {
-    final inclus = auth.abonnement?['modules'];
-    return inclus is List && !inclus.contains(module);
-  }
+  bool _horsFormule(AuthController auth, String module) =>
+      auth.verrou(module) != null;
 
   void _message(String texte) => ScaffoldMessenger.of(
     context,
@@ -117,7 +115,7 @@ class _ReglagesTabState extends State<ReglagesTab> {
                     LigneVerrouillee(
                       icone: Icons.extension_outlined,
                       titre: entree.value,
-                      formule: auth.verrou(entree.key) ?? 'au-dessus',
+                      formule: auth.verrou(entree.key)!,
                     )
                   else
                     SwitchListTile(

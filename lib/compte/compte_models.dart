@@ -235,6 +235,7 @@ class Espace {
     required this.devise,
     this.valide = true,
     this.proprietaire = false,
+    this.demo = false,
   });
 
   final String membreUuid;
@@ -254,6 +255,9 @@ class Espace {
   /// La personne l'a créé : elle seule peut le supprimer.
   final bool proprietaire;
 
+  /// Démonstration de l'éditeur : hors du compte des établissements.
+  final bool demo;
+
   String get profilLabel => ProfilEtablissement.labelDe(profil);
 
   factory Espace.fromJson(Map<String, dynamic> j) {
@@ -272,6 +276,7 @@ class Espace {
       devise: (e['devise'] ?? '').toString(),
       valide: e['valide'] != false,
       proprietaire: j['proprietaire'] == true,
+      demo: j['demo'] == true,
     );
   }
 
@@ -281,6 +286,7 @@ class Espace {
     'role_label': roleLabel,
     'actif': actif,
     'proprietaire': proprietaire,
+    'demo': demo,
     'etablissement': {
       'uuid': etablissementUuid,
       'nom': etablissementNom,
@@ -299,20 +305,35 @@ class LimiteEtablissements {
     required this.crees,
     required this.max,
     required this.restants,
+    this.formule,
+    this.source,
   });
 
   final int crees;
   final int? max;
   final int? restants;
 
+  /// La formule qui donne ce plafond (« Pro »), et l'établissement qui l'a
+  /// (null : l'essai, tant qu'aucun n'est abonné).
+  final String? formule;
+  final String? source;
+
   bool get atteinte => restants != null && restants! <= 0;
+
+  /// « Selon la formule Pro de « CSCom » ».
+  String get explication => formule == null
+      ? 'Selon votre formule'
+      : 'Selon la formule $formule${source == null ? '' : ' de « $source »'}';
 
   static LimiteEtablissements? fromJson(dynamic j) {
     if (j is! Map) return null;
+    final s = j['source'];
     return LimiteEtablissements(
       crees: int.tryParse('${j['crees']}') ?? 0,
       max: int.tryParse('${j['max']}'),
       restants: int.tryParse('${j['restants']}'),
+      formule: s is Map ? s['formule']?.toString() : null,
+      source: s is Map ? s['etablissement']?.toString() : null,
     );
   }
 
@@ -320,6 +341,7 @@ class LimiteEtablissements {
     'crees': crees,
     'max': max,
     'restants': restants,
+    'source': {'formule': formule, 'etablissement': source},
   };
 }
 
