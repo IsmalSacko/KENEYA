@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +24,9 @@ class LaboTab extends StatefulWidget {
 class _LaboTabState extends State<LaboTab> {
   final _service = LaboService();
   bool _validees = false;
+  int _jours = 1;
+  final _recherche = TextEditingController();
+  Timer? _attente;
   List<DemandeLabo>? _liste;
   String? _erreur;
 
@@ -31,9 +36,20 @@ class _LaboTabState extends State<LaboTab> {
     _charger();
   }
 
+  @override
+  void dispose() {
+    _attente?.cancel();
+    _recherche.dispose();
+    super.dispose();
+  }
+
   Future<void> _charger() async {
     try {
-      final l = await _service.demandes(validees: _validees);
+      final l = await _service.demandes(
+        validees: _validees,
+        jours: _jours,
+        q: _recherche.text,
+      );
       if (mounted) {
         setState(() {
           _liste = l;
@@ -86,37 +102,67 @@ class _LaboTabState extends State<LaboTab> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('À faire')),
-                      ButtonSegment(value: true, label: Text('Validées')),
-                    ],
-                    selected: {_validees},
-                    onSelectionChanged: (s) {
-                      setState(() {
-                        _validees = s.first;
-                        _liste = null;
-                      });
-                      _charger();
-                    },
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('À faire')),
+                ButtonSegment(value: true, label: Text('Validées')),
+              ],
+              selected: {_validees},
+              onSelectionChanged: (s) {
+                setState(() {
+                  _validees = s.first;
+                  _liste = null;
+                });
+                _charger();
+              },
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _recherche,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search_rounded),
+                labelText: 'Nom du patient',
+              ),
+              onChanged: (_) {
+                _attente?.cancel();
+                _attente = Timer(const Duration(milliseconds: 350), _charger);
+              },
+            ),
+            if (_validees) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                children: [
+                  for (final (j, libelle) in const [
+                    (1, '24 h'),
+                    (7, '7 jours'),
+                    (30, '30 jours'),
+                    (90, '3 mois'),
+                  ])
+                    ChoiceChip(
+                      label: Text(libelle),
+                      selected: _jours == j,
+                      onSelected: (_) {
+                        setState(() => _jours = j);
+                        _charger();
+                      },
+                    ),
+                ],
+              ),
+            ],
+            if (auth.peut('labo.valider') ||
+                auth.peut('etablissement.regler')) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const CatalogueLaboScreen(),
                   ),
                 ),
-                if (auth.peut('labo.valider') ||
-                    auth.peut('etablissement.regler'))
-                  IconButton(
-                    tooltip: 'Analyses et prix',
-                    icon: const Icon(Icons.biotech_rounded),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CatalogueLaboScreen(),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+                icon: const Icon(Icons.biotech_rounded),
+                label: const Text('Analyses et prix'),
+              ),
+            ],
             const SizedBox(height: 12),
             if (l == null)
               Padding(
@@ -131,8 +177,12 @@ class _LaboTabState extends State<LaboTab> {
               Padding(
                 padding: const EdgeInsets.only(top: 40),
                 child: Text(
-                  _validees
-                      ? 'Aucun résultat validé ces dernières 24 h.'
+                  _recherche.text.trim().isNotEmpty
+                      ? 'Aucune demande pour ce nom.'
+                      : _validees
+                      ? (_jours == 1
+                            ? 'Aucun résultat validé ces dernières 24 h.'
+                            : 'Aucun résultat validé sur cette période.')
                       : 'Rien à faire. Les demandes des médecins arrivent ici.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Kolors.kTextMuted),
@@ -154,7 +204,12 @@ class _LaboTabState extends State<LaboTab> {
                     ),
                     title: Text(d.patient),
                     subtitle: Text(
-                      '${d.statutLabel} · ${d.lignes.map((x) => x.nom).join(', ')}',
+                      [
+                        d.statut == 'demandee' && d.rejetMotif != null
+                            ? 'À reprélever (${d.rejetMotif})'
+                            : d.statutLabel,
+                        d.lignes.map((x) => x.nom).join(', '),
+                      ].join(' · '),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
