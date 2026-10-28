@@ -15,6 +15,7 @@ import '../commun/scanner_qr_screen.dart';
 import 'a_commander_screen.dart';
 import 'delivrance_screen.dart';
 import 'fournisseurs_screen.dart';
+import 'rayons_screen.dart';
 import 'historique_produit_screen.dart';
 import 'inventaire_screen.dart';
 import 'vendre_screen.dart';
@@ -54,6 +55,7 @@ class _PharmacieTabState extends State<PharmacieTab> {
   Future<void> _charger() async {
     final delivre = context.read<AuthController>().peut('pharmacie.delivrer');
     try {
+      await Rayons.charger();
       _produits = await _service.produits(recherche: _recherche.text.trim());
       _alertes = await _service.alertes();
       if (delivre) _aServir = await _service.aServir();
@@ -276,6 +278,16 @@ class _PharmacieTabState extends State<PharmacieTab> {
                   ),
                   icon: const Icon(Icons.storefront_outlined),
                   label: const Text('Fournisseurs'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RayonsScreen()),
+                    );
+                    _charger();
+                  },
+                  icon: const Icon(Icons.category_outlined),
+                  label: const Text('Catégories'),
                 ),
               ],
             ),
@@ -768,6 +780,53 @@ String? _marge(String achat, String vente) {
   return 'Marge : ${m.toStringAsFixed(0)} F (${(m / v * 100).toStringAsFixed(0)} %)';
 }
 
+const _nouvelleCategorie = '__nouvelle__';
+
+/// Demande le nom d'une catégorie, la crée, renvoie son code.
+Future<String?> nouvelleCategorie(BuildContext context) async {
+  final ctrl = TextEditingController();
+  final nom = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Nouvelle catégorie'),
+      content: TextField(
+        controller: ctrl,
+        autofocus: true,
+        maxLength: 40,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(
+          labelText: 'Nom (ex. Parapharmacie, Lunettes)',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Annuler'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (ctrl.text.trim().isNotEmpty) {
+              Navigator.pop(ctx, ctrl.text.trim());
+            }
+          },
+          child: const Text('Créer'),
+        ),
+      ],
+    ),
+  );
+  if (nom == null) return null;
+  try {
+    return await Rayons.ajouter(nom);
+  } on DioException catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(messageErreur(e))));
+    }
+    return null;
+  }
+}
+
 Future<Produit?> editerProduit(
   BuildContext context, [
   Produit? p,
@@ -811,13 +870,25 @@ Future<Produit?> editerProduit(
           ),
         ),
         DropdownButtonFormField<String>(
-          initialValue: rayon,
-          decoration: const InputDecoration(labelText: 'Rayon'),
+          key: ValueKey('rayon-$rayon-${rayons.length}'),
+          initialValue: rayons.containsKey(rayon) ? rayon : null,
+          decoration: const InputDecoration(labelText: 'Catégorie'),
           items: [
             for (final r in rayons.entries)
               DropdownMenuItem(value: r.key, child: Text(r.value)),
+            const DropdownMenuItem(
+              value: _nouvelleCategorie,
+              child: Text('＋ Nouvelle catégorie…'),
+            ),
           ],
-          onChanged: (v) => setD(() => rayon = v ?? rayon),
+          onChanged: (v) async {
+            if (v != _nouvelleCategorie) {
+              setD(() => rayon = v ?? rayon);
+              return;
+            }
+            final code = await nouvelleCategorie(ctx);
+            setD(() => rayon = code ?? rayon);
+          },
         ),
         TextField(
           controller: codeBarres,

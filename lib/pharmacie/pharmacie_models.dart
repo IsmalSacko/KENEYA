@@ -1,15 +1,12 @@
 // Pharmacie : produits, lots, ordonnances, ventes.
 
-/// Les rayons d'une officine : tout ce qu'on y vend n'est pas un médicament.
-const rayons = {
-  'medicaments': 'Médicaments',
-  'contraception': 'Contraception',
-  'bebe': 'Bébé',
-  'hygiene_beaute': 'Hygiène et beauté',
-  'materiel_medical': 'Matériel médical',
-  'complements': 'Compléments',
-  'autres': 'Autres',
-};
+import 'rayons.dart';
+
+export 'rayons.dart' show Rayons;
+
+/// Les rayons de l'officine : tout ce qu'on y vend n'est pas un médicament.
+/// Chaque établissement a les siens (voir [Rayons]).
+Map<String, String> get rayons => Rayons.noms;
 
 class LotProduit {
   const LotProduit({

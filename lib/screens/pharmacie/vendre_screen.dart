@@ -82,6 +82,7 @@ class _VendreScreenState extends State<VendreScreen> {
   Future<void> _charger() async {
     final auth = context.read<AuthController>();
     try {
+      await Rayons.charger();
       _produits = await _service.produits();
       if (auth.peut('caisse.encaisser')) {
         final s = await CaisseService().session();
