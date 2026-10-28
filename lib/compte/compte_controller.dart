@@ -101,9 +101,14 @@ class CompteController extends ChangeNotifier {
     }
   }
 
+  /// Le jeton du compte a expiré : les espaces restent (hors ligne), mais
+  /// il faut se reconnecter pour les mettre à jour (et voir la console).
+  bool sessionExpiree = false;
+
   Future<void> rafraichir() async {
     try {
       final data = await _api.moi();
+      sessionExpiree = false;
       _appliquer(data);
       await _memoriser();
       notifyListeners();
@@ -112,6 +117,8 @@ class CompteController extends ChangeNotifier {
         // Jeton expiré : la session hors ligne reste, la prochaine connexion
         // en ligne en redonnera un.
         await TokenStorage.clearPersonneToken();
+        sessionExpiree = true;
+        notifyListeners();
       }
     } catch (_) {}
   }
@@ -358,6 +365,7 @@ class CompteController extends ChangeNotifier {
     final token = (data['access_token'] ?? '').toString();
     if (token.isEmpty) throw StateError('Jeton manquant');
     await TokenStorage.savePersonneToken(token);
+    sessionExpiree = false;
     _appliquer(data);
     await _memoriser();
 

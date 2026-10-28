@@ -28,6 +28,8 @@ class BoutonEspaces extends StatelessWidget {
 }
 
 Future<void> afficherEspaces(BuildContext context) {
+  // Les espaces et les accès (console) à jour à chaque ouverture.
+  context.read<CompteController>().rafraichir();
   return feuille<void>(
     context: context,
     isScrollControlled: true,
@@ -89,6 +91,16 @@ class _FeuilleEspaces extends StatelessWidget {
                 ),
               )
             else ...[
+              if (compte.sessionExpiree)
+                _Ligne(
+                  icone: Icons.login_rounded,
+                  titre: 'Reconnectez-vous',
+                  sousTitre:
+                      'Votre session a expiré : reconnectez-vous pour tout mettre à jour.',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ConnexionScreen()),
+                  ),
+                ),
               _Ligne(
                 icone: Icons.favorite_rounded,
                 titre: 'Ma santé',
@@ -96,16 +108,6 @@ class _FeuilleEspaces extends StatelessWidget {
                 actif: compte.espaceActif == null,
                 onTap: () => _ouvrir(context, () => compte.quitterEspace(auth)),
               ),
-              for (final espace in compte.espaces)
-                _Ligne(
-                  icone: Icons.local_hospital_rounded,
-                  titre: espace.etablissementNom,
-                  sousTitre: '${espace.roleLabel} · ${espace.profilLabel}',
-                  actif: compte.espaceActif == espace.membreUuid,
-                  desactive: !espace.actif,
-                  onTap: () =>
-                      _ouvrir(context, () => compte.ouvrirEspace(espace, auth)),
-                ),
               if (compte.personne?.adminPlateforme == true)
                 _Ligne(
                   icone: Icons.admin_panel_settings_rounded,
@@ -117,6 +119,16 @@ class _FeuilleEspaces extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const ConsoleScreen()),
                     );
                   },
+                ),
+              for (final espace in compte.espaces)
+                _Ligne(
+                  icone: Icons.local_hospital_rounded,
+                  titre: espace.etablissementNom,
+                  sousTitre: '${espace.roleLabel} · ${espace.profilLabel}',
+                  actif: compte.espaceActif == espace.membreUuid,
+                  desactive: !espace.actif,
+                  onTap: () =>
+                      _ouvrir(context, () => compte.ouvrirEspace(espace, auth)),
                 ),
               if (compte.personne?.pro == true)
                 _Ligne(
