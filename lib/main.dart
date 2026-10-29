@@ -26,6 +26,7 @@ import 'screens/auth_gateway_screen.dart';
 import 'screens/compte/ma_sante_screen.dart';
 import 'common/widgets/tout_selectionnable.dart';
 import 'screens/onboarding_screen.dart';
+import 'core/push/notifications_push.dart';
 import 'services/local_notification_service.dart';
 
 Future<void> main() async {
@@ -38,6 +39,7 @@ Future<void> main() async {
   await ChangementApi.verifier();
   await SyncManager.instance.init();
   await LocalNotificationService.init();
+  await NotificationsPush.init();
   runApp(const KeneyaPlusApp());
 }
 

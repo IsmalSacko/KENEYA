@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -10,6 +12,7 @@ import '../core/offline/pin_cache.dart';
 import '../core/offline/sync_manager.dart';
 import '../core/offline/sync_queue.dart';
 import '../core/offline/uuid.dart';
+import '../core/push/notifications_push.dart';
 import '../core/storage/token_storage.dart';
 import 'compte_api.dart';
 import 'compte_models.dart';
@@ -126,6 +129,7 @@ class CompteController extends ChangeNotifier {
       _appliquer(data);
       await _memoriser();
       notifyListeners();
+      unawaited(_activerNotifications());
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         // Jeton expiré : la session hors ligne reste, la prochaine connexion
@@ -349,7 +353,37 @@ class CompteController extends ChangeNotifier {
     return true;
   });
 
+  /// Ce téléphone reçoit les notifications de la personne (une fois par
+  /// démarrage suffit ; le serveur garde le jeton).
+  bool _notificationsActivees = false;
+  String? _jetonPush;
+
+  Future<void> _activerNotifications() async {
+    if (_notificationsActivees) return;
+    _notificationsActivees = true;
+    final jeton = await NotificationsPush.jeton();
+    if (jeton == null) return;
+    _jetonPush = jeton;
+    try {
+      await _api.enregistrerTelephone(jeton);
+    } catch (_) {
+      _notificationsActivees = false;
+    }
+    NotificationsPush.surNouveauJeton((nouveau) {
+      _jetonPush = nouveau;
+      _api.enregistrerTelephone(nouveau).catchError((_) {});
+    });
+  }
+
   Future<void> deconnexion(AuthController auth) async {
+    final jeton = _jetonPush;
+    if (jeton != null) {
+      try {
+        await _api.oublierTelephone(jeton);
+      } catch (_) {}
+    }
+    _notificationsActivees = false;
+    _jetonPush = null;
     await SyncManager.instance.syncNow();
     try {
       await _api.deconnexion();
@@ -426,6 +460,7 @@ class CompteController extends ChangeNotifier {
     sessionExpiree = false;
     _appliquer(data);
     await _memoriser();
+    unawaited(_activerNotifications());
 
     // De quoi se reconnecter hors ligne sur ce téléphone.
     final cle = _cleCache(paysCode, telephone);

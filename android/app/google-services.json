@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "795078788552",
+    "project_id": "ngoni-caisse",
+    "storage_bucket": "ngoni-caisse.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:795078788552:android:1961a432177f958447ecfd",
+        "android_client_info": {
+          "package_name": "com.ismaeldev.keneya"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMYBTdS9Z9FxVABhgVTjdG6dQ-P0pf-0w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:795078788552:android:0a5755d32179ca2047ecfd",
+        "android_client_info": {
+          "package_name": "com.ismaeldev.ngonipay"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMYBTdS9Z9FxVABhgVTjdG6dQ-P0pf-0w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

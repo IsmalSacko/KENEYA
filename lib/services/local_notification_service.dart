@@ -13,6 +13,19 @@ class LocalNotificationService {
     const linux = LinuxInitializationSettings(defaultActionName: 'Ouvrir');
     const settings = InitializationSettings(android: android, linux: linux);
     await _plugin.initialize(settings);
+    // Le canal des notifications envoyées par Ngoni Santé (Firebase).
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'ngoni_sante',
+            'Ngoni Santé',
+            description: 'Établissements, rendez-vous et alertes',
+            importance: Importance.high,
+          ),
+        );
   }
 
   static Future<void> show({
@@ -20,9 +33,9 @@ class LocalNotificationService {
     required String body,
   }) async {
     const androidDetails = AndroidNotificationDetails(
-      'keneya_activity',
-      'Activité Ngoni Santé',
-      channelDescription: 'Notifications des actions métier',
+      'ngoni_sante',
+      'Ngoni Santé',
+      channelDescription: 'Établissements, rendez-vous et alertes',
       importance: Importance.high,
       priority: Priority.high,
     );

@@ -240,6 +240,18 @@ class CompteApi {
     await _dio.delete('/compte/dossier/acces/$id');
   }
 
+  /// Ce téléphone reçoit les notifications de la personne.
+  Future<void> enregistrerTelephone(String jeton) async {
+    await _dio.post(
+      '/compte/telephones',
+      data: {'jeton': jeton, 'plateforme': 'android'},
+    );
+  }
+
+  Future<void> oublierTelephone(String jeton) async {
+    await _dio.delete('/compte/telephones', data: {'jeton': jeton});
+  }
+
   /// Le propriétaire supprime son établissement ; [nom] retapé pour confirmer.
   Future<Map<String, dynamic>> supprimerEtablissement(
     String uuid,

@@ -86,7 +86,7 @@ Une question : ismael-dev.com
 ## Notes de version (500 caractères)
 
 ```
-Pharmacie : catégories à vous, supprimer un produit, corriger ou retirer un lot, historique du stock, fournisseurs. Caisse : rembourser, rouvrir ou annuler une facture, quantité, monnaie à rendre, impayés. Labo, maternité, hospitalisation : corriger un résultat, clore une grossesse, modifier une chambre. File et rendez-vous : déplacer un rendez-vous, rappeler un absent, SMS au patient. Établissement modifiable, retour au dernier espace.
+Notifications sur le téléphone : établissement validé, et alertes pour l'équipe. Numéro d'autorisation facultatif à la création. Catégories de la pharmacie modifiables. Corrections.
 ```
 
 ## Catégorie et classement
