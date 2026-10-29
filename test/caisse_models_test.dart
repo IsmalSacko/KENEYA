@@ -31,4 +31,13 @@ void main() {
     expect(lireMontant('1,250.50', 'GHS'), 125050);
     expect(lireMontant('', 'XOF'), isNull);
   });
+
+  test('un prix de la pharmacie passe en unité mineure sans changer', () {
+    // 1 500 F ne doit jamais devenir 15 000 F.
+    expect(enMineur(1500.0, 'XOF'), 1500);
+    expect(enMineur(3000, 'XOF'), 3000);
+    expect(enMineur(12.5, 'GHS'), 1250);
+    expect(enMajeur(3000, 'XOF'), 3000);
+    expect(enMajeur(1250, 'GHS'), 12.5);
+  });
 }

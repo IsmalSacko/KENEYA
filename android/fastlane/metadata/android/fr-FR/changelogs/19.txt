@@ -1,1 +1,0 @@
-Notifications sur le téléphone : établissement validé, et alertes pour l'équipe. Le bandeau « En attente de vérification » disparaît dès la validation. Numéro d'autorisation facultatif à la création. Catégories de la pharmacie modifiables. Corrections.

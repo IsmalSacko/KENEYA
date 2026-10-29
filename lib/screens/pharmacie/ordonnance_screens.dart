@@ -224,7 +224,7 @@ class _PrescrireScreenState extends State<PrescrireScreen> {
           if (total > 0) ...[
             const SizedBox(height: 16),
             Text(
-              'Total prévu à la pharmacie : ${formatMontant(lireMontant('$total', devise) ?? 0, devise)}',
+              'Total prévu à la pharmacie : ${formatMontant(enMineur(total, devise), devise)}',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,

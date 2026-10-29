@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 /// « 2 000 FCFA », « 12,50 GHS ». Le montant est en unité mineure (un franc
 /// CFA n'a pas de centimes, un cedi en a).
 String formatMontant(int montant, String devise) {
-  final decimales = const {'XOF': 0, 'XAF': 0, 'GNF': 0}[devise] ?? 2;
+  final decimales = _decimales(devise);
   final valeur = decimales == 0 ? montant : montant / 100;
   final texte = NumberFormat.decimalPatternDigits(
     locale: 'fr',
@@ -20,7 +20,7 @@ String formatMontant(int montant, String devise) {
 /// et « 50,000 » font 50 000. Avec centimes, le dernier séparateur est la
 /// virgule décimale : « 1.250,50 » ou « 1,250.50 » font 1 250,50.
 int? lireMontant(String saisi, String devise) {
-  final decimales = const {'XOF': 0, 'XAF': 0, 'GNF': 0}[devise] ?? 2;
+  final decimales = _decimales(devise);
   final brut = saisi.replaceAll(RegExp(r'[\s\u00a0\u202f]'), '');
   if (brut.isEmpty) return null;
   if (decimales == 0) return int.tryParse(brut.replaceAll(RegExp('[.,]'), ''));
@@ -32,6 +32,17 @@ int? lireMontant(String saisi, String devise) {
   );
   return v == null ? null : (v * 100).round();
 }
+
+int _decimales(String devise) =>
+    const {'XOF': 0, 'XAF': 0, 'GNF': 0}[devise] ?? 2;
+
+/// Un prix de la pharmacie (en francs, cedis…) → unité mineure.
+int enMineur(double montant, String devise) =>
+    _decimales(devise) == 0 ? montant.round() : (montant * 100).round();
+
+/// Unité mineure → francs, cedis…
+double enMajeur(int montant, String devise) =>
+    _decimales(devise) == 0 ? montant.toDouble() : montant / 100;
 
 const Map<String, String> libellesMoyens = {
   'especes': 'Espèces',

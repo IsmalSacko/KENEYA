@@ -447,7 +447,7 @@ class ChoixProduitState extends State<ChoixProduit> {
 
 /// « 1 500 FCFA la boîte de 10 · 200 FCFA l'unité ».
 String prixProduit(Produit p, String devise) {
-  String m(double v) => formatMontant(lireMontant('$v', devise) ?? 0, devise);
+  String m(double v) => formatMontant(enMineur(v, devise), devise);
   return [
     p.conditionnement > 1
         ? '${m(p.prixBoite)} la boîte de ${p.conditionnement}'

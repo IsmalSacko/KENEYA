@@ -105,7 +105,7 @@ class _VendreScreenState extends State<VendreScreen> {
 
   String _f(double v) {
     final devise = context.read<AuthController>().devise;
-    return formatMontant(lireMontant('$v', devise) ?? 0, devise);
+    return formatMontant(enMineur(v, devise), devise);
   }
 
   double get _total => _panier.fold(0, (s, a) => s + a.montant);
@@ -884,9 +884,9 @@ class _PaiementState extends State<_Paiement> {
 
   @override
   Widget build(BuildContext context) {
-    final recu = double.tryParse(
-      _recu.text.replaceAll(' ', '').replaceAll(',', '.'),
-    );
+    final devise = context.read<AuthController>().devise;
+    final saisi = lireMontant(_recu.text, devise);
+    final recu = saisi == null ? null : enMajeur(saisi, devise);
     final rendu = recu == null ? null : recu - widget.total;
     final especes = _moyen == 'especes';
     final credit = _moyen == 'credit';
