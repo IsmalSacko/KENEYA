@@ -120,6 +120,10 @@ class AuthController extends ChangeNotifier {
       final user = _parseUser(data['user']);
       if (user != null) currentUser = user;
       await _appliquerContexte(data);
+      final membre = LocalStore.read<String>(_tokenMembreKey);
+      if (membre != null) {
+        await LocalStore.write('${_contexteKey}_$membre', _contexte());
+      }
       notifyListeners();
     } catch (_) {
       // Keep session even if profile refresh fails.

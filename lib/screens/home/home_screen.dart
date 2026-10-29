@@ -17,7 +17,9 @@ import 'package:keneya_plus/screens/pharmacie/pharmacie_tab.dart';
 import 'package:keneya_plus/screens/pharmacie/vendre_screen.dart';
 import 'package:provider/provider.dart';
 
+import '../../compte/compte_controller.dart';
 import '../../core/offline/sync_manager.dart';
+import '../../core/push/notifications_push.dart';
 import '../abonnement/verrou.dart';
 import 'menu_etablissement.dart';
 import 'ouvrir_onglet.dart';
@@ -35,7 +37,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isOffline = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   int _tabIndex = 0;
@@ -48,6 +50,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    NotificationsPush.recue.addListener(_relireEtablissement);
     Connectivity().checkConnectivity().then((results) {
       if (!mounted) return;
       setState(() {
@@ -82,12 +86,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    NotificationsPush.recue.removeListener(_relireEtablissement);
     _connectivitySub?.cancel();
     SyncManager.instance.pendingCount.removeListener(_pendingListener);
     super.dispose();
   }
 
+  /// Retour dans l'app : l'établissement a pu être validé, l'abonnement
+  /// renouvelé, les droits changés entre-temps.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _relireEtablissement();
+  }
+
+  void _relireEtablissement() {
+    if (!mounted) return;
+    context.read<AuthController>().refreshCurrentUser();
+    context.read<CompteController>().rafraichir();
+  }
+
   Future<void> _refreshAll() async {
+    _relireEtablissement();
     await context.read<PatientController>().fetchPatients();
     if (!mounted) return;
     await context.read<MedicamentController>().fetchMedicaments();

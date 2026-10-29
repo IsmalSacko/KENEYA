@@ -14,6 +14,10 @@ class NotificationsPush {
 
   static bool _pret = false;
 
+  /// Avance à chaque notification reçue ou touchée : les écrans ouverts
+  /// relisent alors l'état (établissement validé…).
+  static final ValueNotifier<int> recue = ValueNotifier(0);
+
   static bool get _disponible => !kIsWeb && Platform.isAndroid;
 
   static Future<void> init() async {
@@ -22,6 +26,7 @@ class NotificationsPush {
       await Firebase.initializeApp();
       // App ouverte : Android ne l'affiche pas tout seul.
       FirebaseMessaging.onMessage.listen((message) {
+        recue.value++;
         final n = message.notification;
         if (n == null) return;
         LocalNotificationService.show(
@@ -29,6 +34,7 @@ class NotificationsPush {
           body: n.body ?? '',
         );
       });
+      FirebaseMessaging.onMessageOpenedApp.listen((_) => recue.value++);
       _pret = true;
     } catch (_) {
       // Firebase indisponible : l'app marche sans notifications.
