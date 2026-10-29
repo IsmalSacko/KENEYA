@@ -86,7 +86,7 @@ Une question : ismael-dev.com
 ## Notes de version (500 caractères)
 
 ```
-Notifications sur le téléphone : établissement validé, et alertes pour l'équipe. Numéro d'autorisation facultatif à la création. Catégories de la pharmacie modifiables. Corrections.
+Notifications sur le téléphone : établissement validé, alertes pour l'équipe. Le bandeau « En attente de vérification » disparaît dès la validation. Numéro d'autorisation facultatif. Catégories de la pharmacie modifiables. Prix justes à l'écran Vendre. Stock modifiable dans la fiche produit. Boutons du bas jamais cachés. Pharmacies et dépôts : plus d'onglet Patients (Vendre, Caisse, Stock). Corrections.
 ```
 
 ## Catégorie et classement
