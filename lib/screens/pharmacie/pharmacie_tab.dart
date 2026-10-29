@@ -879,6 +879,7 @@ Future<Produit?> editerProduit(
     corps: (ctx, setD) => Column(
       spacing: 12,
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
           controller: nom,

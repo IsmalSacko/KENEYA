@@ -274,10 +274,28 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       listTileTheme: const ListTileThemeData(iconColor: Kolors.kPrimary),
+      // Éteint ne doit pas avoir l'air désactivé : rond foncé sur un fond
+      // gris bien visible, bordure nette. Seul un interrupteur vraiment
+      // inactif est pâle.
       switchTheme: SwitchThemeData(
-        trackColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? Kolors.kPrimary : null,
-        ),
+        thumbColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.disabled)) return Kolors.kBorderStrong;
+          return s.contains(WidgetState.selected)
+              ? Colors.white
+              : Kolors.kTextMuted;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.disabled)) return Kolors.kBorder;
+          return s.contains(WidgetState.selected)
+              ? Kolors.kPrimary
+              : Kolors.kBorderStrong;
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.disabled)) return Kolors.kBorder;
+          return s.contains(WidgetState.selected)
+              ? Kolors.kPrimary
+              : Kolors.kTextMuted;
+        }),
       ),
       dividerTheme: const DividerThemeData(color: Kolors.kBorder, thickness: 1),
     );
