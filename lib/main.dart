@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'common/utils/kcolors.dart';
 import 'common/utils/app_theme.dart';
 import 'core/api/changement_api.dart';
 import 'core/api/options_serveur.dart';
@@ -103,8 +104,20 @@ class KeneyaPlusApp extends StatelessWidget {
             // L'app est en français : calendriers et boutons système aussi,
             // même sur un téléphone réglé en anglais.
             locale: const Locale('fr'),
-            builder: (context, child) =>
-                ToutSelectionnable(child: child ?? const SizedBox.shrink()),
+            // Android 15 dessine l'app sous la barre de navigation du
+            // téléphone : tout l'écran (pages, feuilles, boutons du bas)
+            // reste au-dessus, quelle que soit la page.
+            builder: (context, child) => ColoredBox(
+              color: Kolors.kOffWhite,
+              child: SafeArea(
+                top: false,
+                left: false,
+                right: false,
+                child: ToutSelectionnable(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
+            ),
             home: const _AppEntryPoint(),
           );
         },

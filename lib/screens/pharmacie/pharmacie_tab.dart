@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../caisse/caisse_models.dart';
 import '../../common/utils/kcolors.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
@@ -772,12 +773,18 @@ class _Alertes extends StatelessWidget {
 /// propose de saisir le stock déjà en rayon (pas depuis une réception, qui
 /// le saisit elle-même).
 /// « Marge : 450 F (30 %) » quand les deux prix sont saisis.
-String? _marge(String achat, String vente) {
-  final a = double.tryParse(achat.replaceAll(',', '.'));
-  final v = double.tryParse(vente.replaceAll(',', '.'));
+String? _marge(String achat, String vente, String devise) {
+  final a = _montant(achat, devise);
+  final v = _montant(vente, devise);
   if (a == null || v == null || a <= 0 || v <= 0) return null;
   final m = v - a;
   return 'Marge : ${m.toStringAsFixed(0)} F (${(m / v * 100).toStringAsFixed(0)} %)';
+}
+
+/// Un prix saisi (« 1500 », « 1.500 », « 1 500 ») en francs, cedis…
+double? _montant(String saisi, String devise) {
+  final m = lireMontant(saisi, devise);
+  return m == null ? null : enMajeur(m, devise);
 }
 
 const _nouvelleCategorie = '__nouvelle__';
@@ -848,13 +855,23 @@ Future<Produit?> editerProduit(
   final prixAchat = TextEditingController(
     text: p?.prixAchat?.toStringAsFixed(0) ?? '',
   );
+  final devise = context.read<AuthController>().devise;
   var rayon = p?.rayon ?? 'medicaments';
   var venteUnite = p?.venteUnite ?? false;
   var ordonnance = p?.ordonnanceRequise ?? false;
-  // Le stock déjà en rayon, à la création : une première réception.
-  final boites = TextEditingController();
+  // Le stock en rayon : à la création, une première réception ; ensuite,
+  // le compte corrigé (le serveur note l'écart).
+  final boites = TextEditingController(
+    text: p == null ? '' : '${p.stockBoites}',
+  );
+  final unitesEnPlus = TextEditingController(
+    text: p == null
+        ? ''
+        : '${p.stockUnites - p.stockBoites * p.conditionnement}',
+  );
   final lot = TextEditingController();
   DateTime? peremption;
+  int parBoite() => int.tryParse(cond.text) ?? 1;
 
   final donnees = await formulaire<Map<String, dynamic>>(
     context,
@@ -934,6 +951,7 @@ Future<Produit?> editerProduit(
         TextField(
           controller: cond,
           keyboardType: TextInputType.number,
+          onChanged: (_) => setD(() {}),
           decoration: const InputDecoration(
             labelText: 'Combien dans une boîte (comprimés, sachets…) ?',
             helperText:
@@ -965,7 +983,7 @@ Future<Produit?> editerProduit(
             ),
           ],
         ),
-        if (_marge(prixAchat.text, prixBoite.text) case final m?)
+        if (_marge(prixAchat.text, prixBoite.text, devise) case final m?)
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -976,13 +994,87 @@ Future<Produit?> editerProduit(
               ),
             ),
           ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Vendu aussi à l’unité'),
-          value: venteUnite,
-          onChanged: (v) => setD(() => venteUnite = v),
-        ),
-        if (venteUnite)
+        if (p != null || avecStock) ...[
+          const Divider(height: 24),
+          Text(
+            p == null ? 'Stock actuel (facultatif)' : 'En stock',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          Text(
+            p == null
+                ? 'Ce que vous avez déjà en rayon. Ensuite, le stock bouge tout seul : réceptions, ventes, délivrances.'
+                : 'Corrigez si votre compte en rayon est différent. Une livraison se saisit dans « Réception ».',
+            style: const TextStyle(color: Kolors.kTextMuted, fontSize: 12.5),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: boites,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: parBoite() > 1
+                        ? 'Boîtes en stock'
+                        : 'Quantité en stock',
+                  ),
+                ),
+              ),
+              if (p != null && parBoite() > 1) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: unitesEnPlus,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: 'Unités en plus (boîte ouverte)',
+                    ),
+                  ),
+                ),
+              ],
+              if (p == null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: lot,
+                    decoration: const InputDecoration(labelText: 'N° de lot'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (p == null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.event_busy_outlined),
+              title: Text(
+                peremption == null
+                    ? 'Date de péremption'
+                    : 'Périme le ${peremption!.day.toString().padLeft(2, '0')}/${peremption!.month.toString().padLeft(2, '0')}/${peremption!.year}',
+              ),
+              onTap: () async {
+                final choix = await showDatePicker(
+                  context: ctx,
+                  initialDate: DateTime.now().add(const Duration(days: 365)),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 3650)),
+                  initialDatePickerMode: DatePickerMode.year,
+                );
+                if (choix != null) setD(() => peremption = choix);
+              },
+            ),
+          const Divider(height: 24),
+        ],
+        // À l'unité : seulement s'il y a plusieurs unités dans la boîte.
+        if (parBoite() > 1)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Vendu aussi à l’unité'),
+            value: venteUnite,
+            onChanged: (v) => setD(() => venteUnite = v),
+          ),
+        if (venteUnite && parBoite() > 1)
           TextField(
             controller: prixUnite,
             keyboardType: TextInputType.number,
@@ -1001,70 +1093,6 @@ Future<Produit?> editerProduit(
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(labelText: 'Alerte sous (unités)'),
         ),
-        const Divider(height: 24),
-        if (p != null)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.inventory_2_outlined),
-            title: Text(
-              'En stock : ${p.stockBoites} boîte${p.stockBoites > 1 ? 's' : ''}'
-              '${p.conditionnement > 1 ? ' (${p.stockUnites} unités)' : ''}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: const Text(
-              'Pour ajouter : « Réception ». Pour corriger : « Inventaire » sur le lot.',
-            ),
-          )
-        else if (avecStock) ...[
-          const Text(
-            'Stock actuel (facultatif)',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          const Text(
-            'Ce que vous avez déjà en rayon. Ensuite, le stock bouge tout seul : réceptions, ventes, délivrances.',
-            style: TextStyle(color: Kolors.kTextMuted, fontSize: 12.5),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: boites,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Boîtes en stock',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: lot,
-                  decoration: const InputDecoration(labelText: 'N° de lot'),
-                ),
-              ),
-            ],
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.event_busy_outlined),
-            title: Text(
-              peremption == null
-                  ? 'Date de péremption'
-                  : 'Périme le ${peremption!.day.toString().padLeft(2, '0')}/${peremption!.month.toString().padLeft(2, '0')}/${peremption!.year}',
-            ),
-            onTap: () async {
-              final choix = await showDatePicker(
-                context: ctx,
-                initialDate: DateTime.now().add(const Duration(days: 365)),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 3650)),
-                initialDatePickerMode: DatePickerMode.year,
-              );
-              if (choix != null) setD(() => peremption = choix);
-            },
-          ),
-        ],
       ],
     ),
     actions: (ctx, setD) => [
@@ -1074,7 +1102,7 @@ Future<Produit?> editerProduit(
       ),
       TextButton(
         onPressed: () {
-          final prix = double.tryParse(prixBoite.text.replaceAll(',', '.'));
+          final prix = _montant(prixBoite.text, devise);
           if (nom.text.trim().isEmpty || prix == null) {
             ScaffoldMessenger.of(ctx).showSnackBar(
               const SnackBar(
@@ -1090,18 +1118,16 @@ Future<Produit?> editerProduit(
             'dosage': dosage.text.trim(),
             'conditionnement': int.tryParse(cond.text) ?? 1,
             'prix_unitaire': prix,
-            'vente_unite': venteUnite,
-            if (venteUnite)
-              'prix_unite': double.tryParse(
-                prixUnite.text.replaceAll(',', '.'),
-              ),
+            'vente_unite': venteUnite && parBoite() > 1,
+            if (venteUnite && parBoite() > 1)
+              'prix_unite': _montant(prixUnite.text, devise),
             'ordonnance_requise': rayon == 'medicaments' && ordonnance,
             'seuil_alerte': int.tryParse(seuil.text) ?? 5,
             'rayon': rayon,
             'code_barres': codeBarres.text.trim().isEmpty
                 ? null
                 : codeBarres.text.trim(),
-            'prix_achat': double.tryParse(prixAchat.text.replaceAll(',', '.')),
+            'prix_achat': _montant(prixAchat.text, devise),
           });
         },
         child: const Text('Enregistrer'),
@@ -1111,8 +1137,21 @@ Future<Produit?> editerProduit(
   if (donnees == null || !context.mounted) return null;
   try {
     final service = PharmacieService();
-    final produit = await service.enregistrerProduit(donnees, uuid: p?.uuid);
+    var produit = await service.enregistrerProduit(donnees, uuid: p?.uuid);
     final enStock = int.tryParse(boites.text) ?? 0;
+    // Le compte corrigé à la main : le serveur ajoute ou retire l'écart.
+    if (p != null && produit != null && boites.text.trim().isNotEmpty) {
+      final compte =
+          enStock * produit.conditionnement +
+          // Les unités en plus ne valent que si la boîte n'a pas changé.
+          (produit.conditionnement > 1 &&
+                  produit.conditionnement == p.conditionnement
+              ? int.tryParse(unitesEnPlus.text) ?? 0
+              : 0);
+      if (compte != produit.stockUnites) {
+        produit = await service.compterStock(produit.uuid, compte) ?? produit;
+      }
+    }
     if (p == null && avecStock && enStock > 0 && produit != null) {
       await service.recevoir([
         {

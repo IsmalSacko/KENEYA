@@ -71,6 +71,19 @@ class PharmacieService {
     await ApiClient.dio.delete('/pharmacie/produits/$uuid');
   }
 
+  /// Le stock compté en rayon (en unités) : le serveur ajoute ou retire
+  /// l'écart et le note dans les mouvements.
+  Future<Produit?> compterStock(String uuid, int unites) async {
+    final res = await ApiClient.dio.post(
+      '/pharmacie/produits/$uuid/stock',
+      data: {'unites': unites},
+    );
+    final produit = res.data is Map ? (res.data as Map)['produit'] : null;
+    return produit is Map
+        ? Produit.fromJson(Map<String, dynamic>.from(produit))
+        : null;
+  }
+
   /// Entrées et sorties du produit, la plus récente d'abord.
   Future<List<Map<String, dynamic>>> mouvements(String uuid) async {
     final res = await ApiClient.dio.get('/pharmacie/produits/$uuid/mouvements');
