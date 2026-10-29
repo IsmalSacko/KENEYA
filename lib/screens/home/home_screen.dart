@@ -271,8 +271,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _NavTab(
           title: 'Caisse',
           shortLabel: 'Caisse',
-          icon: Icons.point_of_sale_outlined,
-          selectedIcon: Icons.point_of_sale,
+          icon: Icons.account_balance_wallet_outlined,
+          selectedIcon: Icons.account_balance_wallet,
           page: const CaisseTab(),
         ),
       if (voitPharmacie)
@@ -298,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ('hospitalisation', 'Hospitalisation', 'Hospit.', Icons.bed_outlined),
         ('badges', 'Entrée', 'Entrée', Icons.door_front_door_outlined),
         ('rdv', 'Rendez-vous', 'RDV', Icons.event_note_outlined),
-        ('caisse', 'Caisse', 'Caisse', Icons.point_of_sale_outlined),
+        ('caisse', 'Caisse', 'Caisse', Icons.account_balance_wallet_outlined),
         ('pharmacie', 'Pharmacie', 'Pharma.', Icons.local_pharmacy_outlined),
       ];
       for (final (module, titre, court, icone) in fermables) {

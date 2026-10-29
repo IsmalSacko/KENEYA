@@ -367,7 +367,10 @@ class _CaisseTabState extends State<CaisseTab> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              if (auth.aModule('pharmacie') && auth.peut('pharmacie.delivrer'))
+              // Dans une officine, on vend depuis l'onglet « Vendre ».
+              if (!auth.estOfficine &&
+                  auth.aModule('pharmacie') &&
+                  auth.peut('pharmacie.delivrer'))
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Kolors.kJaune,
