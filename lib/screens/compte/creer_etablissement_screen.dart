@@ -141,12 +141,11 @@ class _CreerEtablissementScreenState extends State<CreerEtablissementScreen> {
             TextFormField(
               controller: _autorisation,
               decoration: const InputDecoration(
-                labelText: 'N° d’autorisation, d’agrément ou d’ordre',
+                labelText: 'N° d’autorisation ou d’agrément (facultatif)',
                 hintText: 'ex. arrêté d’ouverture, licence de pharmacie',
+                helperText: 'Vous pourrez l’ajouter plus tard dans Réglages.',
                 prefixIcon: Icon(Icons.verified_outlined),
               ),
-              validator: (v) =>
-                  (v ?? '').trim().length < 3 ? 'Indiquez le numéro' : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
