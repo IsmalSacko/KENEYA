@@ -308,7 +308,7 @@ class _AujourdhuiTabState extends State<AujourdhuiTab> {
               child: Row(
                 children: [
                   for (final (i, bouton) in [
-                    if (auth.peut('patients.gerer'))
+                    if (!auth.estOfficine && auth.peut('patients.gerer'))
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size(0, 48),

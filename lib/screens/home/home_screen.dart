@@ -176,8 +176,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final voitFile =
         auth.aModule('file') &&
         ['file.emettre', 'file.appeler', 'file.gerer'].any(auth.peut);
+    // Une officine vend à des clients : pas de dossiers patients.
     final voitPatients =
-        auth.peut('patients.voir') || auth.peut('dossier.lire');
+        !auth.estOfficine &&
+        (auth.peut('patients.voir') || auth.peut('dossier.lire'));
     final voitMaternite =
         auth.aModule('maternite') && auth.peut('maternite.suivre');
     final voitHospit =
