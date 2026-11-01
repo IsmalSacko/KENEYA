@@ -267,4 +267,18 @@ class CompteApi {
   Future<void> deconnexion() async {
     await _dio.post('/compte/deconnexion');
   }
+
+  /// Ce que la suppression du compte emporterait : établissements, dossier.
+  Future<Map<String, dynamic>> apercuSuppression() async {
+    final res = await _dio.get('/compte/suppression');
+    return Map<String, dynamic>.from((res.data as Map)['data'] as Map);
+  }
+
+  /// Supprime le compte de la personne (PIN et « SUPPRIMER »).
+  Future<void> supprimerCompte(String pin) async {
+    await _dio.post(
+      '/compte/supprimer',
+      data: {'pin': pin, 'confirmation': 'SUPPRIMER'},
+    );
+  }
 }

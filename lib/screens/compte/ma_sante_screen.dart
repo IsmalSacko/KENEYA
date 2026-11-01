@@ -16,6 +16,7 @@ import '../ma_sante/mon_dossier_screen.dart';
 import '../ma_sante/ma_maternite_screen.dart';
 import 'creer_etablissement_screen.dart';
 import 'espaces_sheet.dart';
+import 'suppression_compte.dart';
 
 /// L'espace « Ma santé » : toujours là, pour tout le monde. Les espaces pro
 /// de la personne s'ouvrent d'ici.
@@ -221,6 +222,17 @@ class MaSanteScreen extends StatelessWidget {
                 padding: EdgeInsets.only(top: 12),
                 child: LinearProgressIndicator(),
               ),
+            const SizedBox(height: 24),
+            // Supprimer son compte (exigé par l'App Store), à portée de main.
+            Center(
+              child: TextButton.icon(
+                key: const Key('supprimer-mon-compte'),
+                style: TextButton.styleFrom(foregroundColor: Kolors.kRed),
+                onPressed: () => supprimerMonCompte(context),
+                icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                label: const Text('Supprimer mon compte'),
+              ),
+            ),
           ],
         ),
       ),

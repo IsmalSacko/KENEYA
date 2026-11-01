@@ -388,6 +388,25 @@ class CompteController extends ChangeNotifier {
     try {
       await _api.deconnexion();
     } catch (_) {}
+    await _effacerSession(auth);
+  }
+
+  /// Ce que la suppression du compte emporterait (établissements, dossier).
+  Future<Map<String, dynamic>> apercuSuppression() => _api.apercuSuppression();
+
+  /// Supprime le compte (PIN et « SUPPRIMER ») : plus rien à révoquer chez
+  /// le serveur, la session de ce téléphone s'efface. Une erreur (PIN
+  /// incorrect) remonte telle quelle.
+  Future<void> supprimerCompte(String pin, AuthController auth) async {
+    await _api.supprimerCompte(pin);
+    final uuid = personne?.uuid;
+    if (uuid != null) await LocalStore.remove(_cleDernierEspace(uuid));
+    _notificationsActivees = false;
+    _jetonPush = null;
+    await _effacerSession(auth);
+  }
+
+  Future<void> _effacerSession(AuthController auth) async {
     await auth.logout();
     await TokenStorage.clearPersonneToken();
     await LocalStore.remove(_clePersonne);

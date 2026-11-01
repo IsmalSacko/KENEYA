@@ -5,6 +5,7 @@ import 'package:keneya_plus/common/widgets/carte_marque.dart';
 import 'package:keneya_plus/common/utils/role_ui.dart';
 import 'package:keneya_plus/compte/compte_controller.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
+import 'package:keneya_plus/screens/compte/suppression_compte.dart';
 import 'package:provider/provider.dart';
 
 class ProfileTab extends StatefulWidget {
@@ -127,6 +128,16 @@ class ProfileTabState extends State<ProfileTab> {
           onPressed: auth.loading ? null : _deconnexion,
           icon: const Icon(Icons.logout_rounded),
           label: const Text('Se déconnecter'),
+        ),
+        const SizedBox(height: 8),
+        // Supprimer son compte (exigé par l'App Store) : le compte entier,
+        // pas seulement l'accès à cet établissement.
+        TextButton.icon(
+          key: const Key('supprimer-mon-compte'),
+          style: TextButton.styleFrom(foregroundColor: Kolors.kRed),
+          onPressed: auth.loading ? null : () => supprimerMonCompte(context),
+          icon: const Icon(Icons.delete_forever_outlined),
+          label: const Text('Supprimer mon compte'),
         ),
       ],
     );
