@@ -1,0 +1,80 @@
+name: App Store (iPhone et iPad)
+
+# Lancé à la main seulement (Actions › App Store › Run workflow), sur un tag
+# existant « ios-v4.0.10 » : construit l'application iOS sur un Mac, la signe
+# avec la clé d'API App Store Connect (signature automatique, équipe
+# P2VK5LC48H) et l'envoie dans App Store Connect (TestFlight). Le numéro de
+# build vient du tag : 4.0.10 → 40010 ; Apple refuse deux fois le même.
+#
+# Secrets : APP_STORE_CONNECT_KEY_ID, APP_STORE_CONNECT_ISSUER_ID,
+# APP_STORE_CONNECT_KEY (contenu du fichier .p8), APPLE_TEAM_ID.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.44.7"
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Version
+        id: v
+        run: |
+          case "$GITHUB_REF_NAME" in ios-v*) ;; *) echo "::error::Lancer sur un tag ios-v* (ex. ios-v4.0.10)"; exit 1 ;; esac
+          V="${GITHUB_REF_NAME#ios-v}"
+          IFS=. read -r A B C <<< "$V"
+          echo "nom=$V" >> "$GITHUB_OUTPUT"
+          echo "code=$((A * 10000 + B * 100 + C))" >> "$GITHUB_OUTPUT"
+          echo "iOS $V ($((A * 10000 + B * 100 + C)))"
+
+      - name: Clé d'API App Store Connect
+        env:
+          CLE: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        run: |
+          [ -n "$CLE" ] && [ -n "$ID" ] || { echo "::error::Secrets App Store Connect manquants"; exit 1; }
+          mkdir -p "$HOME/private_keys"
+          printf '%s' "$CLE" > "$HOME/private_keys/AuthKey_$ID.p8"
+
+      - run: flutter pub get
+
+      - name: Préparer le projet iOS
+        run: flutter build ios --config-only --release --build-name=${{ steps.v.outputs.nom }} --build-number=${{ steps.v.outputs.code }}
+
+      - name: Archiver (signature automatique)
+        run: |
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Runner.xcarchive" archive \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+      - name: Envoyer dans App Store Connect
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :teamID string ${{ secrets.APPLE_TEAM_ID }}" ios/ExportOptions.plist
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist ios/ExportOptions.plist -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          echo "Envoyée : version ${{ steps.v.outputs.nom }} (${{ steps.v.outputs.code }}) — visible dans TestFlight après le traitement d'Apple."

@@ -6,12 +6,14 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'abonnement/achats_apple_controller.dart';
 import 'common/utils/kcolors.dart';
 import 'common/utils/app_theme.dart';
 import 'core/api/changement_api.dart';
 import 'core/api/options_serveur.dart';
 import 'core/offline/local_store.dart';
 import 'core/offline/sync_manager.dart';
+import 'core/plateforme.dart';
 import 'compte/compte_controller.dart';
 import 'compte/mes_tickets_controller.dart';
 import 'file/appareil_api.dart';
@@ -85,6 +87,19 @@ class KeneyaPlusApp extends StatelessWidget {
           create: (_) => EtablissementController(),
         ),
         ChangeNotifierProvider<UserController>(create: (_) => UserController()),
+        // iPhone : les achats Apple confirmés, ou restés en suspens au
+        // lancement précédent, sont vérifiés par le serveur puis clos dès le
+        // lancement. Ailleurs, jamais créé : la boutique d'Apple n'y est pas.
+        ChangeNotifierProvider<AchatsAppleController>(
+          lazy: !achatsInterdits,
+          create: (context) {
+            final auth = context.read<AuthController>();
+            return AchatsAppleController(
+              sessionOuverte: () => auth.isAuthenticated,
+              surAbonnement: auth.majAbonnement,
+            );
+          },
+        ),
       ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),

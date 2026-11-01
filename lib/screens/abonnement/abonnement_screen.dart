@@ -16,19 +16,26 @@ import '../../common/widgets/formulaire.dart';
 import '../../compte/compte_models.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/api/api_client.dart';
+import '../../core/plateforme.dart';
+import 'offres_apple.dart';
 
 /// L'abonnement de l'établissement, comme dans Ngoni Caisse : où il en est,
 /// les formules et leurs prix, payer puis envoyer sa demande, que Ngoni
 /// Santé valide. Le soin ne s'arrête jamais : échu, seule la gestion ferme.
+/// Sur iPhone, les formules s'achètent par l'achat intégré d'Apple, seul
+/// moyen permis : ni autre paiement, ni prix en francs, ni demande.
 class AbonnementScreen extends StatefulWidget {
-  const AbonnementScreen({super.key});
+  const AbonnementScreen({super.key, this.service});
+
+  /// Pour les tests ; sinon celui de l'API.
+  final AbonnementService? service;
 
   @override
   State<AbonnementScreen> createState() => _AbonnementScreenState();
 }
 
 class _AbonnementScreenState extends State<AbonnementScreen> {
-  final _service = AbonnementService();
+  late final _service = widget.service ?? AbonnementService();
   Map<String, dynamic>? _donnees;
   String? _erreur;
   int _mois = 1;
@@ -255,108 +262,133 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
                     espace: context.watch<CompteController>().espaceOuvert,
                   ),
                   const SizedBox(height: 12),
-                  if (_etat['demande_en_attente'] is Map)
-                    _EnAttente(
-                      demande: Map<String, dynamic>.from(
-                        _etat['demande_en_attente'] as Map,
-                      ),
-                      duree: _duree,
-                      onAnnuler: (uuid) async {
-                        await _service.annuler(uuid);
-                        await _charger();
-                      },
+                  // iPhone : l'achat intégré d'Apple, seul permis (règle 3.1.1).
+                  if (achatsInterdits)
+                    OffresApple(
+                      formules: _liste('formules'),
+                      compte: _donnees?['apple_compte'] as String?,
+                      actuelle: _etat['en_cours'] != false
+                          ? _etat['formule'] as String?
+                          : null,
+                      onAbonne: _charger,
                     ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Choisir une formule',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<int>(
-                    showSelectedIcon: false,
-                    segments: [
-                      for (final m in const [1, 3, 6, 12])
-                        ButtonSegment(
-                          value: m,
-                          label: FittedBox(child: Text(_duree(m))),
-                        ),
-                    ],
-                    selected: {_mois},
-                    onSelectionChanged: (s) => setState(() => _mois = s.first),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_liste('formules').isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Text(
-                        'Aucune formule proposée pour le moment : écrivez-nous.',
-                        style: TextStyle(color: Kolors.kTextMuted),
-                      ),
-                    ),
-                  for (final f in _liste('formules'))
-                    _CarteFormule(
-                      formule: f,
-                      mois: _mois,
-                      actuelle: f['code'] == _etat['formule'],
-                      peutChoisir: _etat['demande_en_attente'] == null,
-                      onChoisir: () => _choisir(f),
-                    ),
-                  if ('${_paiement['whatsapp'] ?? ''}'.isNotEmpty)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      onPressed: () => envoyerWhatsApp(
-                        context,
-                        '${_paiement['whatsapp']}',
-                        'Bonjour, je voudrais m’abonner à Ngoni Santé.',
-                      ),
-                      icon: const Icon(Icons.chat_outlined),
-                      label: const Text('Une question ? WhatsApp'),
-                    ),
-                  if (_liste('historique').isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      'Historique',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    for (final d in _liste('historique'))
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(switch (d['statut']) {
-                          'approuvee' => Icons.check_circle_rounded,
-                          'refusee' => Icons.cancel_rounded,
-                          _ => Icons.schedule_rounded,
-                        }),
-                        title: Text(
-                          '${d['formule_nom']} · ${_duree(int.tryParse('${d['mois']}') ?? 1)} · '
-                          '${formatMontant(int.tryParse('${d['montant']}') ?? 0, '${d['devise']}')}',
-                        ),
-                        subtitle: Text(switch (d['statut']) {
-                          'approuvee' =>
-                            'Reçu ${d['recu_numero']} · du ${_date(d['periode_debut'] as String?)} au ${_date(d['periode_fin'] as String?)}',
-                          'refusee' => 'Refusée : ${d['motif_refus'] ?? ''}',
-                          'annulee' => 'Annulée',
-                          _ => 'En attente de validation',
-                        }),
-                        trailing: d['statut'] == 'approuvee'
-                            ? IconButton(
-                                tooltip: 'Reçu (PDF)',
-                                icon: const Icon(Icons.receipt_long_rounded),
-                                onPressed: () => _recu(d),
-                              )
-                            : null,
-                      ),
-                  ],
+                  if (!achatsInterdits) ..._offres(),
                 ],
               ),
             ),
+    );
+  }
+
+  /// Ailleurs que sur iPhone : payer (Orange Money, Wave…) puis envoyer sa
+  /// demande, et l'historique des paiements.
+  List<Widget> _offres() => [
+    if (_etat['demande_en_attente'] is Map)
+      _EnAttente(
+        demande: Map<String, dynamic>.from(_etat['demande_en_attente'] as Map),
+        duree: _duree,
+        onAnnuler: (uuid) async {
+          await _service.annuler(uuid);
+          await _charger();
+        },
+      ),
+    const SizedBox(height: 8),
+    Text(
+      'Choisir une formule',
+      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
+    ),
+    const SizedBox(height: 8),
+    SegmentedButton<int>(
+      showSelectedIcon: false,
+      segments: [
+        for (final m in const [1, 3, 6, 12])
+          ButtonSegment(
+            value: m,
+            label: FittedBox(child: Text(_duree(m))),
+          ),
+      ],
+      selected: {_mois},
+      onSelectionChanged: (s) => setState(() => _mois = s.first),
+    ),
+    const SizedBox(height: 12),
+    if (_liste('formules').isEmpty)
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Aucune formule proposée pour le moment : écrivez-nous.',
+          style: TextStyle(color: Kolors.kTextMuted),
+        ),
+      ),
+    for (final f in _liste('formules')) _carte(f),
+    if ('${_paiement['whatsapp'] ?? ''}'.isNotEmpty)
+      OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+        onPressed: () => envoyerWhatsApp(
+          context,
+          '${_paiement['whatsapp']}',
+          'Bonjour, je voudrais m’abonner à Ngoni Santé.',
+        ),
+        icon: const Icon(Icons.chat_outlined),
+        label: const Text('Une question ? WhatsApp'),
+      ),
+    if (_liste('historique').isNotEmpty) ...[
+      const SizedBox(height: 16),
+      Text(
+        'Historique',
+        style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      for (final d in _liste('historique'))
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(switch (d['statut']) {
+            'approuvee' => Icons.check_circle_rounded,
+            'refusee' => Icons.cancel_rounded,
+            _ => Icons.schedule_rounded,
+          }),
+          title: Text(
+            '${d['formule_nom']} · ${_duree(int.tryParse('${d['mois']}') ?? 1)} · '
+            '${formatMontant(int.tryParse('${d['montant']}') ?? 0, '${d['devise']}')}',
+          ),
+          subtitle: Text(switch (d['statut']) {
+            'approuvee' =>
+              'Reçu ${d['recu_numero']} · du ${_date(d['periode_debut'] as String?)} au ${_date(d['periode_fin'] as String?)}',
+            'refusee' => 'Refusée : ${d['motif_refus'] ?? ''}',
+            'annulee' => 'Annulée',
+            _ => 'En attente de validation',
+          }),
+          trailing: d['statut'] == 'approuvee'
+              ? IconButton(
+                  tooltip: 'Reçu (PDF)',
+                  icon: const Icon(Icons.receipt_long_rounded),
+                  onPressed: () => _recu(d),
+                )
+              : null,
+        ),
+    ],
+  ];
+
+  Widget _carte(Map<String, dynamic> f) {
+    final tarif = (f['tarifs'] as List? ?? const [])
+        .whereType<Map>()
+        .where((t) => t['mois'] == _mois)
+        .firstOrNull;
+    final actuelle = f['code'] == _etat['formule'];
+    return CarteFormule(
+      formule: f,
+      prix: tarif == null
+          ? null
+          : formatMontant(
+              int.tryParse('${tarif['montant']}') ?? 0,
+              '${tarif['devise'] ?? 'XOF'}',
+            ),
+      actuelle: actuelle,
+      bouton: tarif == null
+          ? 'Pas proposé sur cette durée'
+          : actuelle
+          ? 'Renouveler'
+          : 'Choisir ${f['nom']}',
+      onChoisir: _etat['demande_en_attente'] == null && tarif != null
+          ? () => _choisir(f)
+          : null,
     );
   }
 }
@@ -508,27 +540,31 @@ class _EnAttente extends StatelessWidget {
   );
 }
 
-class _CarteFormule extends StatelessWidget {
-  const _CarteFormule({
+/// Une formule : ce qu'elle ouvre, son prix pour la durée choisie (en
+/// francs, ou celui d'Apple sur iPhone) et le bouton pour la prendre.
+class CarteFormule extends StatelessWidget {
+  const CarteFormule({
     required this.formule,
-    required this.mois,
+    required this.prix,
     required this.actuelle,
-    required this.peutChoisir,
+    required this.bouton,
     required this.onChoisir,
+    this.cleBouton,
+    super.key,
   });
 
   final Map<String, dynamic> formule;
-  final int mois;
+
+  /// Null : pas proposée sur cette durée.
+  final String? prix;
   final bool actuelle;
-  final bool peutChoisir;
-  final VoidCallback onChoisir;
+  final String bouton;
+  final VoidCallback? onChoisir;
+  final Key? cleBouton;
 
   @override
   Widget build(BuildContext context) {
-    final tarif = (formule['tarifs'] as List? ?? const [])
-        .whereType<Map>()
-        .where((t) => t['mois'] == mois)
-        .firstOrNull;
+    final prix = this.prix;
     final max = formule['max_membres'];
     final etabs = formule['max_etablissements'];
     final inclus = [
@@ -566,12 +602,9 @@ class _CarteFormule extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (tarif != null)
+                if (prix != null)
                   Text(
-                    formatMontant(
-                      int.tryParse('${tarif['montant']}') ?? 0,
-                      '${tarif['devise'] ?? 'XOF'}',
-                    ),
+                    prix,
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -596,17 +629,12 @@ class _CarteFormule extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             ElevatedButton(
+              key: cleBouton,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(46),
               ),
-              onPressed: peutChoisir && tarif != null ? onChoisir : null,
-              child: Text(
-                tarif == null
-                    ? 'Pas proposé sur cette durée'
-                    : actuelle
-                    ? 'Renouveler'
-                    : 'Choisir ${formule['nom']}',
-              ),
+              onPressed: onChoisir,
+              child: Text(bouton),
             ),
           ],
         ),

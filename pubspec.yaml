@@ -78,6 +78,8 @@ dependencies:
   country_flags: ^4.1.2
   firebase_core: ^5.1.0
   firebase_messaging: ^17.0.1
+  # iPhone : les formules s'achètent par l'achat intégré d'Apple (StoreKit 2)
+  in_app_purchase: ^3.3.1
 
 dev_dependencies:
   flutter_test:

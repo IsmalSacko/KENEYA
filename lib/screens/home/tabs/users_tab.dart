@@ -7,8 +7,15 @@ import 'package:keneya_plus/common/whatsapp.dart';
 import 'package:keneya_plus/compte/compte_controller.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/controllers/user_controller.dart';
+import 'package:keneya_plus/core/plateforme.dart';
 import 'package:keneya_plus/models/user_model.dart';
 import 'package:provider/provider.dart';
+
+/// Le lien de l'application dans l'invitation : celui de l'App Store depuis
+/// un iPhone (Apple n'y veut pas d'autre boutique), du Play Store ailleurs.
+String get _lienApplication => achatsInterdits
+    ? 'https://apps.apple.com/app/id6829558069'
+    : 'https://play.google.com/store/apps/details?id=com.ismaeldev.keneya';
 
 class UsersTab extends StatefulWidget {
   const UsersTab({super.key, required this.userCtrl});
@@ -86,7 +93,7 @@ class _UsersTabState extends State<UsersTab> {
     final message =
         'Bonjour $nom, vous faites partie de l’équipe de $etab sur Ngoni Santé '
         '(${AppRoles.labelOf(_roleAjoute ?? _role)}).\n'
-        'Installez l’application : https://play.google.com/store/apps/details?id=com.ismaeldev.keneya\n'
+        'Installez l’application : $_lienApplication\n'
         'Connectez-vous avec votre numéro $telephone et le PIN $pin '
         '(si vous aviez déjà Ngoni Santé, gardez votre PIN habituel).';
     await showDialog<void>(

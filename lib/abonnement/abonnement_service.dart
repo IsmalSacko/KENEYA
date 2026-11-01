@@ -7,6 +7,7 @@ const libellesMoyensAbonnement = {
   'wave': 'Wave',
   'especes': 'Espèces',
   'virement': 'Virement',
+  'apple_app_store': 'App Store',
 };
 
 /// Ce que la formule ouvre en plus des modules.
@@ -44,4 +45,17 @@ class AbonnementService {
 
   Future<void> annuler(String uuid) =>
       ApiClient.dio.delete('/abonnement/demandes/$uuid');
+
+  /// Un achat intégré Apple (transaction signée par Apple, StoreKit 2) : le
+  /// serveur la vérifie et accorde la formule. Renvoie le nouvel état, comme
+  /// [etat].
+  Future<Map<String, dynamic>> validerAchatApple(
+    String transactionSignee,
+  ) async {
+    final res = await ApiClient.dio.post(
+      '/abonnement/apple',
+      data: {'signed_transaction': transactionSignee},
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
 }

@@ -9,9 +9,21 @@ class LocalNotificationService {
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    // Sur Linux, le module refuse de démarrer sans ses réglages.
+    // Sur Linux, iPhone et Mac, le module refuse de démarrer sans ses réglages
+    // (l'app restait sur l'écran de lancement). Aucune autorisation demandée
+    // au lancement : les notifications viennent de Firebase, Android seulement.
     const linux = LinuxInitializationSettings(defaultActionName: 'Ouvrir');
-    const settings = InitializationSettings(android: android, linux: linux);
+    const darwin = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const settings = InitializationSettings(
+      android: android,
+      iOS: darwin,
+      macOS: darwin,
+      linux: linux,
+    );
     await _plugin.initialize(settings);
     // Le canal des notifications envoyées par Ngoni Santé (Firebase).
     await _plugin

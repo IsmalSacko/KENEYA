@@ -2,10 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<!-- Seulement le chiffrement du système (HTTPS) : rien à déclarer à l'export. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>La position sert à afficher l'itinéraire vers les établissements de santé.</string>
+		<!-- Demandée par l'extension de localisation ; Ngoni Santé ne suit jamais la position en arrière-plan. -->
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Ngoni Santé n'utilise votre position que lorsque l'application est ouverte, pour l'itinéraire vers les établissements de santé.</string>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleLocalizations</key>
+		<array>
+			<string>fr</string>
+		</array>
 		<key>CFBundleDisplayName</key>
 		<string>Ngoni Santé</string>
 		<key>CFBundleExecutable</key>
@@ -26,6 +36,33 @@
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<!-- Appeler un établissement depuis sa fiche (« tel: »). -->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>tel</string>
+		</array>
+		<!-- Cycle de vie par scène (UIScene), exigé par Apple avec les SDK récents. -->
+		<key>UIApplicationSceneManifest</key>
+		<dict>
+			<key>UIApplicationSupportsMultipleScenes</key>
+			<false/>
+			<key>UISceneConfigurations</key>
+			<dict>
+				<key>UIWindowSceneSessionRoleApplication</key>
+				<array>
+					<dict>
+						<key>UISceneClassName</key>
+						<string>UIWindowScene</string>
+						<key>UISceneConfigurationName</key>
+						<string>flutter</string>
+						<key>UISceneDelegateClassName</key>
+						<string>FlutterSceneDelegate</string>
+						<key>UISceneStoryboardFile</key>
+						<string>Main</string>
+					</dict>
+				</array>
+			</dict>
+		</dict>
 		<key>UILaunchStoryboardName</key>
 		<string>LaunchScreen</string>
 		<key>UIMainStoryboardFile</key>
@@ -51,15 +88,18 @@
 		<true/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
-		<!-- Autorise les appels HTTP en clair vers le back Docker en dev (ATS) -->
+		<!-- L'API de production est en HTTPS. En développement, le back Docker
+		     en HTTP clair (localhost, adresse du réseau local) reste joignable. -->
 		<key>NSAppTransportSecurity</key>
 		<dict>
-			<key>NSAllowsArbitraryLoads</key>
+			<key>NSAllowsLocalNetworking</key>
 			<true/>
 		</dict>
 		<key>NSCameraUsageDescription</key>
-		<string>Pour scanner les QR codes : arrivée à un rendez-vous, ordonnance, appairage d'un écran.</string>
+		<string>Ngoni Santé utilise l'appareil photo pour scanner les QR codes : arrivée à un rendez-vous, ordonnance, appairage d'un écran.</string>
 		<key>NSBluetoothAlwaysUsageDescription</key>
-		<string>Pour imprimer les tickets de file d'attente sur une imprimante Bluetooth.</string>
+		<string>Ngoni Santé utilise le Bluetooth pour imprimer les tickets de file d'attente sur une imprimante thermique.</string>
+		<key>NSBluetoothPeripheralUsageDescription</key>
+		<string>Ngoni Santé utilise le Bluetooth pour imprimer les tickets de file d'attente sur une imprimante thermique.</string>
 	</dict>
 </plist>
