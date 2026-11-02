@@ -44,7 +44,8 @@ import 'package:provider/provider.dart';
 /// iPhone, et l'écran d'achat Apple pour la vérification des abonnements :
 ///          `flutter test tool/captures_store.dart --dart-define=APPLE=true`
 ///          (`--dart-define=SORTIE=dossier`, défaut `store/iphone-6.7/`)
-/// Sortie  : `1.png` à `5.png` dans l'ordre d'affichage, et `achat.png`, en
+/// Sortie  : `1.png` à `5.png` dans l'ordre d'affichage, `achat.png`, et
+///           `ipad1.png` à `ipad5.png` (iPad 13 pouces, 2048 × 2732), en
 ///           RGBA : les aplatir en RGB avant l'envoi à Apple.
 ///
 /// Ce n'est pas un test : c'est un outil, hébergé ici parce que seul le
@@ -61,6 +62,9 @@ const _tablette10 = _Format('tablette-10', 1440, 2560, 1.6);
 
 /// iPhone 6,7 pouces : île dynamique en haut, barre d'accueil en bas.
 const _iphone = _Format('iphone-6.7', 1290, 2796, 3.0, haut: 59, bas: 34);
+
+/// iPad 13 pouces, en portrait : la mise en page tablette (rail à gauche).
+const _ipad = _Format('ipad-13', 2048, 2732, 2.0, haut: 24, bas: 20);
 const _apple = bool.fromEnvironment('APPLE');
 const _sortieApple = String.fromEnvironment('SORTIE', defaultValue: 'store/iphone-6.7');
 
@@ -131,14 +135,17 @@ void main() {
     final debordements = <String>{};
 
     try {
-      for (final (i, ecran) in _ecransApple.indexed) {
-        await _rendre(
-          tester,
-          chemin: '$_sortieApple/${i + 1}.png',
-          format: _iphone,
-          enfant: _Demonstration(format: _iphone, ecran: ecran),
-          debordements: debordements,
-        );
+      // iPhone : 1.png…5.png ; iPad : ipad1.png…ipad5.png.
+      for (final (prefixe, format) in [('', _iphone), ('ipad', _ipad)]) {
+        for (final (i, ecran) in _ecransApple.indexed) {
+          await _rendre(
+            tester,
+            chemin: '$_sortieApple/$prefixe${i + 1}.png',
+            format: format,
+            enfant: _Demonstration(format: format, ecran: ecran),
+            debordements: debordements,
+          );
+        }
       }
       // L'écran d'achat, avec les prix d'une boutique Apple de démonstration.
       await _rendre(
