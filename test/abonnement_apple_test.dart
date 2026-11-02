@@ -24,13 +24,17 @@ Map<String, dynamic> _tarif(int mois, int montant, String? apple) => {
 
 /// La réponse de GET /abonnement : un essai, trois formules, de quoi payer
 /// par Orange Money et WhatsApp, un paiement dans l'historique.
-Map<String, dynamic> _etat({String formule = 'essai', bool enCours = true}) => {
+Map<String, dynamic> _etat({
+  String formule = 'essai',
+  bool enCours = true,
+  String? fin = '2026-11-16',
+}) => {
   'abonnement': {
     'formule': formule,
     'formule_nom': formule == 'essai' ? 'Essai gratuit' : 'Pro',
     'essai': formule == 'essai',
     'en_cours': enCours,
-    'fin': '2026-11-16',
+    'fin': fin,
     'jours_restants': 14,
     'membres': 2,
     'max_membres': null,
@@ -107,7 +111,10 @@ Map<String, dynamic> _etat({String formule = 'essai', bool enCours = true}) => {
 };
 
 class _Service extends AbonnementService {
-  _Service({this.refus});
+  _Service({this.refus, this.sansEcheance = false});
+
+  /// Formule Hôpital accordée sans échéance par Ngoni Santé.
+  final bool sansEcheance;
 
   /// Le serveur refuse l'achat (422), ou il est injoignable.
   DioException? refus;
@@ -115,8 +122,9 @@ class _Service extends AbonnementService {
   var abonne = false;
 
   @override
-  Future<Map<String, dynamic>> etat() async =>
-      _etat(formule: abonne ? 'pro' : 'essai');
+  Future<Map<String, dynamic>> etat() async => sansEcheance
+      ? _etat(formule: 'hopital', fin: null)
+      : _etat(formule: abonne ? 'pro' : 'essai');
 
   @override
   Future<Map<String, dynamic>> validerAchatApple(String jws) async {
@@ -369,6 +377,38 @@ void main() {
         await tester.pumpAndSettle();
         expect(service.transactions, ['jws-2', 'jws-3']);
         expect(apple.termines.last, 'ngonisante.essentiel.mensuel');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
+  testWidgets(
+    'iPhone : un abonnement sans échéance ne propose ni achat ni « Restaurer »',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        final service = _Service(sansEcheance: true);
+        final apple = _BoutiqueApple();
+        await _monter(tester, service: service, apple: apple, hauteur: 9000);
+
+        expect(find.text('Sans échéance.'), findsOneWidget);
+        expect(
+          find.byKey(const Key('abonnement-sans-echeance')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'Votre abonnement est sans échéance : vous n’avez rien à payer.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('acheter-apple-pro')), findsNothing);
+        expect(find.byKey(const Key('acheter-apple-essentiel')), findsNothing);
+        expect(find.text('S’abonner'), findsNothing);
+        expect(find.text('Restaurer mes achats'), findsNothing);
+        expect(apple.achetes, isEmpty);
+        expect(apple.restaurations, isEmpty);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

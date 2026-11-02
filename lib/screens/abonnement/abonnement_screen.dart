@@ -270,6 +270,9 @@ class _AbonnementScreenState extends State<AbonnementScreen> {
                       actuelle: _etat['en_cours'] != false
                           ? _etat['formule'] as String?
                           : null,
+                      // Accordé sans échéance : le serveur refuserait l'achat.
+                      sansEcheance:
+                          _etat['formule'] != null && _etat['fin'] == null,
                       onAbonne: _charger,
                     ),
                   if (!achatsInterdits) ..._offres(),

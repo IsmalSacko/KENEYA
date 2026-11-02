@@ -23,6 +23,7 @@ class OffresApple extends StatefulWidget {
     required this.compte,
     required this.actuelle,
     required this.onAbonne,
+    this.sansEcheance = false,
     super.key,
   });
 
@@ -37,6 +38,10 @@ class OffresApple extends StatefulWidget {
 
   /// Un achat validé : l'écran relit l'état.
   final Future<void> Function() onAbonne;
+
+  /// L'abonnement en cours est sans échéance (accordé par Ngoni Santé) : le
+  /// serveur refuserait tout achat, qu'Apple aurait pourtant encaissé.
+  final bool sansEcheance;
 
   @override
   State<OffresApple> createState() => _OffresAppleState();
@@ -122,6 +127,17 @@ class _OffresAppleState extends State<OffresApple> {
 
   @override
   Widget build(BuildContext context) {
+    // Rien à vendre : ni achat, ni « Restaurer », le client paierait pour rien.
+    if (widget.sansEcheance) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 16),
+        child: Text(
+          'Votre abonnement est sans échéance : vous n’avez rien à payer.',
+          key: Key('abonnement-sans-echeance'),
+          style: TextStyle(color: Kolors.kTextMuted),
+        ),
+      );
+    }
     final compte = widget.compte;
     return FutureBuilder<Map<String, ProduitApple>>(
       future: _produits,
