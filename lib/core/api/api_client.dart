@@ -4,28 +4,47 @@ import 'package:dio/dio.dart';
 
 import '../constants/api_constants.dart';
 import '../storage/token_storage.dart';
+import 'renouvellement_jeton.dart';
 
 class ApiClient {
-  static final Dio dio =
-      Dio(
-          BaseOptions(
-            baseUrl: ApiConstants.baseUrl,
-            connectTimeout: const Duration(seconds: 10),
-            receiveTimeout: const Duration(seconds: 20),
-            headers: {'Accept': 'application/json'},
-          ),
-        )
-        ..interceptors.add(
-          InterceptorsWrapper(
-            onRequest: (options, handler) async {
-              final token = await TokenStorage.getToken();
-              if (token != null && token.isNotEmpty) {
-                options.headers['Authorization'] = 'Bearer $token';
-              }
-              handler.next(options);
-            },
-          ),
-        );
+  /// Le jeton de l'espace pro ne peut plus être renouvelé : la session se
+  /// ferme (branché par l'application sur [AuthController.sessionExpiree]).
+  static void Function()? surSessionExpiree;
+
+  static final Dio dio = _creer();
+
+  static Dio _creer() {
+    final dio =
+        Dio(
+            BaseOptions(
+              baseUrl: ApiConstants.baseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 20),
+              headers: {'Accept': 'application/json'},
+            ),
+          )
+          ..interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (options, handler) async {
+                final token = await TokenStorage.getToken();
+                if (token != null && token.isNotEmpty) {
+                  options.headers['Authorization'] = 'Bearer $token';
+                }
+                handler.next(options);
+              },
+            ),
+          );
+    return dio
+      ..interceptors.add(
+        RenouvellementJeton(
+          dio: dio,
+          chemin: '/refresh',
+          lire: TokenStorage.getToken,
+          ecrire: TokenStorage.saveToken,
+          surExpiration: () => surSessionExpiree?.call(),
+        ),
+      );
+  }
 
   static bool isNetworkError(DioException e) {
     return e.type == DioExceptionType.connectionError ||

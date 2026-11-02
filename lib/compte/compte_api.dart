@@ -1,32 +1,48 @@
 import 'package:dio/dio.dart';
 
 import '../core/api/api_client.dart';
+import '../core/api/renouvellement_jeton.dart';
 import '../core/constants/api_constants.dart';
 import '../core/storage/token_storage.dart';
 
 /// Appels du compte Ngoni Santé (`/compte`, `/pays`, `/profils`). Ils portent
 /// le jeton de la personne, jamais celui du membre.
 class CompteApi {
-  static final Dio _dio =
-      Dio(
-          BaseOptions(
-            baseUrl: ApiConstants.baseUrl,
-            connectTimeout: const Duration(seconds: 10),
-            receiveTimeout: const Duration(seconds: 20),
-            headers: {'Accept': 'application/json'},
-          ),
-        )
-        ..interceptors.add(
-          InterceptorsWrapper(
-            onRequest: (options, handler) async {
-              final token = await TokenStorage.getPersonneToken();
-              if (token != null && token.isNotEmpty) {
-                options.headers['Authorization'] = 'Bearer $token';
-              }
-              handler.next(options);
-            },
-          ),
-        );
+  static final Dio _dio = _creer();
+
+  static Dio _creer() {
+    final dio =
+        Dio(
+            BaseOptions(
+              baseUrl: ApiConstants.baseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 20),
+              headers: {'Accept': 'application/json'},
+            ),
+          )
+          ..interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (options, handler) async {
+                final token = await TokenStorage.getPersonneToken();
+                if (token != null && token.isNotEmpty) {
+                  options.headers['Authorization'] = 'Bearer $token';
+                }
+                handler.next(options);
+              },
+            ),
+          );
+    // Jeton de la personne expiré : renouvelé ; trop vieux, `rafraichir`
+    // le constate (401) et demande de se reconnecter.
+    return dio
+      ..interceptors.add(
+        RenouvellementJeton(
+          dio: dio,
+          chemin: '/compte/refresh',
+          lire: TokenStorage.getPersonneToken,
+          ecrire: TokenStorage.savePersonneToken,
+        ),
+      );
+  }
 
   static bool estHorsLigne(DioException e) => ApiClient.isNetworkError(e);
 

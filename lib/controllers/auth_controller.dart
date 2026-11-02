@@ -192,19 +192,31 @@ class AuthController extends ChangeNotifier {
     } catch (_) {
       // Ignore API logout errors and clear local session.
     } finally {
-      await TokenStorage.clearToken();
-      await LocalStore.remove(_offlineProfileKey);
-      await LocalStore.remove(_tokenMembreKey);
-      await LocalStore.remove(_contexteKey);
-      permissions = [];
-      modules = [];
-      profil = null;
-      accessToken = null;
-      currentUser = null;
-      offlineProvisionalSession = false;
-      loading = false;
-      notifyListeners();
+      await _effacerSessionLocale();
     }
+  }
+
+  /// Le jeton de l'espace pro est trop vieux pour être renouvelé (voir
+  /// RenouvellementJeton) : la session se ferme ici, sans appel au serveur
+  /// (qui refuserait, et relancerait un renouvellement).
+  Future<void> sessionExpiree() async {
+    if (!isAuthenticated) return;
+    await _effacerSessionLocale();
+  }
+
+  Future<void> _effacerSessionLocale() async {
+    await TokenStorage.clearToken();
+    await LocalStore.remove(_offlineProfileKey);
+    await LocalStore.remove(_tokenMembreKey);
+    await LocalStore.remove(_contexteKey);
+    permissions = [];
+    modules = [];
+    profil = null;
+    accessToken = null;
+    currentUser = null;
+    offlineProvisionalSession = false;
+    loading = false;
+    notifyListeners();
   }
 
   Future<bool> updateProfile({

@@ -27,6 +27,7 @@ import 'controllers/user_controller.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth_gateway_screen.dart';
 import 'screens/compte/ma_sante_screen.dart';
+import 'core/api/api_client.dart';
 import 'common/widgets/tout_selectionnable.dart';
 import 'screens/onboarding_screen.dart';
 import 'core/push/notifications_push.dart';
@@ -63,6 +64,25 @@ CompteController _compteApresAuth(AuthController auth) {
   return compte;
 }
 
+/// Messages de l'app hors d'un écran précis (session expirée…).
+final messagerApp = GlobalKey<ScaffoldMessengerState>();
+
+/// La session pro ne peut plus être renouvelée : elle se ferme, l'app revient
+/// à « Ma santé » ou à la connexion, et le dit.
+AuthController _authAvecExpiration() {
+  final auth = AuthController();
+  ApiClient.surSessionExpiree = () async {
+    if (!auth.isAuthenticated) return;
+    await auth.sessionExpiree();
+    messagerApp.currentState?.showSnackBar(
+      const SnackBar(
+        content: Text('Votre session a expiré : reconnectez-vous.'),
+      ),
+    );
+  };
+  return auth;
+}
+
 class KeneyaPlusApp extends StatelessWidget {
   const KeneyaPlusApp({super.key});
 
@@ -70,7 +90,9 @@ class KeneyaPlusApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AuthController>(create: (_) => AuthController()),
+        ChangeNotifierProvider<AuthController>(
+          create: (_) => _authAvecExpiration(),
+        ),
         ChangeNotifierProvider<MesTicketsController>(
           create: (_) => MesTicketsController(),
         ),
@@ -108,6 +130,7 @@ class KeneyaPlusApp extends StatelessWidget {
         builder: (context, child) {
           return MaterialApp(
             title: 'Ngoni Santé',
+            scaffoldMessengerKey: messagerApp,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             localizationsDelegates: const [
