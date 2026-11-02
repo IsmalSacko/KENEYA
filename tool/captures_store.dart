@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +11,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:keneya_plus/abonnement/abonnement_service.dart';
+import 'package:keneya_plus/abonnement/achats_apple_controller.dart';
+import 'package:keneya_plus/abonnement/boutique_apple.dart';
 import 'package:keneya_plus/common/utils/app_theme.dart';
+import 'package:keneya_plus/compte/compte_controller.dart';
 import 'package:keneya_plus/controllers/auth_controller.dart';
 import 'package:keneya_plus/core/api/api_client.dart';
 import 'package:keneya_plus/core/offline/local_store.dart';
@@ -18,6 +23,7 @@ import 'package:keneya_plus/labo/labo_models.dart';
 import 'package:keneya_plus/maternite/maternite_models.dart';
 import 'package:keneya_plus/models/user_model.dart';
 import 'package:keneya_plus/patients/patients_service.dart';
+import 'package:keneya_plus/screens/abonnement/abonnement_screen.dart';
 import 'package:keneya_plus/screens/dossier/dossier_screen.dart';
 import 'package:keneya_plus/screens/home/tabs/aujourdhui_tab.dart';
 import 'package:keneya_plus/screens/hospitalisation/sejour_screen.dart';
@@ -34,6 +40,13 @@ import 'package:provider/provider.dart';
 ///          `flutter test tool/captures_store.dart`
 /// Sortie  : `store/telephone/`, `store/tablette-7/`, `store/tablette-10/`
 ///
+/// App Store (iPhone 6,7 pouces, 1290 × 2796) : les écrans tels que sur
+/// iPhone, et l'écran d'achat Apple pour la vérification des abonnements :
+///          `flutter test tool/captures_store.dart --dart-define=APPLE=true`
+///          (`--dart-define=SORTIE=dossier`, défaut `store/iphone-6.7/`)
+/// Sortie  : `1.png` à `5.png` dans l'ordre d'affichage, et `achat.png`, en
+///           RGBA : les aplatir en RGB avant l'envoi à Apple.
+///
 /// Ce n'est pas un test : c'est un outil, hébergé ici parce que seul le
 /// harnais de test sait transformer un widget en PNG. Les captures sortent
 /// des vrais écrans, avec le vrai thème, nourris par une fausse API (un
@@ -46,13 +59,22 @@ const _tablette7 = _Format('tablette-7', 1080, 1920, 2.0);
 // agrandi.
 const _tablette10 = _Format('tablette-10', 1440, 2560, 1.6);
 
+/// iPhone 6,7 pouces : île dynamique en haut, barre d'accueil en bas.
+const _iphone = _Format('iphone-6.7', 1290, 2796, 3.0, haut: 59, bas: 34);
+const _apple = bool.fromEnvironment('APPLE');
+const _sortieApple = String.fromEnvironment('SORTIE', defaultValue: 'store/iphone-6.7');
+
 class _Format {
-  const _Format(this.dossier, this.largeur, this.hauteur, this.densite);
+  const _Format(this.dossier, this.largeur, this.hauteur, this.densite, {this.haut = 28, this.bas = 0});
 
   final String dossier;
   final int largeur;
   final int hauteur;
   final double densite;
+
+  /// Barre d'état et bas de l'écran réservés par le système, en points.
+  final double haut;
+  final double bas;
 
   bool get large => largeur / densite >= 700;
 }
@@ -81,6 +103,16 @@ final _ecrans = <_Ecran>[
   _Ecran('7-hospitalisation', () => SejourScreen(sejour: _sejourDemo)),
 ];
 
+/// App Store : cinq écrans, sans aucun montant (Apple veut voir l'app, pas
+/// des prix en francs qui ressembleraient à un autre moyen de payer).
+final _ecransApple = <_Ecran>[
+  _ecrans[1], // les patients
+  _ecrans[3], // la consultation
+  _ecrans[4], // le laboratoire
+  _ecrans[5], // la maternité
+  _ecrans[6], // l'hospitalisation
+];
+
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -92,6 +124,41 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
     ApiClient.dio.httpClientAdapter = _FausseApi();
   });
+
+  testWidgets('écrit les captures de l’App Store (iPhone 6,7 pouces)', (tester) async {
+    debugDisableShadows = false;
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final debordements = <String>{};
+
+    try {
+      for (final (i, ecran) in _ecransApple.indexed) {
+        await _rendre(
+          tester,
+          chemin: '$_sortieApple/${i + 1}.png',
+          format: _iphone,
+          enfant: _Demonstration(format: _iphone, ecran: ecran),
+          debordements: debordements,
+        );
+      }
+      // L'écran d'achat, avec les prix d'une boutique Apple de démonstration.
+      await _rendre(
+        tester,
+        chemin: '$_sortieApple/achat.png',
+        format: _iphone,
+        enfant: _Demonstration(
+          format: _iphone,
+          ecran: _Ecran('achat', () => AbonnementScreen(service: _AbonnementDemo())),
+        ),
+        debordements: debordements,
+      );
+    } finally {
+      debugDisableShadows = true;
+      debugDefaultTargetPlatformOverride = null;
+    }
+    for (final d in debordements) {
+      debugPrint('⚠ $d');
+    }
+  }, skip: !_apple);
 
   testWidgets('écrit les captures de la fiche Play', (tester) async {
     debugDisableShadows = false;
@@ -115,7 +182,7 @@ void main() {
     for (final d in debordements) {
       debugPrint('⚠ $d');
     }
-  });
+  }, skip: _apple);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,8 +197,15 @@ class _Demonstration extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<AuthController>.value(
-      value: _session(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthController>.value(value: _session()),
+        ChangeNotifierProvider<CompteController>(create: (_) => CompteController()),
+        // L'écran d'achat (App Store) : une boutique Apple de démonstration.
+        ChangeNotifierProvider<AchatsAppleController>(
+          create: (_) => AchatsAppleController(boutique: _BoutiqueAppleDemo(), service: _AbonnementDemo()),
+        ),
+      ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
@@ -447,6 +521,72 @@ Object? _reponse(String methode, String chemin) {
   };
 }
 
+/// L'abonnement du CSCom de démonstration : un essai, trois formules vendues
+/// sur l'App Store au mois et à l'année.
+class _AbonnementDemo extends AbonnementService {
+  static Map<String, dynamic> _tarif(int mois, int montant, String apple) =>
+      {'mois': mois, 'montant': montant, 'devise': 'XOF', 'apple_produit': apple};
+
+  @override
+  Future<Map<String, dynamic>> etat() async => {
+    'abonnement': {'formule': 'essai', 'formule_nom': 'Essai gratuit', 'essai': true, 'en_cours': true, 'fin': _jour(9), 'jours_restants': 9, 'membres': 6, 'max_membres': null},
+    'formules': [
+      {
+        'code': 'essentiel', 'nom': 'Essentiel', 'description': 'Cabinet médical ou dentaire, dépôt de médicaments.',
+        'modules': ['file', 'rdv', 'consultation', 'caisse', 'pharmacie'], 'fonctions': <String>[], 'max_membres': 5, 'max_etablissements': 2,
+        'tarifs': [_tarif(1, 5000, 'ngonisante.essentiel.mensuel'), _tarif(12, 50000, 'ngonisante.essentiel.annuel')],
+      },
+      {
+        'code': 'pro', 'nom': 'Pro', 'description': 'Centre de santé, maternité, laboratoire, pharmacie.',
+        'modules': ['file', 'rdv', 'consultation', 'caisse', 'pharmacie', 'labo', 'maternite'], 'fonctions': ['ecrans', 'rapport'], 'max_membres': 15, 'max_etablissements': 3,
+        'tarifs': [_tarif(1, 15000, 'ngonisante.pro.mensuel'), _tarif(12, 150000, 'ngonisante.pro.annuel')],
+      },
+      {
+        'code': 'hopital', 'nom': 'Hôpital', 'description': 'Clinique, hôpital : tout, sans limite d’équipe.',
+        'modules': ['file', 'rdv', 'consultation', 'caisse', 'pharmacie', 'labo', 'maternite', 'hospitalisation', 'badges', 'assurances'],
+        'fonctions': ['ecrans', 'rapport'], 'max_membres': null, 'max_etablissements': 10,
+        'tarifs': [_tarif(1, 40000, 'ngonisante.hopital.mensuel'), _tarif(12, 400000, 'ngonisante.hopital.annuel')],
+      },
+    ],
+    'historique': <Object>[],
+    'apple_compte': '0b7c4f2e-5d1a-4e8b-9c3f-2a6d8e1f4b70',
+  };
+}
+
+/// Une boutique Apple de démonstration : des prix fictifs, mis en forme
+/// comme ceux d'Apple.
+class _BoutiqueAppleDemo implements BoutiqueApple {
+  static const _prix = {
+    'ngonisante.essentiel.mensuel': '9,99 \$US',
+    'ngonisante.essentiel.annuel': '99,99 \$US',
+    'ngonisante.pro.mensuel': '24,99 \$US',
+    'ngonisante.pro.annuel': '249,99 \$US',
+    'ngonisante.hopital.mensuel': '64,99 \$US',
+    'ngonisante.hopital.annuel': '649,99 \$US',
+  };
+
+  @override
+  Future<bool> disponible() async => true;
+
+  @override
+  Future<Map<String, ProduitApple>> produits(Set<String> ids) async => {
+    for (final id in ids)
+      if (_prix[id] case final prix?) id: (id: id, titre: id, prix: prix),
+  };
+
+  @override
+  Future<void> acheter(String produitId, {required String compte}) async {}
+
+  @override
+  Future<void> restaurer({required String compte}) async {}
+
+  @override
+  Stream<List<AchatApple>> get achats => const Stream.empty();
+
+  @override
+  Future<void> terminer(AchatApple achat) async {}
+}
+
 class _FausseApi implements HttpClientAdapter {
   @override
   Future<ResponseBody> fetch(
@@ -607,7 +747,7 @@ Future<void> _rendre(
   final cle = GlobalKey();
   tester.view.physicalSize = Size(format.largeur.toDouble(), format.hauteur.toDouble());
   tester.view.devicePixelRatio = format.densite;
-  tester.view.padding = FakeViewPadding(top: 28 * format.densite);
+  tester.view.padding = FakeViewPadding(top: format.haut * format.densite, bottom: format.bas * format.densite);
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(RepaintBoundary(key: cle, child: enfant));
