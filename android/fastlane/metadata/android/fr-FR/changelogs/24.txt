@@ -1,0 +1,1 @@
+Connexion : elle ne se perd plus au bout d'un jour, l'app la renouvelle toute seule. Plus de « non authentifié » en enregistrant un médicament, et la déconnexion marche toujours. « Supprimer mon compte » dans Ma santé et dans le profil pro. Corrections.
